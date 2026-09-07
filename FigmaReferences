@@ -1,3 +1,42 @@
+Basic Info
+
+1. Figma Design for Beginners — Complete Introduction
+https://help.figma.com/hc/en-us/articles/30848209492887-Course-overview-Figma-Design-for-beginners-2025
+
+This is Figma’s official beginner course and is a good starting point for anyone with little or no experience using Figma. It covers 
+the interface, shapes, text, frames, Auto Layout, components, and basic prototyping. Team members can use this as an overall introduction 
+before working on the project.
+
+2. Frames — Creating App and Website Screens
+https://help.figma.com/hc/en-us/articles/360041539473-Frames-in-Figma-Design
+
+Frames are the main containers used to create individual screens and sections of an interface. For our project, frames can represent 
+pages such as a login screen, dashboard, profile page, or mobile screen. This guide explains how to create, resize, organize, and nest frames.
+
+3. Auto Layout — Keeping Designs Organized and Responsive
+https://help.figma.com/hc/en-us/articles/360040451373-Guide-to-auto-layout
+
+Auto Layout automatically manages spacing, alignment, padding, and positioning of elements. It is especially useful for buttons, 
+menus, lists, cards, navigation bars, and responsive layouts. Using Auto Layout can make our designs easier to modify and more 
+similar to how the final application will behave.
+
+4. Components — Reusing Buttons, Cards, Inputs, and Other UI Elements
+https://help.figma.com/hc/en-us/articles/360038662654-Guide-to-components-in-Figma
+
+Components allow us to create a UI element once and reuse it throughout the project. Common examples include buttons, 
+navigation bars, form inputs, cards, and icons. This helps the team maintain consistent styling and prevents us from recreating the 
+same elements on every screen.
+
+5. Prototyping — Connecting Screens and Simulating the Application
+https://help.figma.com/hc/en-us/articles/360040314193-Guide-to-prototyping-in-Figma
+
+Figma’s prototyping tools allow us to connect different frames and simulate how a user would navigate the application. For example, 
+clicking a login button could move to the dashboard, or clicking a profile icon could open the profile page. This lets us test and 
+demonstrate user flows before implementing them in code.
+
+
+Advanced Integrations
+
 1. Figma MCP Server — AI-Assisted Design-to-Code
 https://help.figma.com/hc/en-us/articles/32132100833559-Guide-to-the-Figma-MCP-server
 
