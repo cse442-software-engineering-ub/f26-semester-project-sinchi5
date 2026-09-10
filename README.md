@@ -4,10 +4,15 @@ A single-file HTML/CSS/JS wireframe exploring the desktop and mobile layout
 for Noters: an overview dashboard, notes list, note detail with
 collaborator invites, and a course schedule view.
 
-## Run it
+## How to view it
 
-No install, no server needed — just open `index.html` directly in a
-browser (double-click it, or drag it into a browser window).
+1. On the repo page, click the green **Code** button → **Download ZIP**.
+2. Unzip the downloaded file (double-clicking it on Mac usually extracts
+   it automatically into a folder next to it).
+3. Open that folder and double-click `index.html`. It should open
+   directly in your browser and show the wireframe.
+
+No install, no server, no build step needed.
 
 ## What's implemented
 
