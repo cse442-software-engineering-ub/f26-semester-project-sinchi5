@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#11161a" />
+    <title>margin — your semester, in one place</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Main navigation">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true">m</div>
+          <div>
+            <div class="brand-name">margin<span>°</span></div>
+            <div class="brand-caption">your thinking space</div>
+          </div>
+        </div>
+
+        <div class="semester-switcher">
+          <div>
+            <span class="eyebrow">Current workspace</span>
+            <strong>Fall semester <span>↗</span></strong>
+          </div>
+          <button class="icon-button small" aria-label="Switch workspace">⌄</button>
+        </div>
+
+        <nav class="nav-stack">
+          <span class="nav-section-label">Workspace</span>
+          <button class="nav-item active" data-view="overview"><span class="nav-icon">◌</span> Overview</button>
+          <button class="nav-item" data-view="notes"><span class="nav-icon">▤</span> All notes</button>
+          <button class="nav-item" data-view="schedule"><span class="nav-icon">▦</span> Course schedule</button>
+          <button class="nav-item" data-view="shared"><span class="nav-icon">◎</span> Shared with me</button>
+
+          <span class="nav-section-label nav-section-spaced">Collections <button class="add-collection" aria-label="Add collection">+</button></span>
+          <button class="nav-item collection" data-filter="School"><span class="collection-dot green"></span> School</button>
+          <button class="nav-item collection" data-filter="Work"><span class="collection-dot orange"></span> Work</button>
+          <button class="nav-item collection" data-filter="Personal"><span class="collection-dot pink"></span> Personal</button>
+        </nav>
+
+        <div class="sidebar-bottom">
+          <div class="storage-meter">
+            <div class="storage-row"><span>Workspace status</span><span>Synced</span></div>
+            <div class="meter"><i></i></div>
+            <div class="storage-detail">Ready for your semester</div>
+          </div>
+          <div class="user-card">
+            <div class="avatar avatar-maya">OV</div>
+            <div class="user-copy"><strong>Oliver Varney</strong><span>Student account</span></div>
+            <button class="more-button" aria-label="Account menu">•••</button>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div class="breadcrumbs"><span>Fall 2024</span><b>/</b><strong id="breadcrumb-current">Overview</strong><span id="breadcrumb-note-wrap" hidden><b>/</b><strong id="breadcrumb-note"></strong></span></div>
+          <div class="topbar-actions">
+            <label class="global-search">
+              <span aria-hidden="true">⌕</span>
+              <input id="search-input" type="search" placeholder="Search notes, events, or keywords" autocomplete="off" />
+              <kbd>⌘ K</kbd>
+            </label>
+            <div class="theme-picker">
+              <button class="icon-button theme-toggle" id="theme-toggle" aria-label="Change color scheme" aria-expanded="false">◐</button>
+              <div class="theme-menu" id="theme-menu" hidden>
+                <span class="theme-menu-label">Color scheme</span>
+                <button class="theme-option active" data-theme-option="mint"><span class="theme-swatch swatch-mint"></span>Mint <span>✓</span></button>
+                <button class="theme-option" data-theme-option="apricot"><span class="theme-swatch swatch-apricot"></span>Apricot <span> </span></button>
+                <button class="theme-option" data-theme-option="ocean"><span class="theme-swatch swatch-ocean"></span>Ocean <span> </span></button>
+              </div>
+            </div>
+            <button class="icon-button notification-button" aria-label="Notifications"><span class="notification-dot"></span>♧</button>
+            <div class="avatar avatar-maya">OV</div>
+          </div>
+        </header>
+
+        <div class="content-wrap">
+          <section class="view-panel active-view" data-panel="overview">
+            <div class="welcome-row reveal reveal-1">
+              <div>
+                <div class="eyebrow accent-eyebrow"><span class="pulse-dot"></span> Tuesday, October 15, 2024</div>
+                <h1>Good morning, Oliver<span class="title-dot">.</span></h1>
+                <p class="lede">A clear view of what’s next, and room for what you’re thinking.</p>
+              </div>
+              <div class="welcome-actions">
+                <button class="button button-quiet" id="capture-note-button"><span>＋</span> Capture note</button>
+                <button class="button button-dark" id="add-event-button"><span>＋</span> Add event</button>
+              </div>
+            </div>
+
+            <div class="dashboard-grid reveal reveal-2">
+              <article class="syllabus-card paper-card">
+                <div class="card-orbit orbit-one"></div><div class="card-orbit orbit-two"></div>
+                <div class="card-topline"><span class="eyebrow dark-eyebrow">New this semester</span><span class="arrow-chip">↗</span></div>
+                <div class="syllabus-copy">
+                  <h2>Bring your syllabus.<br /><em>We’ll find the shape.</em></h2>
+                  <p>Upload a PDF and margin will map out weeks, assignments, exams, and all the dates in between.</p>
+                </div>
+                <div class="upload-zone" id="syllabus-dropzone" tabindex="0" role="button" aria-label="Upload a course syllabus">
+                  <input id="syllabus-input" type="file" accept=".pdf,.doc,.docx,image/*" hidden />
+                  <span class="upload-icon">↑</span><span><strong>Drop a syllabus here</strong><small>PDF, DOCX or image · up to 20 MB</small></span><span class="upload-arrow">↗</span>
+                </div>
+              </article>
+
+              <article class="focus-card dark-card">
+                <div class="card-topline"><span class="eyebrow">Your focus</span><span class="tiny-label">This week</span></div>
+                <div class="focus-title"><span class="focus-number">Next</span><span>up in your<br />schedule</span></div>
+                <div class="focus-list">
+                  <div class="focus-item"><span class="focus-marker mint"></span><div><span class="focus-course">CS 240 · tomorrow</span><strong>Binary trees lab</strong></div><span class="focus-time">9:00a</span></div>
+                  <div class="focus-item"><span class="focus-marker coral"></span><div><span class="focus-course">ART 110 · today</span><strong>Studio critique</strong></div><span class="focus-time">2:30p</span></div>
+                  <div class="focus-item"><span class="focus-marker yellow"></span><div><span class="focus-course">BIO 201 · Friday</span><strong>Quiz 04</strong></div><span class="focus-time">—</span></div>
+                </div>
+                <button class="text-button view-schedule-button" data-view-target="schedule">View full schedule <span>↗</span></button>
+              </article>
+            </div>
+
+            <div class="section-heading reveal reveal-3">
+              <div><span class="eyebrow">The rhythm of your week</span><h2>Course schedule</h2></div>
+              <div class="section-tools"><button class="week-control" id="previous-week" aria-label="Previous week">←</button><span id="week-label">Oct 14 — 20, 2024</span><button class="week-control" id="next-week" aria-label="Next week">→</button><button class="text-button view-all-schedule" data-view-target="schedule">See all <span>↗</span></button></div>
+            </div>
+
+            <div class="schedule-board reveal reveal-4" id="overview-schedule"></div>
+
+            <div class="section-heading notes-heading reveal reveal-5">
+              <div><span class="eyebrow">Keep close</span><h2>Pinned notes</h2></div>
+              <button class="text-button" data-view-target="notes">Browse notes <span>↗</span></button>
+            </div>
+            <div class="notes-grid reveal reveal-5" id="overview-notes"></div>
+          </section>
+
+          <section class="view-panel" data-panel="notes">
+            <div class="page-heading"><div><span class="eyebrow">Your thinking, collected</span><h1>All notes<span class="title-dot">.</span></h1><p class="lede">Search, sort, and keep the useful things close.</p></div><button class="button button-dark" id="capture-note-button-2">＋ Capture note</button></div>
+            <div class="notes-toolbar"><label class="notes-search"><span>⌕</span><input id="notes-search-input" type="search" placeholder="Search your notes..." /></label><div class="filter-pills"><button class="filter-pill active" data-category="All">All notes</button><button class="filter-pill" data-category="School">School</button><button class="filter-pill" data-category="Work">Work</button><button class="filter-pill" data-category="Personal">Personal</button></div><label class="sort-select"><span>Sort by</span><select id="sort-select"><option value="updated">Last modified</option><option value="created">Date created</option><option value="alpha">Alphabetical</option></select></label></div>
+            <div class="notes-list" id="all-notes-list"></div>
+          </section>
+
+          <section class="view-panel" data-panel="schedule">
+            <div class="page-heading"><div><span class="eyebrow">Dates that have a place</span><h1>Course schedule<span class="title-dot">.</span></h1><p class="lede">Your syllabi, translated into a living map of the semester.</p></div><button class="button button-dark" id="add-event-button-2">＋ Add event</button></div>
+            <div class="schedule-page-tools"><div class="week-switcher"><button class="week-tab active" data-week="08">Current week</button><button class="week-tab" data-week="09">Next week</button><button class="week-tab" data-week="10">Following week</button><button class="week-tab" data-week="all">All upcoming</button></div><button class="text-button" id="upload-syllabus-button">↑ Upload another syllabus</button></div>
+            <div class="full-schedule" id="full-schedule"></div>
+          </section>
+
+          <section class="view-panel" data-panel="shared">
+            <div class="page-heading"><div><span class="eyebrow">Study, together</span><h1>Shared with me<span class="title-dot">.</span></h1><p class="lede">Notes and ideas your people have opened up.</p></div><button class="button button-dark" id="invite-button">＋ Invite someone</button></div>
+            <div class="shared-summary"><div class="shared-stat"><span class="stat-number">✦</span><span>Active collaborations</span></div><div class="shared-stat"><span class="stat-number">◌</span><span>Comments this week</span></div><div class="shared-stat"><span class="stat-number">↗</span><span>Awaiting your review</span></div></div>
+            <div class="shared-list" id="shared-list"></div>
+          </section>
+
+          <section class="view-panel" data-panel="note-detail">
+            <div class="note-page-top"><button class="text-button" id="back-to-notes">← All notes</button><span class="eyebrow">A note in your workspace</span><button class="button button-quiet note-edit-toggle" id="note-page-edit-toggle">Edit note</button></div>
+            <div class="note-page-grid">
+              <article class="note-page-content">
+                <div class="note-page-category" id="note-page-category"></div>
+                <h1 id="note-page-title"></h1>
+                <div class="markdown-content" id="note-page-rendered"></div>
+                <div class="note-editor" id="note-page-editor" hidden>
+                  <div class="markdown-toolbar" id="note-markdown-toolbar" role="toolbar" aria-label="Markdown formatting tools">
+                    <button type="button" data-markdown-action="heading" title="Add a heading">H</button>
+                    <button type="button" data-markdown-action="bold" title="Bold selected text"><strong>B</strong></button>
+                    <button type="button" data-markdown-action="italic" title="Italicize selected text"><em>I</em></button>
+                    <button type="button" data-markdown-action="bullet" title="Add a bullet list">•</button>
+                    <button type="button" data-markdown-action="checklist" title="Add a checklist item">☑</button>
+                    <button type="button" data-markdown-action="quote" title="Add a quote">“</button>
+                    <button type="button" data-markdown-action="code" title="Add inline code">&lt;/&gt;</button>
+                    <span class="toolbar-spacer"></span>
+                    <button type="button" class="markdown-preview-toggle" id="note-markdown-preview">Preview</button>
+                  </div>
+                  <textarea id="note-markdown-input" aria-label="Markdown note editor" spellcheck="true"></textarea>
+                  <div class="markdown-helper"><span>Markdown supported</span><span># heading · - bullet · - [ ] task · **bold**</span></div>
+                </div>
+                <div class="note-page-divider"></div>
+                <div class="note-page-section-head"><span class="eyebrow">Checklist</span><span class="note-page-hint">Mark things off as you go</span></div>
+                <div class="page-checklist" id="note-page-checklist"></div>
+                <div class="checklist-add"><input id="note-checklist-input" type="text" placeholder="Add a checklist item..." aria-label="New checklist item" /><button id="note-checklist-add" type="button">Add</button></div>
+              </article>
+              <aside class="note-page-sidebar">
+                <section class="note-side-section"><div class="note-page-section-head"><span class="eyebrow">Collaborators</span><button class="text-button" id="note-page-invite">＋ Invite</button></div><div id="note-page-collaborators"></div></section>
+                <section class="note-side-section"><div class="note-page-section-head"><span class="eyebrow">Comments</span></div><div class="page-comments" id="note-page-comments"></div><div class="page-comment-box"><input id="note-page-comment-input" placeholder="Leave a comment..." /><button id="note-page-comment-button" aria-label="Add comment">↗</button></div></section>
+              </aside>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <div class="modal-backdrop" id="modal-backdrop" aria-hidden="true">
+      <div class="modal" id="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <button class="modal-close" id="modal-close" aria-label="Close">×</button>
+        <div id="modal-content"></div>
+      </div>
+    </div>
+    <div class="toast" id="toast" role="status"><span class="toast-icon">✓</span><span id="toast-copy">Saved</span></div>
+    <input id="note-file-input" type="file" accept="image/*,.pdf" hidden />
+    <script src="app.js"></script>
+  </body>
+</html>
