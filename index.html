@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Noters — wireframe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --ink:#171b26;
+  --ink-soft:#232838;
+  --paper:#f6f5f1;
+  --surface:#ffffff;
+  --line:rgba(23,27,38,.12);
+  --line-soft:rgba(246,245,241,.14);
+  --amber:#f2b134;
+  --amber-deep:#c98a10;
+  --teal:#2f6f66;
+  --teal-soft:#dcece9;
+  --text:#242737;
+  --muted:#767c8c;
+  --danger:#c2564a;
+  --font: 'Inter', sans-serif;
+}
+*{box-sizing:border-box;}
+[hidden]{display:none!important;}
+body{margin:0;font-family:var(--font);color:var(--text);background:var(--paper);-webkit-font-smoothing:antialiased;}
+button,input,select{font:inherit;}
+button{cursor:pointer;}
+
+.shell{display:flex;min-height:100vh;}
+
+/* ---- Rail (desktop sidebar / mobile bottom nav) ---- */
+.rail{width:224px;flex:0 0 224px;background:var(--ink);color:#e7e8ee;padding:24px 14px;display:flex;flex-direction:column;}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px 28px;}
+.brand-mark{width:30px;height:30px;border-radius:7px 7px 7px 2px;background:var(--amber);color:var(--ink);display:grid;place-items:center;font-weight:800;font-size:15px;}
+.brand-name{font-weight:700;font-size:17px;letter-spacing:-.4px;}
+.rail-section{color:#767e94;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin:18px 8px 8px;}
+.rail-item{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;color:#c3c7d6;border-radius:8px;padding:10px 10px;font-size:13.5px;font-weight:500;text-align:left;}
+.rail-item:hover{background:rgba(255,255,255,.06);color:#fff;}
+.rail-item.active{background:var(--amber);color:var(--ink);font-weight:700;}
+.rail-icon{width:18px;text-align:center;font-size:15px;}
+.rail-bottom{margin-top:auto;border-top:1px solid var(--line-soft);padding-top:14px;}
+.rail-user{display:flex;align-items:center;gap:9px;padding:6px 8px;}
+.rail-avatar{width:28px;height:28px;border-radius:7px;background:var(--teal);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700;}
+.rail-user small{display:block;color:#8b91a3;font-size:10px;margin-top:1px;}
+
+/* ---- Main ---- */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;}
+.topbar{height:64px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px;padding:0 28px;background:var(--surface);}
+.crumb{font-size:12px;color:var(--muted);font-weight:500;flex:0 0 auto;}
+.search{flex:1;max-width:340px;display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;height:36px;padding:0 12px;color:var(--muted);background:var(--paper);}
+.search input{border:0;background:transparent;outline:0;font-size:12.5px;color:var(--text);width:100%;}
+.new-btn{margin-left:auto;background:var(--amber);color:var(--ink);border:0;border-radius:8px;padding:9px 14px;font-weight:700;font-size:12.5px;}
+.new-btn:hover{background:var(--amber-deep);}
+
+.content{padding:28px 32px 60px;max-width:1100px;width:100%;margin:0 auto;}
+.panel{display:none;}
+.panel.active{display:block;}
+
+.page-head h1{font-size:26px;font-weight:700;letter-spacing:-.6px;margin:0 0 4px;}
+.page-head p{margin:0;color:var(--muted);font-size:13px;}
+
+/* Overview */
+.upload-card{margin-top:22px;background:var(--ink);color:#fff;border-radius:14px;padding:22px 24px;display:flex;align-items:center;gap:20px;}
+.upload-card h2{font-size:19px;margin:0 0 4px;font-weight:700;}
+.upload-card p{margin:0;color:#a9adc0;font-size:12.5px;max-width:380px;}
+.upload-btn{margin-left:auto;flex:0 0 auto;background:var(--amber);color:var(--ink);border:0;border-radius:8px;padding:11px 16px;font-weight:700;font-size:12.5px;white-space:nowrap;}
+
+.section-head{display:flex;align-items:baseline;justify-content:space-between;margin:32px 0 14px;}
+.section-head h2{font-size:16px;font-weight:700;margin:0;}
+.section-head a{font-size:11.5px;color:var(--teal);font-weight:600;text-decoration:none;}
+
+.sched-row{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line);}
+.sched-row:last-child{border-bottom:0;}
+.sched-date{width:46px;flex:0 0 46px;text-align:center;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:5px 0;}
+.sched-date b{display:block;font-size:15px;}
+.sched-date span{display:block;font-size:9px;color:var(--muted);text-transform:uppercase;}
+.sched-dot{width:7px;height:7px;border-radius:50%;background:var(--teal);flex:0 0 auto;}
+.sched-row div.info{flex:1;min-width:0;}
+.sched-row strong{display:block;font-size:13px;}
+.sched-row small{display:block;color:var(--muted);font-size:11px;margin-top:2px;}
+.sched-type{font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;}
+
+.note-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.note-card{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 15px 15px;cursor:pointer;transition:transform .15s ease;}
+.note-card:hover{transform:translateY(-2px);}
+.note-tab{position:absolute;top:-1px;left:14px;width:34px;height:8px;border-radius:0 0 4px 4px;}
+.note-card h3{font-size:13.5px;font-weight:700;margin:6px 0 6px;}
+.note-card p{font-size:11px;color:var(--muted);margin:0 0 10px;line-height:1.5;}
+.note-meta{display:flex;justify-content:space-between;font-size:10px;color:#9b9fac;}
+
+/* Notes list panel */
+.toolbar{display:flex;align-items:center;gap:12px;margin:18px 0;flex-wrap:wrap;}
+.pill{border:1px solid var(--line);background:var(--surface);border-radius:7px;padding:7px 11px;font-size:11.5px;color:var(--muted);font-weight:600;}
+.pill.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+.notes-list{display:grid;gap:9px;}
+.list-note{display:flex;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:13px 15px;cursor:pointer;}
+.list-note:hover{border-color:var(--teal);}
+.list-tab{width:6px;height:32px;border-radius:4px;flex:0 0 auto;}
+.list-note h4{margin:0 0 3px;font-size:13px;font-weight:700;}
+.list-note p{margin:0;font-size:11px;color:var(--muted);}
+.list-note .meta{margin-left:auto;text-align:right;font-size:10px;color:#9b9fac;white-space:nowrap;}
+
+/* Note detail */
+.back-link{border:0;background:none;color:var(--teal);font-size:12px;font-weight:600;padding:0;margin-bottom:14px;}
+.detail-grid{display:grid;grid-template-columns:1fr 260px;gap:40px;}
+.detail-main h1{font-size:26px;margin:4px 0 16px;letter-spacing:-.6px;}
+.detail-cat{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+.detail-body{font-size:14px;line-height:1.75;color:#3c3f4d;}
+.side-block{border-top:1px solid var(--line);padding-top:14px;margin-top:22px;}
+.side-block h3{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 10px;}
+.collab-row{display:flex;align-items:center;gap:9px;padding:7px 0;}
+.collab-avatar{width:26px;height:26px;border-radius:7px;background:var(--teal-soft);color:var(--teal);display:grid;place-items:center;font-size:10px;font-weight:700;}
+.collab-row strong{font-size:11.5px;display:block;}
+.collab-row small{font-size:9.5px;color:var(--muted);}
+.invite-btn{border:1px dashed var(--line);background:transparent;border-radius:7px;width:100%;padding:9px;font-size:11.5px;color:var(--teal);font-weight:600;margin-top:6px;}
+
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(23,27,38,.45);display:none;align-items:center;justify-content:center;z-index:20;padding:20px;}
+.modal-bg.open{display:flex;}
+.modal{width:100%;max-width:400px;background:var(--surface);border-radius:12px;padding:22px;}
+.modal h2{font-size:18px;margin:0 0 4px;}
+.modal p{font-size:12px;color:var(--muted);margin:0 0 16px;}
+.field{margin-bottom:12px;}
+.field label{display:block;font-size:10.5px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:6px;}
+.field input,.field select{width:100%;border:1px solid var(--line);border-radius:7px;padding:9px 10px;font-size:12.5px;}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
+.btn-quiet{border:1px solid var(--line);background:transparent;border-radius:7px;padding:9px 14px;font-size:12px;font-weight:600;}
+.btn-solid{border:0;background:var(--amber);color:var(--ink);border-radius:7px;padding:9px 14px;font-size:12px;font-weight:700;}
+
+/* Mobile nav */
+.mobile-nav{display:none;}
+
+@media (max-width: 780px){
+  .rail{display:none;}
+  .mobile-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--ink);z-index:10;border-top:1px solid var(--line-soft);}
+  .mobile-nav button{flex:1;background:none;border:0;color:#9599ab;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 0 11px;font-size:9.5px;font-weight:600;}
+  .mobile-nav button.active{color:var(--amber);}
+  .mobile-nav .rail-icon{font-size:16px;}
+  .main{padding-bottom:58px;}
+  .content{padding:20px 16px 40px;}
+  .topbar{padding:0 16px;gap:10px;}
+  .search{max-width:none;}
+  .new-btn span.label{display:none;}
+  .note-grid{grid-template-columns:1fr 1fr;}
+  .detail-grid{grid-template-columns:1fr;gap:24px;}
+  .side-block{margin-top:0;}
+}
+@media (max-width:460px){
+  .note-grid{grid-template-columns:1fr;}
+  .upload-card{flex-direction:column;align-items:flex-start;}
+  .upload-btn{margin-left:0;}
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- Desktop rail -->
+  <aside class="rail">
+    <div class="brand"><div class="brand-mark">N</div><div class="brand-name">Noters</div></div>
+    <div class="rail-section">Workspace</div>
+    <button class="rail-item active" data-view="overview"><span class="rail-icon">◆</span>Overview</button>
+    <button class="rail-item" data-view="notes"><span class="rail-icon">▤</span>Notes</button>
+    <button class="rail-item" data-view="schedule"><span class="rail-icon">▦</span>Schedule</button>
+    <button class="rail-item" data-view="shared"><span class="rail-icon">◎</span>Shared with me</button>
+    <div class="rail-bottom">
+      <div class="rail-user"><div class="rail-avatar">AS</div><div><strong style="font-size:12px;">You</strong><small>Student account</small></div></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <span class="crumb" id="crumb">Fall 2026 / Overview</span>
+      <label class="search"><span>⌕</span><input id="search-input" placeholder="Search notes, courses…" /></label>
+      <button class="new-btn" id="new-note-btn">＋ <span class="label">New note</span></button>
+    </header>
+
+    <div class="content">
+
+      <!-- OVERVIEW -->
+      <section class="panel active" data-panel="overview">
+        <div class="page-head"><h1>Good afternoon.</h1><p>Here's what's on deck for the week.</p></div>
+
+        <div class="upload-card">
+          <div>
+            <h2>Upload a syllabus</h2>
+            <p>Drop in a PDF and we'll map out assignments, exams, and due dates onto your schedule.</p>
+          </div>
+          <button class="upload-btn">Upload syllabus</button>
+        </div>
+
+        <div class="section-head"><h2>This week</h2><a data-view-target="schedule">See full schedule →</a></div>
+        <div id="overview-schedule"></div>
+
+        <div class="section-head"><h2>Pinned notes</h2><a data-view-target="notes">Browse all →</a></div>
+        <div class="note-grid" id="overview-notes"></div>
+      </section>
+
+      <!-- NOTES -->
+      <section class="panel" data-panel="notes">
+        <div class="page-head"><h1>Your notes</h1><p>Search, filter, and pick up where you left off.</p></div>
+        <div class="toolbar">
+          <button class="pill active" data-filter="All">All</button>
+          <button class="pill" data-filter="School">School</button>
+          <button class="pill" data-filter="Work">Work</button>
+          <button class="pill" data-filter="Personal">Personal</button>
+        </div>
+        <div class="notes-list" id="notes-list"></div>
+      </section>
+
+      <!-- SCHEDULE -->
+      <section class="panel" data-panel="schedule">
+        <div class="page-head"><h1>Schedule</h1><p>Everything pulled from your syllabi, plus anything you've added.</p></div>
+        <div style="margin-top:18px;" id="full-schedule"></div>
+      </section>
+
+      <!-- SHARED -->
+      <section class="panel" data-panel="shared">
+        <div class="page-head"><h1>Shared with me</h1><p>Notes your classmates have opened up to you.</p></div>
+        <div class="notes-list" id="shared-list" style="margin-top:18px;"></div>
+      </section>
+
+      <!-- NOTE DETAIL -->
+      <section class="panel" data-panel="detail">
+        <button class="back-link" id="back-btn">← All notes</button>
+        <div class="detail-grid">
+          <div class="detail-main">
+            <div class="detail-cat" id="detail-cat"></div>
+            <h1 id="detail-title"></h1>
+            <div class="detail-body" id="detail-body"></div>
+          </div>
+          <aside>
+            <div class="side-block" style="border-top:0;padding-top:0;">
+              <h3>Collaborators</h3>
+              <div id="detail-collabs"></div>
+              <button class="invite-btn" id="invite-btn">＋ Invite someone</button>
+            </div>
+            <div class="side-block">
+              <h3>Linked to</h3>
+              <div class="collab-row"><div class="collab-avatar" style="background:var(--paper);color:var(--muted);">▦</div><div><strong id="detail-course"></strong><small>Course schedule</small></div></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- Mobile bottom nav -->
+<nav class="mobile-nav">
+  <button class="active" data-view="overview"><span class="rail-icon">◆</span>Overview</button>
+  <button data-view="notes"><span class="rail-icon">▤</span>Notes</button>
+  <button data-view="schedule"><span class="rail-icon">▦</span>Schedule</button>
+  <button data-view="shared"><span class="rail-icon">◎</span>Shared</button>
+</nav>
+
+<!-- Invite modal -->
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <h2>Invite a collaborator</h2>
+    <p>Share this note with a classmate in your study group.</p>
+    <div class="field"><label>Email address</label><input placeholder="classmate@buffalo.edu" /></div>
+    <div class="field"><label>Permission</label><select><option>Can edit</option><option>Can view</option><option>Can comment</option></select></div>
+    <div class="modal-actions">
+      <button class="btn-quiet" id="modal-cancel">Cancel</button>
+      <button class="btn-solid" id="modal-send">Send invite</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const notes = [
+  {id:1,title:'Binary trees — lecture 7',category:'School',course:'CSE 250',updated:'2h ago',excerpt:'Traversal patterns and balancing.',color:'#2f6f66',pinned:true,collabs:['You','CD'],body:'A binary tree is a recursive structure: every node carries a value, a left subtree, and a right subtree.'},
+  {id:2,title:'Group project: sources',category:'School',course:'CSE 442',updated:'Yesterday',excerpt:'Shared source list for the presentation.',color:'#c98a10',pinned:true,collabs:['You','OV','SK'],body:'Shared source bank collected so far for the wetlands presentation, split by topic.'},
+  {id:3,title:'Sprint retro — Oct',category:'Work',course:'Internship',updated:'Oct 8',excerpt:'Keep the small demos going forward.',color:'#c2564a',pinned:true,collabs:['You'],body:'Keep the small demos. Make the handoff doc feel less like a handoff.'},
+  {id:4,title:'Reading list',category:'Personal',course:'Personal',updated:'Oct 4',excerpt:'Books to pick up from the library.',color:'#8a8fa3',pinned:false,collabs:['You'],body:'A running list of books to grab next time I\'m at the library.'},
+  {id:5,title:'Recitation notes — wk 3',category:'School',course:'CSE 431',updated:'Oct 2',excerpt:'Dynamic programming warm-up problems.',color:'#2f6f66',pinned:false,collabs:['You','CZ'],body:'Notes from the recitation warm-up covering memoization patterns.'},
+];
+const events = [
+  {date:'14',month:'OCT',day:'MON',course:'CSE 250',title:'Lab 5 due',type:'ASSIGNMENT',time:'11:59p'},
+  {date:'15',month:'OCT',day:'TUE',course:'CSE 442',title:'Team standup',type:'MEETING',time:'3:00p'},
+  {date:'17',month:'OCT',day:'THU',course:'CSE 431',title:'Quiz 4',type:'EXAM',time:'—'},
+];
+let activeFilter='All', activeNote=null;
+const $=(s,p=document)=>p.querySelector(s), $$=(s,p=document)=>[...p.querySelectorAll(s)];
+
+function renderSchedule(target){
+  target.innerHTML = events.map(e=>`
+    <div class="sched-row">
+      <div class="sched-date"><b>${e.date}</b><span>${e.month}</span></div>
+      <span class="sched-dot"></span>
+      <div class="info"><strong>${e.title}</strong><small>${e.course} · ${e.day}</small></div>
+      <div class="sched-type">${e.type}</div>
+      <div style="font-size:11px;color:var(--muted);margin-left:8px;">${e.time}</div>
+    </div>`).join('');
+}
+function noteCard(n){
+  return `<article class="note-card" data-id="${n.id}">
+    <div class="note-tab" style="background:${n.color}"></div>
+    <h3>${n.title}</h3><p>${n.excerpt}</p>
+    <div class="note-meta"><span>${n.course}</span><span>${n.updated}</span></div>
+  </article>`;
+}
+function listNote(n){
+  return `<article class="list-note" data-id="${n.id}">
+    <div class="list-tab" style="background:${n.color}"></div>
+    <div><h4>${n.title}</h4><p>${n.excerpt}</p></div>
+    <div class="meta">${n.course}<br>${n.updated}</div>
+  </article>`;
+}
+function renderNotesList(){
+  const filtered = notes.filter(n=>activeFilter==='All'||n.category===activeFilter);
+  $('#notes-list').innerHTML = filtered.map(listNote).join('');
+  bindNoteClicks($('#notes-list'));
+}
+function bindNoteClicks(scope){
+  $$('.note-card,.list-note',scope).forEach(el=>el.addEventListener('click',()=>openDetail(Number(el.dataset.id))));
+}
+function openDetail(id){
+  const n = notes.find(x=>x.id===id); if(!n) return;
+  activeNote=n;
+  $('#detail-cat').textContent = `${n.category} · ${n.course}`;
+  $('#detail-title').textContent = n.title;
+  $('#detail-body').textContent = n.body;
+  $('#detail-course').textContent = n.course;
+  $('#detail-collabs').innerHTML = n.collabs.map(c=>`<div class="collab-row"><div class="collab-avatar">${c==='You'?'You'.slice(0,2):c}</div><div><strong>${c}</strong><small>${c==='You'?'Owner':'Collaborator'}</small></div></div>`).join('');
+  showPanel('detail');
+}
+function showPanel(name){
+  $$('.panel').forEach(p=>p.classList.remove('active'));
+  $(`[data-panel="${name}"]`).classList.add('active');
+  $$('.rail-item, .mobile-nav button').forEach(b=>b.classList.toggle('active', b.dataset.view===name));
+  const labels={overview:'Overview',notes:'Notes',schedule:'Schedule',shared:'Shared with me',detail:'Note'};
+  $('#crumb').textContent = `Fall 2026 / ${labels[name]||''}`;
+  if(name==='notes') renderNotesList();
+  if(name==='schedule') renderSchedule($('#full-schedule'));
+}
+$$('.rail-item, .mobile-nav button').forEach(b=>b.addEventListener('click',()=>showPanel(b.dataset.view)));
+$$('[data-view-target]').forEach(b=>b.addEventListener('click',()=>showPanel(b.dataset.viewTarget)));
+$$('.pill').forEach(p=>p.addEventListener('click',()=>{activeFilter=p.dataset.filter;$$('.pill').forEach(x=>x.classList.toggle('active',x===p));renderNotesList();}));
+$('#back-btn').addEventListener('click',()=>showPanel('notes'));
+$('#invite-btn').addEventListener('click',()=>$('#modal-bg').classList.add('open'));
+$('#modal-cancel').addEventListener('click',()=>$('#modal-bg').classList.remove('open'));
+$('#modal-send').addEventListener('click',()=>$('#modal-bg').classList.remove('open'));
+$('#new-note-btn').addEventListener('click',()=>alert('Would open a blank note editor — not wired up in this wireframe.'));
+
+renderSchedule($('#overview-schedule'));
+$('#overview-notes').innerHTML = notes.filter(n=>n.pinned).map(noteCard).join('');
+bindNoteClicks($('#overview-notes'));
+$('#shared-list').innerHTML = notes.filter(n=>n.collabs.length>1).map(listNote).join('');
+bindNoteClicks($('#shared-list'));
+renderNotesList();
+</script>
+</body>
+</html>
