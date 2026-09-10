@@ -1,0 +1,7 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+devwork-ai/
+*.tsbuildinfo
+.DS_Store
