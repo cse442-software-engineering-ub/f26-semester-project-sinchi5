@@ -1,0 +1,83 @@
+Basic Info
+
+1. Figma Design for Beginners — Complete Introduction
+https://help.figma.com/hc/en-us/articles/30848209492887-Course-overview-Figma-Design-for-beginners-2025
+
+This is Figma’s official beginner course and is a good starting point for anyone with little or no experience using Figma. It covers 
+the interface, shapes, text, frames, Auto Layout, components, and basic prototyping. Team members can use this as an overall introduction 
+before working on the project.
+
+2. Frames — Creating App and Website Screens
+https://help.figma.com/hc/en-us/articles/360041539473-Frames-in-Figma-Design
+
+Frames are the main containers used to create individual screens and sections of an interface. For our project, frames can represent 
+pages such as a login screen, dashboard, profile page, or mobile screen. This guide explains how to create, resize, organize, and nest frames.
+
+3. Auto Layout — Keeping Designs Organized and Responsive
+https://help.figma.com/hc/en-us/articles/360040451373-Guide-to-auto-layout
+
+Auto Layout automatically manages spacing, alignment, padding, and positioning of elements. It is especially useful for buttons, 
+menus, lists, cards, navigation bars, and responsive layouts. Using Auto Layout can make our designs easier to modify and more 
+similar to how the final application will behave.
+
+4. Components — Reusing Buttons, Cards, Inputs, and Other UI Elements
+https://help.figma.com/hc/en-us/articles/360038662654-Guide-to-components-in-Figma
+
+Components allow us to create a UI element once and reuse it throughout the project. Common examples include buttons, 
+navigation bars, form inputs, cards, and icons. This helps the team maintain consistent styling and prevents us from recreating the 
+same elements on every screen.
+
+5. Prototyping — Connecting Screens and Simulating the Application
+https://help.figma.com/hc/en-us/articles/360040314193-Guide-to-prototyping-in-Figma
+
+Figma’s prototyping tools allow us to connect different frames and simulate how a user would navigate the application. For example, 
+clicking a login button could move to the dashboard, or clicking a profile icon could open the profile page. This lets us test and 
+demonstrate user flows before implementing them in code.
+
+
+Advanced Integrations
+
+1. Figma MCP Server — AI-Assisted Design-to-Code
+https://help.figma.com/hc/en-us/articles/32132100833559-Guide-to-the-Figma-MCP-server
+
+The Figma MCP Server connects Figma designs directly to AI coding tools such as VS Code, Cursor, Claude Code, and Codex. 
+Instead of giving an AI model only a screenshot, MCP provides structured information from the Figma file, including components, 
+layout information, variables, colors, spacing, and other design details. This could allow our team to take completed Figma 
+screens and use AI to generate an initial implementation that more closely follows the original design. It could be especially useful 
+for quickly building responsive interfaces while still allowing developers to review and improve the generated code.
+
+2. Anima — Convert Figma Designs into Frontend Code
+https://docs.animaapp.com/docs/dev-mode
+
+Anima is a Figma integration that automatically converts designs into responsive frontend code. It supports technologies such as 
+React, Vue, HTML, CSS, and Tailwind and can translate Figma Auto Layout into responsive web layouts. For our project, Anima could be
+used to quickly turn a completed wireframe or interface into an initial frontend implementation. Rather than manually recreating every 
+button, card, form, and layout from Figma, the team could generate a starting point and then modify the resulting code to match 
+our architecture and functionality requirements.
+
+3. Figma for VS Code — Developer Handoff Inside the Code Editor
+https://help.figma.com/hc/en-us/articles/15023121296151-Figma-for-VS-Code
+
+Figma for VS Code brings Figma's developer tools directly into Visual Studio Code. Developers can inspect designs, view measurements 
+and styles, access assets, read comments, examine component properties, and reference the design without constantly switching between 
+Figma and the code editor. For our project, this could make the transition from wireframes to actual implementation much easier. 
+A designer can prepare a finished screen in Figma while the developer can view the exact specifications next to the code they are writing, 
+reducing misunderstandings between the design and implementation.
+
+4. Maze + Figma — Test Our Prototype with Real Users Before Coding It
+https://help.maze.co/articles/1286349424-importing-a-figma-prototype
+
+Maze allows interactive Figma prototypes to be turned into usability tests. Users can be given tasks to complete inside the prototype, 
+allowing the team to see whether navigation, buttons, forms, and application flows are intuitive before those features are fully implemented. 
+This could be particularly useful for CSE442 because we can validate important user stories and application workflows before 
+spending significant development time coding them. If users struggle with a workflow in the prototype, we can redesign it in Figma 
+first rather than discovering the problem after implementing the feature.
+
+5. Figma REST API — Build Custom Automation Around Our Designs
+https://developers.figma.com/docs/rest-api/
+
+Figma's REST API allows developers to programmatically access information stored inside Figma files, including frames, components, styles, 
+comments, versions, images, and other design data. This opens the possibility of building our own tools around Figma rather than only using 
+existing plugins. For example, our team could create a script that checks whether every feature has both desktop and mobile wireframes, 
+verifies naming conventions, connects Figma screens to GitHub user stories, or tracks design changes between sprints. This would allow 
+Figma to become part of our software-development workflow rather than simply being a tool for drawing interfaces.
