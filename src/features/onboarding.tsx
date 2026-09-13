@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   BookOpen,
@@ -121,6 +121,9 @@ export function Onboarding() {
                   >
                     Take a look around first <ArrowRight size={15} />
                   </button>
+                  <Link className={s.textLink} to="/investor-demo">
+                    Investor proof-of-concept demo <ArrowRight size={15} />
+                  </Link>
                 </div>
               ) : (
                 <form

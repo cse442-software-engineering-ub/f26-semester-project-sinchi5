@@ -5,3 +5,4 @@ playwright-report/
 devwork-ai/
 *.tsbuildinfo
 .DS_Store
+public/api/v1/config.php

@@ -30,6 +30,7 @@ import { Schedule, EventDialog } from "../features/schedule";
 import { Notes, NoteWorkspace, CoursePage } from "../features/notes";
 import { Settings } from "../features/settings";
 import { Onboarding } from "../features/onboarding";
+import { InvestorDemo } from "../features/investorDemo";
 import { ImportDialog } from "../features/imports";
 import { BRAND, type UploadKind } from "../domain";
 import s from "./App.module.css";
@@ -57,6 +58,7 @@ export default function App() {
       setError((e as Error).message);
     }
   }
+  if (location.pathname === "/investor-demo") return <InvestorDemo />;
   if (!state.ready)
     return (
       <div className={s.boot} role="status">
