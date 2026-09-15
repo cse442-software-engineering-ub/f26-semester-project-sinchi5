@@ -133,10 +133,15 @@ export function ImportDialog({
               onChange={(e) => pick(e.target.files?.[0])}
             />
           </label>
+          <p className={s.muted}>
+            {kind === "syllabus"
+              ? "Syllabus extraction uses sample results. Review all events before saving."
+              : "Course codes and dates are detected from TXT/Markdown text and filenames. PDF, DOCX, and image contents are not read yet. You can review or add missing details before saving."}
+          </p>
           <details className={s.demoDetails}>
             <summary>Prototype preview options</summary>
             <p>
-              Extraction uses sample results. Your file stays on this device.
+              Preview processing states. Your file stays on this device.
             </p>
             <label>
               Processing result
@@ -213,7 +218,7 @@ export function ImportDialog({
               }
             />
           </label>
-          <div className={s.formRow}>
+          <div className={`${s.formRow} ${s.importMetadata}`}>
             <label>
               Course
               <select
@@ -225,6 +230,7 @@ export function ImportDialog({
                   })
                 }
               >
+                <option value="">Not detected</option>
                 {state.courses.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.code}
@@ -236,7 +242,9 @@ export function ImportDialog({
               {kind === "syllabus" ? "Review date" : "Lecture date"}
               <input
                 type="date"
-                required
+                aria-label={kind === "syllabus" ? "Review date" : "Lecture date"}
+                required={kind === "syllabus"}
+                aria-describedby={!job.metadata.lectureDate ? "import-date-missing" : undefined}
                 value={job.metadata.lectureDate}
                 onChange={(e) =>
                   setJob({
@@ -245,6 +253,7 @@ export function ImportDialog({
                   })
                 }
               />
+              {!job.metadata.lectureDate && <small id="import-date-missing">Not detected</small>}
             </label>
           </div>
           <label>

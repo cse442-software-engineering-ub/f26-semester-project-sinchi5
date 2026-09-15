@@ -16,6 +16,7 @@ import {
   dateKey,
   offsetDate,
 } from "./fixtures";
+import { detectNoteMetadata } from "./noteMetadata";
 interface Store {
   user: User | null;
   completed: boolean;
@@ -74,7 +75,7 @@ export function filterNotes(
         (!query.category || n.category === query.category) &&
         (!query.visibility || n.visibility === query.visibility) &&
         (!query.from || n.lectureDate >= query.from) &&
-        (!query.to || n.lectureDate <= query.to),
+        (!query.to || (!!n.lectureDate && n.lectureDate <= query.to)),
     )
     .sort((a, b) =>
       query.sort === "title"
@@ -268,6 +269,18 @@ export function createRepositories(
       async start(file, kind, scenario = "success") {
         const error = repo.imports.validate(file, kind);
         if (error) throw new Error(error);
+        let body: string | undefined;
+        if (kind !== "syllabus" && scenario !== "failure" && /\.(txt|md)$/i.test(file.name) && file.text) {
+          try {
+            body = await file.text();
+          } catch {
+            throw new Error("This file could not be read. Please choose it again.");
+          }
+        }
+        // Syllabus events remain the existing prototype; note metadata uses actual input.
+        const detected = kind === "syllabus"
+          ? { courseId: db.courses[0]?.id || "", lectureDate: dateKey() }
+          : detectNoteMetadata(body || "", file.name, db.courses);
         return {
           id: id(),
           kind,
@@ -275,15 +288,15 @@ export function createRepositories(
           state:
             scenario === "failure"
               ? "failed"
-              : scenario === "partial"
+              : scenario === "partial" || !detected.courseId || !detected.lectureDate
                 ? "partial"
                 : "review",
           metadata: {
             title: file.name.replace(/\.[^.]+$/, ""),
-            courseId: db.courses[0]?.id || "",
-            lectureDate: dateKey(),
+            ...detected,
             category: "School",
           },
+          body,
           events:
             kind === "syllabus"
               ? [
@@ -323,7 +336,7 @@ export function createRepositories(
         } else
           await repo.notes.create({
             ...job.metadata,
-            body: `Imported from ${job.name}.\n\nYour document is ready to organize. Add your notes here.`,
+            body: job.body ?? `Imported from ${job.name}.\n\nYour document is ready to organize. Add your notes here.`,
           });
       },
     },

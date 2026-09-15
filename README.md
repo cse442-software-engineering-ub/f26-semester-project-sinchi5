@@ -37,7 +37,30 @@ Library query parameters are `q`, `course`, `category`, `visibility`, `from`, `t
 
 ## PHP / XAMPP handoff
 
-The prototype deliberately does not perform server authentication, OCR, document parsing, file storage, or real-time collaboration. Upload files remain local and are not persisted; extraction uses deterministic sample results. The upload dialog’s **Prototype preview options** can exercise successful, partial, and failed processing. The 20 MB limit and supported extensions are enforced by the mock import repository.
+The prototype does not perform server authentication, OCR, binary document parsing, file storage, or real-time collaboration. Original upload files remain local and are not persisted. TXT/Markdown note contents and detected metadata are saved in browser localStorage after review. PDF, DOCX, and image notes use filename metadata only; syllabus event extraction still uses deterministic sample results. The upload dialog’s **Prototype preview options** can exercise successful, partial, and failed processing. The 20 MB limit and supported extensions are enforced by the import repository.
+
+### Sprint 1: automatic note organization (User Story #4)
+
+Note uploads use a small local parser in `src/services/noteMetadata.ts`, with no new dependencies or AI service. It matches existing workspace course codes case-insensitively, accepting spaces, hyphens, underscores, or joined codes (for example, `CSE 442`, `CSE-442`, and `cse442`). It stores the existing course ID so the review form, note editor, and course folders display the canonical code **CSE 442**. A `Course:` or `Course code:` header takes precedence over course references in the body. Courses that are not in the workspace are left undetected.
+
+Lecture dates are read first from `Lecture date:`/`Lecture:` headers, then `Date:` headers, then standalone date lines. Markdown heading/emphasis markers are supported. Accepted dates include `2026-09-14`, `2026/9/14`, US `9/14/2026`, `September 14, 2026`, and `14 September 2026`. A four-digit year is required; invalid calendar dates and conflicting candidates are left empty. Assignment/deadline dates in prose are not treated as lecture dates. Each field can fall back to the filename when its content metadata is absent. Stored dates use `YYYY-MM-DD`, independent of timezone; native date inputs display them according to the browser locale.
+
+Missing fields stay empty and display **Not detected**. They do not default to the first course or today's date. Students can save a partially detected note or correct either field in the existing review form/editor. Undated course notes have a **Lecture date: Not detected** folder and are excluded from date-range searches. Metadata fields stack vertically on mobile.
+
+No test note was supplied with the story; `tests/fixtures/cse442-lecture.txt` provides a reproducible example with course **CSE 442**, lecture date **September 14, 2026**, and a different assignment deadline. To try it, start the app, choose **Take a look around first**, then **Create → Upload document**, upload that fixture, review, and choose **Save to my notes**. Open `cse442-lecture` in All notes. Both fields and the note text survive a reload. For PDF/DOCX/images, a filename such as `CSE442_2026-09-14.pdf` is supported; reading those formats' contents requires a later parser/OCR implementation.
+
+Run these commands from the repository root with Node 22.12 or newer:
+
+```sh
+npm ci
+npm test
+npm run build
+npx playwright install chromium
+npx playwright test tests/note-metadata.spec.ts --project=chromium --project=mobile
+npm run dev
+```
+
+Unit/repository tests cover formats, exact course matching, date precedence, missing/invalid/conflicting metadata, partial saves, review corrections, filename-only binary imports, read failures, and persistence. Browser tests cover real upload/review/open/reload flows, missing fields, course folders, and metadata visibility/overflow at 320, 375, 768, and 1440 pixels. To run all existing browser regressions as well, install all engines with `npx playwright install chromium firefox webkit`, then run `npm run test:e2e`.
 
 Replace the repository implementations in `src/services/repositories.ts` with HTTP adapters for future `/api/v1` PHP JSON endpoints. Keep the domain interfaces as the boundary. Suggested resource groups are `/auth`, `/courses`, `/notes` (including comments and versions), `/events`, and `/imports`. Server-side validation, authorization, session handling, file scanning/storage, and actual extraction belong in that later backend milestone. Do not treat localStorage as an authentication or authorization boundary.
 

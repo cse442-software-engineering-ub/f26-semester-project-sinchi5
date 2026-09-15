@@ -126,6 +126,56 @@ describe("repository contracts", () => {
     expect(await r.schedule.lectureNotes(saved)).toHaveLength(1);
     expect((await r.courses.folders("cse442"))[dateKey()]).toHaveLength(1);
   });
+  it("extracts and persists uploaded content, course and lecture date across reloads", async () => {
+    const storage = memory();
+    const r = createRepositories(storage);
+    const text = "Course: CSE 442\nLecture date: September 14, 2026\nSprint planning notes.";
+    const job = await r.imports.start(new File([text], "Sprint planning.txt"), "document");
+    expect(job.state).toBe("review");
+    expect((await r.courses.list()).find((c) => c.id === job.metadata.courseId)?.code).toBe("CSE 442");
+    expect(job.metadata.lectureDate).toBe("2026-09-14");
+    await r.imports.confirm(job);
+    const reloaded = createRepositories(storage);
+    const [note] = await reloaded.notes.list({ q: "Sprint planning" });
+    expect(note).toMatchObject({ body: text, courseId: "cse442", lectureDate: "2026-09-14" });
+    expect((await reloaded.courses.folders("cse442"))["2026-09-14"].some((n) => n.id === note.id)).toBe(true);
+  });
+  it("saves missing fields as empty and excludes undated notes from date filters", async () => {
+    const r = createRepositories();
+    const job = await r.imports.start(new File(["No metadata here."], "Unidentified.txt"), "document");
+    expect(job.state).toBe("partial");
+    expect(job.metadata).toMatchObject({ courseId: "", lectureDate: "" });
+    await r.imports.confirm(job);
+    const [note] = await r.notes.list({ q: "Unidentified" });
+    expect(note).toMatchObject({ courseId: "", lectureDate: "" });
+    expect(await r.notes.list({ q: "Unidentified", to: "2026-09-14" })).toEqual([]);
+    expect(await r.notes.list({ q: "Unidentified", from: "2026-09-14" })).toEqual([]);
+  });
+  it("keeps independent fields and respects corrections at review", async () => {
+    const r = createRepositories();
+    const job = await r.imports.start(new File(["CSE 442"], "Course only.md"), "document");
+    expect(job.metadata).toMatchObject({ courseId: "cse442", lectureDate: "" });
+    job.metadata.lectureDate = "2026-09-15";
+    job.metadata.courseId = "cse331";
+    await r.imports.confirm(job);
+    expect((await r.notes.list({ q: "Course only" }))[0]).toMatchObject({ courseId: "cse331", lectureDate: "2026-09-15" });
+    const dated = await r.imports.start(new File(["Date: 2026-09-14"], "Date only.txt"), "document");
+    expect(dated.metadata).toMatchObject({ courseId: "", lectureDate: "2026-09-14" });
+  });
+  it("uses filenames for binary uploads and never reads them as plain text", async () => {
+    const r = createRepositories();
+    for (const extension of ["pdf", "docx", "png"]) {
+      const job = await r.imports.start({ name: `CSE442_2026-09-14.${extension}`, size: 10, text: async () => { throw Error("Do not read binary text"); } }, "document");
+      expect(job.metadata).toMatchObject({ courseId: "cse442", lectureDate: "2026-09-14" });
+    }
+    const unknown = await r.imports.start({ name: "lecture.pdf", size: 10 }, "document");
+    expect(unknown.metadata).toMatchObject({ courseId: "", lectureDate: "" });
+  });
+  it("reports text read failures without creating a note", async () => {
+    const r = createRepositories();
+    await expect(r.imports.start({ name: "lecture.txt", size: 10, text: async () => { throw Error("read failed"); } }, "document")).rejects.toThrow("could not be read");
+    expect(await r.notes.list()).toHaveLength(6);
+  });
   it("recovers corrupted storage and reports write failures", async () => {
     const r = createRepositories({
       getItem: () => "{invalid",

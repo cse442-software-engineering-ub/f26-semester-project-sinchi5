@@ -75,6 +75,7 @@ export interface UploadJob {
   state:
     "queued" | "processing" | "review" | "completed" | "partial" | "failed";
   metadata: DetectedMetadata;
+  body?: string;
   events: CourseEvent[];
 }
 export interface NoteQuery {
@@ -116,7 +117,7 @@ export interface ScheduleRepository {
 export interface ImportRepository {
   validate(file: Pick<File, "name" | "size">, kind: UploadKind): string | null;
   start(
-    file: Pick<File, "name" | "size">,
+    file: Pick<File, "name" | "size"> & Partial<Pick<File, "text">>,
     kind: UploadKind,
     scenario?: string,
   ): Promise<UploadJob>;
