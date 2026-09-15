@@ -77,11 +77,12 @@ export function filterNotes(
         (!query.to || n.lectureDate <= query.to),
     )
     .sort((a, b) =>
-      query.sort === "title"
+      Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) ||
+      (query.sort === "title"
         ? a.title.localeCompare(b.title)
         : query.sort === "created"
           ? b.createdAt.localeCompare(a.createdAt)
-          : b.updatedAt.localeCompare(a.updatedAt),
+          : b.updatedAt.localeCompare(a.updatedAt)),
     );
 }
 export function createRepositories(
@@ -199,6 +200,13 @@ export function createRepositories(
         db.notes = db.notes.map((n) => (n.id === note.id ? saved : n));
         persist();
         return saved;
+      },
+      async setPinned(noteId, pinned) {
+        // Pinning changes list placement, not the note's edit date or history.
+        const saved = { ...get(noteId), pinned };
+        db.notes = db.notes.map((n) => (n.id === noteId ? saved : n));
+        persist();
+        return { ...saved };
       },
       async comments(noteId) {
         return db.comments.filter((c) => c.noteId === noteId);

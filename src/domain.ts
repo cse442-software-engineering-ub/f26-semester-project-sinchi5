@@ -102,6 +102,7 @@ export interface NoteRepository {
   list(query?: NoteQuery): Promise<Note[]>;
   get(id: string): Promise<Note>;
   save(note: Note): Promise<Note>;
+  setPinned(id: string, pinned: boolean): Promise<Note>;
   create(data: Partial<Note>): Promise<Note>;
   comments(id: string): Promise<Comment[]>;
   comment(id: string, body: string): Promise<Comment>;

@@ -241,6 +241,7 @@ export function NoteWorkspace() {
   const [preview, setPreview] = useState<NoteVersion>();
   const [restore, setRestore] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [pinning, setPinning] = useState(false);
   const noteRef = useRef<Note>();
   const dirtyRef = useRef(false);
   const generation = useRef(0);
@@ -313,6 +314,23 @@ export function NoteWorkspace() {
     setDirty(true);
     setStatus("Saving…");
   }
+  async function togglePin() {
+    if (!noteRef.current || pinning) return;
+    setPinning(true);
+    try {
+      const saved = await repo.notes.setPinned(id, !noteRef.current.pinned);
+      // Keep any pending editor changes when updating the persisted pin state.
+      const next = { ...noteRef.current!, pinned: saved.pinned };
+      noteRef.current = next;
+      setNote(next);
+      setError("");
+      await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setPinning(false);
+    }
+  }
   if (error && !note)
     return (
       <Empty title="We couldn’t open that note">
@@ -330,12 +348,14 @@ export function NoteWorkspace() {
           <Check size={14} /> {status}
         </span>
         <button
-          className={s.iconButton}
+          className={note.pinned ? s.primary : s.secondary}
           aria-label={note.pinned ? "Unpin note" : "Pin note"}
-          aria-pressed={note.pinned}
-          onClick={() => edit({ pinned: !note.pinned })}
+          aria-pressed={Boolean(note.pinned)}
+          disabled={pinning}
+          onClick={togglePin}
         >
-          <Pin size={18} />
+          <Pin size={18} aria-hidden="true" />
+          {note.pinned ? "Unpin" : "Pin"}
         </button>
       </div>
       {error && (
