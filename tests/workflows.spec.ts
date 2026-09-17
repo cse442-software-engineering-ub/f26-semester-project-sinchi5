@@ -55,7 +55,7 @@ test("search, combined filters, clear and view persistence", async ({
     .getByRole("combobox", { name: "Visibility", exact: true })
     .selectOption("private");
   await expect(
-    page.getByRole("heading", { name: "No notes found" }),
+    page.getByRole("heading", { name: "No matching notes found" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Clear all" }).click();
   await page.getByLabel("Sort notes").selectOption("title");
@@ -67,6 +67,57 @@ test("search, combined filters, clear and view persistence", async ({
     "true",
   );
 });
+for (const { scenario, keyword, titles } of [
+  {
+    scenario: "title match, ignoring case",
+    keyword: "ReCuRsIoN",
+    titles: ["Divide, conquer, and a little recursion"],
+  },
+  {
+    scenario: "content match, ignoring case",
+    keyword: "ReTeNtIoN",
+    titles: ["How we learn: memory & cognition"],
+  },
+  {
+    scenario: "all matching notes",
+    keyword: "development",
+    titles: [
+      "Agile development & the Scrum framework",
+      "Team sync · ideas worth keeping",
+    ],
+  },
+  {
+    scenario: "no matching notes",
+    keyword: "no-such-keyword",
+    titles: [],
+  },
+]) {
+  test(`note keyword search: ${scenario}; clearing restores all notes`, async ({ page }) => {
+    await demo(page);
+    await page.goto("/notes");
+    const cards = page.locator('a[href^="/notes/"]');
+    const headings = cards.getByRole("heading");
+    await expect(cards).toHaveCount(6);
+    const allTitles = await headings.allTextContents();
+    const search = page.getByRole("searchbox", { name: "Search notes" });
+
+    await search.fill(keyword);
+    await expect(headings).toHaveText(titles);
+    if (!titles.length) {
+      await expect(
+        page.getByRole("heading", { name: "No matching notes found" }),
+      ).toBeVisible();
+    }
+
+    await search.fill("");
+    await expect(headings).toHaveText(allTitles);
+    await expect(
+      page.getByRole("heading", { name: "No matching notes found" }),
+    ).toHaveCount(0);
+    await expect(page).not.toHaveURL(/[?&]q=/);
+  });
+}
+
 test("manual event and lecture folder", async ({ page }) => {
   await demo(page);
   await page.goto("/schedule");

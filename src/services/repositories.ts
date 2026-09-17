@@ -49,27 +49,14 @@ const initial = (): Store => ({
     createdAt: n.createdAt,
   })),
 });
-export function filterNotes(
-  notes: Note[],
-  query: NoteQuery = {},
-  allCourses: Course[] = courses,
-) {
+export function filterNotes(notes: Note[], query: NoteQuery = {}) {
   const q = (query.q || "").toLowerCase();
   return notes
     .filter(
       (n) =>
         (!q ||
-          [
-            n.title,
-            n.body,
-            n.category,
-            ...n.tags,
-            allCourses.find((c) => c.id === n.courseId)?.name,
-            allCourses.find((c) => c.id === n.courseId)?.code,
-          ]
-            .join(" ")
-            .toLowerCase()
-            .includes(q)) &&
+          n.title.toLowerCase().includes(q) ||
+          n.body.toLowerCase().includes(q)) &&
         (!query.course || n.courseId === query.course) &&
         (!query.category || n.category === query.category) &&
         (!query.visibility || n.visibility === query.visibility) &&
@@ -160,7 +147,7 @@ export function createRepositories(
     },
     notes: {
       async list(q) {
-        return filterNotes(db.notes, q, db.courses);
+        return filterNotes(db.notes, q);
       },
       async get(noteId) {
         return { ...get(noteId) };

@@ -90,7 +90,8 @@ export function Notes() {
           <Search size={18} />
           <input
             aria-label="Search notes"
-            placeholder="Find a thought, a topic, a little inspiration…"
+            type="search"
+            placeholder="Search note titles and content…"
             value={params.get("q") || ""}
             onChange={(e) => set("q", e.target.value)}
           />
@@ -221,7 +222,9 @@ export function Notes() {
           ))}
         </div>
       ) : (
-        <Empty title="No notes found">
+        <Empty
+          title={params.get("q") ? "No matching notes found" : "No notes found"}
+        >
           Try another keyword or clear a filter to find your way back.
         </Empty>
       )}

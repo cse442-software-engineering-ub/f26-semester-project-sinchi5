@@ -27,7 +27,7 @@ describe("repository contracts", () => {
       filterNotes(notes, { q: "scrum", visibility: "private" }),
     ).toHaveLength(0);
     expect(
-      filterNotes(notes, { q: "Algorithms" }).map((n) => n.courseId),
+      filterNotes(notes, { q: "recursion" }).map((n) => n.courseId),
     ).toEqual(["cse331"]);
   });
   it("sorts alphabetically and by creation date without mutating input", () => {
