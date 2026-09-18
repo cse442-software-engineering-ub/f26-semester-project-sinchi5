@@ -31,7 +31,7 @@ describe("repository contracts", () => {
     ).toEqual(["cse331"]);
   });
   it("sorts alphabetically and by creation date without mutating input", () => {
-    const notes = seedNotes();
+    const notes = seedNotes().map((n) => ({ ...n, pinned: false }));
     const names = filterNotes(notes, { sort: "title" }).map((n) => n.title);
     expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
     expect(filterNotes(notes, { sort: "created" })[0].createdAt).toBe(
@@ -135,5 +135,80 @@ describe("repository contracts", () => {
     });
     expect(await r.notes.list()).toHaveLength(6);
     await expect(r.notes.create({})).rejects.toThrow("storage");
+  });
+});
+
+describe("note pinning", () => {
+  it.each([undefined, "modified", "created", "title"])(
+    "puts pins first and preserves the %s sort within both groups",
+    (sort) => {
+      const notes = seedNotes().map((n, i) => ({
+        ...n,
+        title: `Note ${String.fromCharCode(70 - i)}`,
+        pinned: i === 2 || i === 4,
+      }));
+      const before = structuredClone(notes);
+      const normal = filterNotes(notes.map((n) => ({ ...n, pinned: false })), { sort });
+      const pinnedIds = new Set(notes.filter((n) => n.pinned).map((n) => n.id));
+      expect(filterNotes(notes, { sort }).map((n) => n.id)).toEqual([
+        ...normal.filter((n) => pinnedIds.has(n.id)).map((n) => n.id),
+        ...normal.filter((n) => !pinnedIds.has(n.id)).map((n) => n.id),
+      ]);
+      expect(notes).toEqual(before);
+      expect(filterNotes(notes, { q: notes[0].title })).toEqual([notes[0]]);
+    },
+  );
+
+  it("persists pin and unpin without changing edit dates, history or normal order", async () => {
+    const storage = memory();
+    const r = createRepositories(storage);
+    const note = await r.notes.create({ title: "Test Note A", updatedAt: "2020-01-01T00:00:00.000Z" });
+    const originalOrder = (await r.notes.list()).map((n) => n.id);
+    const versions = await r.notes.versions(note.id);
+    expect(note.pinned).toBe(false);
+    await r.notes.setPinned(note.id, true);
+    const reopened = createRepositories(storage);
+    expect(await reopened.notes.get(note.id)).toEqual({ ...note, pinned: true });
+    await reopened.notes.setPinned(note.id, false);
+    const next = createRepositories(storage);
+    expect(await next.notes.get(note.id)).toEqual(note);
+    expect((await next.notes.list()).map((n) => n.id)).toEqual(originalOrder);
+    expect(await next.notes.versions(note.id)).toEqual(versions);
+  });
+
+  it("preserves pinning through edits and history restoration", async () => {
+    const r = createRepositories();
+    const n = await r.notes.create({ title: "Original", body: "first" });
+    const pinned = await r.notes.setPinned(n.id, true);
+    await r.notes.save({ ...pinned, body: "second" });
+    const [version] = await r.notes.versions(n.id);
+    expect((await r.notes.restore(n.id, version.id)).pinned).toBe(true);
+    expect((await r.notes.get(n.id)).body).toBe("first");
+  });
+
+  it("treats older notes without a pinned field as unpinned", () => {
+    const notes = seedNotes().map((n) => ({ ...n, pinned: false }));
+    Reflect.deleteProperty(notes[0], "pinned");
+    notes[2].pinned = true;
+    expect(filterNotes(notes)[0].id).toBe(notes[2].id);
+    expect(filterNotes(notes)[1].id).toBe(notes[0].id);
+  });
+
+  it("rolls back a failed pin write and rejects unknown notes", async () => {
+    const data = memory();
+    let fail = false;
+    const r = createRepositories({
+      getItem: data.getItem,
+      setItem: (key, value) => {
+        if (fail) throw Error("quota");
+        data.setItem(key, value);
+      },
+    });
+    const n = await r.notes.create({ title: "Test Note A" });
+    fail = true;
+    await expect(r.notes.setPinned(n.id, true)).rejects.toThrow("storage");
+    expect(await r.notes.get(n.id)).toEqual(n);
+    expect(await createRepositories(data).notes.get(n.id)).toEqual(n);
+    await expect(r.notes.setPinned("missing", true)).rejects.toThrow("found");
   });
 });

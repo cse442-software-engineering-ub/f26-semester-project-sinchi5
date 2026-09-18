@@ -96,7 +96,11 @@ export function NoteCard({ note }: { note: Note }) {
           <i />
           {course?.code || note.category}
         </span>
-        {note.pinned ? <Pin size={14} /> : <FileText size={16} />}
+        {note.pinned ? (
+          <span className={s.pinnedBadge}>
+            <Pin size={14} aria-hidden="true" /> Pinned
+          </span>
+        ) : <FileText size={16} aria-hidden="true" />}
       </div>
       <h3>{note.title}</h3>
       <p className={s.excerpt}>{note.body}</p>

@@ -506,10 +506,18 @@
 }
 .cardTop {
   display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 18px;
   color: var(--muted);
+}
+.pinnedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.65rem;
 }
 .courseBadge {
   display: inline-flex;
@@ -1324,6 +1332,7 @@
 }
 .editorTop {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   align-items: center;
   justify-content: space-between;
