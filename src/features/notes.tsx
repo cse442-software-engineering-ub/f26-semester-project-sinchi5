@@ -22,6 +22,7 @@ import { useApp } from "../app/context";
 import { PageHeading, NoteCard, Empty, Modal, EventRow } from "../shared/ui";
 import type { Note, NoteVersion, Comment } from "../domain";
 import s from "../app/App.module.css";
+import { Collaborators } from "./collaborators";
 export function Notes() {
   const { repo, state } = useApp();
   const navigate = useNavigate();
@@ -440,6 +441,8 @@ export function NoteWorkspace() {
           />
         </section>
         <aside className={s.inspector}>
+          <Collaborators key={`${note.id}:${state.user?.id || ""}`} noteId={note.id}
+            isOwner={!!state.user && note.ownerId === state.user.id} repository={repo.notes} />
           <div className={s.segment}>
             <button
               className={panel === "comments" ? s.activeButton : ""}

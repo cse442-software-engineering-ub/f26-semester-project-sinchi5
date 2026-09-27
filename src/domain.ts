@@ -24,6 +24,7 @@ export interface Category {
 }
 export interface Note {
   id: string;
+  ownerId?: string;
   title: string;
   body: string;
   courseId: string;
@@ -99,6 +100,8 @@ export interface CourseRepository {
   folders(id: string): Promise<Record<string, Note[]>>;
 }
 export interface NoteRepository {
+  collaborators(id: string): Promise<Collaborator[]>;
+  inviteCollaborator(id: string, email: string): Promise<{ collaborator: Collaborator }>;
   list(query?: NoteQuery): Promise<Note[]>;
   get(id: string): Promise<Note>;
   save(note: Note): Promise<Note>;
@@ -108,6 +111,12 @@ export interface NoteRepository {
   comment(id: string, body: string): Promise<Comment>;
   versions(id: string): Promise<NoteVersion[]>;
   restore(id: string, versionId: string): Promise<Note>;
+}
+export interface Collaborator {
+  id: string;
+  name: string;
+  email: string;
+  status?: "Pending" | "Invited" | "Accepted";
 }
 export interface ScheduleRepository {
   list(from?: string, to?: string): Promise<CourseEvent[]>;

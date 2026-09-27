@@ -1409,6 +1409,21 @@
   font-size: 0.72rem;
   margin-bottom: 16px;
 }
+.collaborators {
+  padding-bottom: 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.collaboratorList {
+  list-style: none;
+  padding: 0;
+}
+.collaboratorList li {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 16px;
+  overflow-wrap: anywhere;
+}
 .comment {
   border-bottom: 1px solid var(--line);
   padding: 0 0 18px;
