@@ -20,19 +20,21 @@ export function Modal({
   children,
   onClose,
   wide = false,
+  dismissible = true,
 }: {
   title: string;
   description?: string;
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
+  dismissible?: boolean;
 }) {
   const [open, setOpen] = useState(true);
   const previousFocus = useRef(document.activeElement as HTMLElement | null);
   return (
     <Dialog.Root
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={(next) => { if (next || dismissible) setOpen(next); }}
       onOpenChangeComplete={(isOpen) => {
         if (!isOpen) onClose();
       }}
@@ -54,7 +56,7 @@ export function Modal({
                 {description || "Make a little room for your ideas."}
               </Dialog.Description>
             </div>
-            <Dialog.Close className={s.iconButton} aria-label="Close">
+            <Dialog.Close className={s.iconButton} aria-label="Close" disabled={!dismissible}>
               <X size={20} />
             </Dialog.Close>
           </div>

@@ -9,6 +9,7 @@ import type {
   Course,
   NoteQuery,
 } from "../domain";
+import { createMockCollaborators } from "./collaborators.mock";
 import {
   courses,
   seedNotes,
@@ -99,6 +100,8 @@ export function createRepositories(
   } catch {
     /* Recover from unavailable or corrupted storage. */
   }
+  // Legacy prototype notes belong to the seeded student account.
+  db.notes = db.notes.map((note) => ({ ...note, ownerId: note.ownerId ?? "student" }));
   let committed = structuredClone(db);
   const persist = () => {
     try {
@@ -160,6 +163,7 @@ export function createRepositories(
       },
     },
     notes: {
+      ...createMockCollaborators(),
       async list(q) {
         return filterNotes(db.notes, q, db.courses);
       },
@@ -180,6 +184,7 @@ export function createRepositories(
           createdAt: now(),
           updatedAt: now(),
           ...data,
+          ownerId: db.user?.id ?? "student",
         };
         db.notes.unshift(n);
         persist();
@@ -337,6 +342,8 @@ export function createRepositories(
     },
     async reset() {
       db = initial();
+      db.notes = db.notes.map((note) => ({ ...note, ownerId: "student" }));
+      Object.assign(repo.notes, createMockCollaborators());
       persist();
     },
   };
