@@ -1,5 +1,6 @@
 <?php
-// Copy OUTSIDE the served directory, chmod 600, and set NOTELY_CONFIG to its path.
+// Copy OUTSIDE the served directory. Use NOTELY_CONFIG or config-path.example.php to locate it.
+// Keep credentials private; the PHP execution user must be able to read this file.
 // Do not put real credentials in this example or any committed file.
 return [
     'db_name' => 'cse442_2026_fall_team_c_db',

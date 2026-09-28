@@ -1,10 +1,26 @@
 <?php
 declare(strict_types=1);
+if (PHP_SAPI !== 'cli' && !defined('NOTELY_INTERNAL')) {
+    http_response_code(403);
+    exit;
+}
 require_once __DIR__ . '/security.php';
 
 function configuration(): array
 {
     $path = getenv('NOTELY_CONFIG');
+    // Shared Apache hosts may ignore .htaccess and its SetEnv directive.
+    // This optional deployment file returns only a path, never credentials.
+    $pointer = __DIR__ . '/../config-path.php';
+    if (!$path && is_file($pointer)) {
+        $path = require $pointer;
+        if (!is_string($path) || $path === '') {
+            throw new RuntimeException('Invalid configuration path.');
+        }
+    }
+    if ($path && (!is_file($path) || !is_readable($path))) {
+        throw new RuntimeException('Private configuration is not readable.');
+    }
     $config = $path ? require $path : [];
     if (!is_array($config)) {
         throw new RuntimeException('Invalid configuration.');

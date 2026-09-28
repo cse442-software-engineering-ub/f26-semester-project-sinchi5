@@ -13,7 +13,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "dev:api": "php -S 127.0.0.1:8080 backend/dev-router.php",
-    "test:php": "php backend/tests/security.php",
+    "test:php": "php backend/tests/security.php && php backend/tests/configuration.php",
     "test:accounts": "node backend/tests/http.mjs",
     "test:schema": "php backend/tests/schema.php"
   },

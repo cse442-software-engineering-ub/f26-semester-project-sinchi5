@@ -34,6 +34,14 @@ function client() {
 const a = client(); const b = client(); const recovery = client();
 let currentPassword = password; let exists = false;
 try {
+  for (const file of ["security.php", "bootstrap.php", "accounts.php"]) {
+    const response = await fetch(new URL(`lib/${file}`, url), { redirect: "error" });
+    // The DEV router returns 404 before PHP; deployed libraries must deny access themselves.
+    assert(url.hostname === "aptitude.cse.buffalo.edu"
+      ? response.status === 403
+      : [403, 404].includes(response.status), `Direct library request must be denied: ${file}`);
+    await response.text();
+  }
   const anonymous = await a.call("session");
   assert.equal(anonymous.data.user, null);
   const cookies = anonymous.headers.getSetCookie().join(";");

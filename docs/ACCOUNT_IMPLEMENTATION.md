@@ -32,6 +32,7 @@ Email is a normalized, case-insensitive login identifier, not a verified mailbox
 | `backend/lib/accounts.php` | Account lifecycle and transactional credential changes |
 | `backend/migrations/001_accounts.sql` | MySQL schema; run separately on each environment |
 | `backend/config.example.php` | Non-secret private configuration template |
+| `backend/config-path.example.php` | Path-only deployment template when Apache cannot set environment variables |
 | `backend/prune.php` | CLI removal of expired sessions and old rate counters |
 | `backend/tests/` | PHP validation/schema and real HTTP integration tests |
 | `src/services/auth.ts` | Same-origin PHP account adapter |
@@ -97,6 +98,8 @@ Use Node 22.12+, PHP 8.0+ with PDO MySQL, and MySQL 5.7+/8 or MariaDB 10.2+. Pre
 
 Environment variables can replace the config file: `NOTELY_DB_NAME`, `NOTELY_DB_USER`, `NOTELY_DB_PASSWORD`, `NOTELY_APP_KEY`, `NOTELY_ORIGIN`, `NOTELY_COOKIE_PATH`, and `NOTELY_ALLOW_LOCAL_HTTP=1` for loopback-only DEV. Do not put secrets into `VITE_*`, source code, a command history, or a frontend `.env` file. An invalid/incomplete configuration fails closed with HTTP 503. HTTP mode refuses non-loopback origins.
 
+`npm run test:php` also tests configuration discovery with isolated fixture files: the deployed path fallback, explicit environment precedence, missing/invalid configuration, and environment-only settings. It does not load actual deployment credentials or connect to MySQL.
+
 ## TEST and PROD release procedure
 
 TEST: https://aptitude.cse.buffalo.edu/CSE442/2026-Fall/cse-442c/
@@ -106,13 +109,24 @@ PROD: https://cattle.cse.buffalo.edu/CSE442/2026-Fall/cse-442c/
 Both document roots: `/data/web/CSE442/2026-Fall/cse-442c/`. Both database names: `cse442_2026_fall_team_c_db`, on `localhost` of that machine. University network/VPN access is required. TEST and PROD have separate databases, keys, and credentials; never copy their data/session rows between environments.
 
 1. Configure and verify **aptitude first**, during the sprint. Confirm PHP executes and `pdo_mysql` is enabled. Import the migration into that server's database. Preserve existing unrelated tables.
-2. Place the private config file outside `/data/web`, readable only by the account/PHP execution identity. Use `origin = https://aptitude.cse.buffalo.edu`, `cookie_path = /CSE442/2026-Fall/cse-442c/`, `secure_cookies = true`, and a unique random app key. Set `NOTELY_CONFIG` in the Apache/PHP environment to the private path. If permitted, a server-local Apache `SetEnv NOTELY_CONFIG /absolute/private/path/notely.php` directive can set the path. The supplied example contains no usable credentials.
+2. Place the private config file outside `/data/web`, readable only by the account/PHP execution identity. Use `origin = https://aptitude.cse.buffalo.edu`, `cookie_path = /CSE442/2026-Fall/cse-442c/`, `secure_cookies = true`, and a unique random app key. Set `NOTELY_CONFIG` in the Apache/PHP environment to the private path. If permitted, a server-local Apache `SetEnv NOTELY_CONFIG /absolute/private/path/notely.php` directive can set the path. If `.htaccess` overrides are ignored, use the path-only fallback below. The supplied examples contain no usable credentials.
 3. Build: `BASE_PATH=/CSE442/2026-Fall/cse-442c/ npm run build`. The API URL automatically follows the same base. Upload the **contents of `dist/`**, including dotfiles, to the shared document root. Do not upload the whole repository, migration, tests, config example, or private config. Build output includes `api/index.php`, `api/lib/*.php`, and access-denying `.htaccess` files, alongside the SPA. If setting `NOTELY_CONFIG` in the deployed `api/.htaccess`, append the `SetEnv` directive after uploading and retain the existing access restrictions. Reapply the server-local directive after future uploads that replace that file; generated builds do not contain the private configuration path.
 4. Confirm Apache supports the supplied rewrite rules and `.htaccess` authorization directives; requests under `api/` must not be rewritten to the SPA. Direct requests to `/api/lib/security.php` must return 403. A GET to `/api/index.php?route=session` must return JSON with a null user and CSRF token, never PHP source. Confirm the cookie is Secure, HttpOnly, SameSite=Lax, and has the class path.
 5. Run the task tests on aptitude: `NOTELY_TEST_URL=https://aptitude.cse.buffalo.edu/CSE442/2026-Fall/cse-442c/api/index.php npm run test:accounts`. Run PHP/schema tests on the server using the private config. Record outcomes on each task. Run `php backend/prune.php` daily via an approved scheduler/cron outside the web root to bound expired session/rate-limit storage.
 6. Only at the end-of-sprint release, repeat configuration/migration on **cattle** with cattle's origin and distinct secrets. Deploy the reviewed release from main using the same base. Run the nontechnical acceptance tests in `../devwork-ai/ACCOUNT_STORY_TASKS.md` against cattle. Do not run the automated destructive task suite on PROD; it explicitly rejects cattle.
 
 The department serves several teams on one web origin. Cookie paths avoid accidental collisions but cannot isolate hostile JavaScript served by another application on the same origin. Origin-wide isolation requires department-controlled separate origins. These application files cannot change that hosting boundary.
+
+### Hosts that ignore `.htaccess`
+
+The aptitude diagnostic reported Apache module PHP running as `www-data`, no `NOTELY_CONFIG` environment value despite the deployed `SetEnv` directive, and HTTP 200 for a library request. This points to `.htaccess` overrides being ignored. The account service supports this deployment without placing credentials in the served directory:
+
+1. Copy `backend/config-path.example.php` to the server's deployed `api/config-path.php`. Edit only the returned string to the absolute path of the private config file. Retain the PHP access guard. This file holds only a path; never put database credentials or the app key into it. It is server-local, excluded from Git and generated builds, and must be preserved during uploads.
+2. The PHP execution user needs read access to the private config and traversal access to its parent directories. A mode-600 file under a mode-700 home is inaccessible to a different PHP user. Confirm the execution identity and use narrowly scoped filesystem ACLs where the server supports them, or ask the department to provision an appropriate private location. Do not make the credential file world-readable. All PHP applications running as the same `www-data` Unix identity share that identity's file access; per-team credential isolation requires department-managed separate execution identities.
+3. `NOTELY_CONFIG` remains the first choice when present. Otherwise, PHP reads the path-only file; if neither is configured, the existing per-setting environment variables remain supported. An invalid or unreadable configured path fails closed instead of silently selecting a different configuration.
+4. Direct requests to the PHP libraries return 403 through PHP access guards, even when Apache ignores `.htaccess`. These files remain includable by the API and command-line tests. Verify `api/lib/security.php`, `api/lib/bootstrap.php`, `api/lib/accounts.php`, and `api/config-path.php` return 403; then check `api/index.php?route=session`.
+
+This fallback handles the account API. SPA deep-link reloads still depend on the root rewrite rules or equivalent server configuration, and must be checked separately on the host.
 
 No remote deployment, database migration, or scrum-board publication is performed by the local implementation. Release requires a configured PHP/MySQL environment and the course's branch/PR/card workflow. The private config and PHP version/permissions must be confirmed by the team on the target server.
 
@@ -140,3 +154,4 @@ Vitest covers the adapter and workspace selection. Browser account tests use an 
 
 - Aptitude setup follow-up: the user confirmed database `cse442_2026_fall_team_c_db`, CLI PHP 8.1.2 (Ubuntu package), and the PDO MySQL extension. The config template and runtime default now match that database. After resolving a MySQL 1045 login error, the user reported that the CLI PDO connection check using the private configuration succeeded. Web PHP access to that configuration, the schema test, and the real HTTP integration suite remain unverified.
 - Integration with `dev` at `319e712`: all 29 unit tests, the TypeScript/subdirectory production build, and 34 desktop/mobile Chromium account, collaborator, and workflow tests passed. The two collaborator permission tests now receive authenticated users through the workspace constructor instead of the retired prototype sign-in method; both permission assertions remain enforced. These browser checks use mocked account HTTP responses or the explicit demo workspace and do not replace live PHP/MySQL integration tests.
+- Aptitude hosting follow-up: the user confirmed web PHP 8.1.2 via `apache2handler`, execution user `www-data` (UID 33), a missing `NOTELY_CONFIG` value, and HTTP 200 for a direct library request despite the deployed `.htaccess` rules. The PHP fallback/access-guard update passed 41 checks in a temporary PHP 8.1.34 WebAssembly runtime: 26 existing security checks, 9 configuration cases, and 6 request/access checks. Named-user ACL availability was confirmed, but applying permissions and verifying the deployed session endpoint remain user-run steps.
