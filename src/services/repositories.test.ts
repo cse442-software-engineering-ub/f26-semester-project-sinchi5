@@ -42,12 +42,12 @@ describe("repository contracts", () => {
   it("persists notes, sessions and onboarding across repository instances", async () => {
     const storage = memory();
     const r = createRepositories(storage);
-    await r.auth.signIn("student@example.edu", "Student");
+    await r.auth.startDemo();
     await r.auth.completeOnboarding();
     const n = await r.notes.create({ title: "Persistent thought" });
     const next = createRepositories(storage);
     expect((await next.notes.get(n.id)).title).toBe("Persistent thought");
-    expect((await next.auth.session())?.name).toBe("Student");
+    expect((await next.auth.session())?.name).toBe("Erin");
     expect((await next.auth.onboarding()).completed).toBe(true);
     await next.auth.signOut();
     expect(await next.auth.session()).toBeNull();
@@ -137,13 +137,17 @@ describe("repository contracts", () => {
     await expect(r.notes.create({})).rejects.toThrow("storage");
   });
   it("allows an edit-level collaborator to save note changes", async () => {
-    const r = createRepositories();
+    const storage = memory();
+    const owner = createRepositories(storage, { id: "owner", name: "Owner", email: "owner@example.edu" });
 
-    const note = await r.notes.create({
+    const note = await owner.notes.create({
       title: "Shared Note",
       body: "Original content",
       visibility: "shared",
     });
+    // Server authentication supplies the current user to the prototype workspace.
+    const r = createRepositories(storage, { id: "classmate-jamie", name: "Jamie", email: "jamie@example.edu" });
+    expect(note.ownerId).not.toBe((await r.auth.session())?.id);
 
     await r.notes.inviteCollaborator(
       note.id,
@@ -156,8 +160,6 @@ describe("repository contracts", () => {
       "edit",
     );
 
-    await r.auth.signIn("jamie@example.edu", "Jamie");
-
     const saved = await r.notes.save({
       ...note,
       body: "Edited by Jamie",
@@ -167,13 +169,16 @@ describe("repository contracts", () => {
     expect((await r.notes.get(note.id)).body).toBe("Edited by Jamie");
   });
   it("rejects edits from a view-level collaborator", async () => {
-    const r = createRepositories();
+    const storage = memory();
+    const owner = createRepositories(storage, { id: "owner", name: "Owner", email: "owner@example.edu" });
 
-    const note = await r.notes.create({
+    const note = await owner.notes.create({
       title: "Shared Note",
       body: "Original content",
       visibility: "shared",
     });
+    const r = createRepositories(storage, { id: "classmate-jamie", name: "Jamie", email: "jamie@example.edu" });
+    expect(note.ownerId).not.toBe((await r.auth.session())?.id);
 
     await r.notes.inviteCollaborator(
       note.id,
@@ -185,8 +190,6 @@ describe("repository contracts", () => {
       "classmate-jamie",
       "view",
     );
-
-    await r.auth.signIn("jamie@example.edu", "Jamie");
 
     await expect(
       r.notes.save({

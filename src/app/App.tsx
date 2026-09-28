@@ -71,7 +71,7 @@ export default function App() {
       </Routes>
     );
   return (
-    <div className={s.app}>
+    <div className={s.app} key={state.user.id}>
       <a href="#main" className={s.skip}>
         Skip to content
       </a>

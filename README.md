@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-Open the URL printed by Vite. Choose **Take a look around first** for the populated workspace, or **Create your workspace** to walk through onboarding. Passwords are validated as form input only and are never persisted. Use sample credentials.
+Open the URL printed by Vite. Choose **Take a look around first** for the populated workspace, or **Create your workspace** to walk through onboarding. Real accounts require the PHP/MySQL service described in [Account setup and deployment](docs/ACCOUNT_IMPLEMENTATION.md). Passwords are salted and hashed on the server; signup displays a one-time recovery code to save. The sample workspace works independently of the account service.
 
 ```sh
 npm run build
@@ -31,17 +31,19 @@ Install the matching browsers once with `npx playwright install chromium firefox
 - `src/shared/`: reusable accessible dialogs, note cards, event rows, headings, and empty states.
 - `tests/`: browser workflows, responsive checks, and axe accessibility tests.
 
-All product data access goes through the typed repository interfaces. Prototype records live under `notely-data-v1` in browser localStorage; appearance lives under `notely-theme`. Use Settings → Reset sample data to remove prototype changes and return to onboarding. Seed dates are relative to the day the workspace is first created so its initial dashboard is useful. Resetting creates a fresh set of relative dates.
+Account identity, sessions, recovery-code hashes, and onboarding completion live in MySQL. Notes/courses/events remain a browser prototype: demo records use `notely-data-v1`, account workspaces use `notely-workspace-v1-<user-id>`, and appearance uses `notely-theme`. Settings → Reset sample data resets only prototype content, preserving a real account. Seed dates are relative to the day the workspace is first created so its initial dashboard is useful. Resetting creates a fresh set of relative dates.
 
 Library query parameters are `q`, `course`, `category`, `visibility`, `from`, `to`, `sort` (`modified`, `created`, `title`), and `view` (`grid`, `list`). Calendar parameters are `date` (`YYYY-MM-DD`) and `view` (`agenda`, `month`). Course lecture links use `/courses/:id?lecture=YYYY-MM-DD`.
 
-## PHP / XAMPP handoff
+## PHP / MySQL accounts and XAMPP
 
-The prototype deliberately does not perform server authentication, OCR, document parsing, file storage, or real-time collaboration. Upload files remain local and are not persisted; extraction uses deterministic sample results. The upload dialog’s **Prototype preview options** can exercise successful, partial, and failed processing. The 20 MB limit and supported extensions are enforced by the mock import repository.
+PHP account management is implemented in `backend/`, including signup/login/logout, profile/password changes, recovery codes, and deletion. Follow [setup, database schema, deployment, and security details](docs/ACCOUNT_IMPLEMENTATION.md). The local user story and task drafts are in `devwork-ai/ACCOUNT_STORY_TASKS.md`, which is excluded from Git. Run `npm run dev:api` alongside Vite after configuring local PHP/MySQL. `npm run build` packages the public PHP endpoints in `dist/api`.
 
-Replace the repository implementations in `src/services/repositories.ts` with HTTP adapters for future `/api/v1` PHP JSON endpoints. Keep the domain interfaces as the boundary. Suggested resource groups are `/auth`, `/courses`, `/notes` (including comments and versions), `/events`, and `/imports`. Server-side validation, authorization, session handling, file scanning/storage, and actual extraction belong in that later backend milestone. Do not treat localStorage as an authentication or authorization boundary.
+OCR, document parsing, file storage, and real-time collaboration remain prototype features. Upload files remain local and are not persisted; extraction uses deterministic sample results. The upload dialog’s **Prototype preview options** can exercise successful, partial, and failed processing. The 20 MB limit and supported extensions are enforced by the mock import repository.
 
-For Apache at the web root, copy `dist/` contents into the document root after building. Vite copies `public/.htaccess` into `dist`; enable `mod_rewrite` and `AllowOverride FileInfo` for SPA deep links. Requests under `api/` are excluded from the SPA fallback. Do not expose a PHP production service through the Vite development server.
+The account HTTP adapter is `src/services/auth.ts`; it calls the same-origin `api/index.php?route=...` PHP API under the frontend base path. Future course/note/event/import HTTP adapters should keep the domain interfaces as their boundary. Server authorization of those resources, file scanning/storage, and actual extraction belong in a later backend milestone. Browser storage is not an authentication or authorization boundary.
+
+For Apache at the web root, copy `dist/` contents into the document root after building. Vite copies `public/.htaccess` into `dist`; enable `mod_rewrite` and allow the FileInfo, AuthConfig, and Options directives used by the supplied `.htaccess` files for SPA deep links. Requests under `api/` are excluded from the SPA fallback. Do not expose a PHP production service through the Vite development server.
 
 For a subdirectory such as `/notely/`, build with the matching base:
 
@@ -49,7 +51,7 @@ For a subdirectory such as `/notely/`, build with the matching base:
 BASE_PATH=/notely/ npm run build
 ```
 
-Copy the output into that Apache directory. React Router uses the generated base URL. PHP service URLs should continue to use the chosen `/api/v1` endpoint configuration independently of the frontend base.
+Copy the output into that Apache directory. React Router uses the generated base URL. The account API follows this base automatically. Set the PHP cookie path and configured Origin for the corresponding server; details are in the deployment guide.
 
 ## Design and verification
 
@@ -57,7 +59,7 @@ The interface uses the supplied sage, mint, brown, and slate palette, with seman
 
 Automated coverage includes repository behavior, onboarding, library search/filter/sort, lecture links, event creation, note saving/comments/history, imports, theme persistence, keyboard dismissal, responsive overflow, and accessibility. Final physical-device and additional-browser checks should be completed with the team’s target devices before release. Screenshots and traces are generated in ignored `test-results/` on browser runs.
 
-Verified on September 10, 2026:
+Historical prototype baseline (September 10, 2026; current account verification is documented separately):
 
 - TypeScript and production build pass; JavaScript is approximately **128 KB gzip**, below the 200 KB target.
 - **7 repository tests** and **22 browser checks** pass. Browser coverage includes Chromium desktop/mobile workflows and Chromium, Firefox, and WebKit screen/theme/dialog checks.

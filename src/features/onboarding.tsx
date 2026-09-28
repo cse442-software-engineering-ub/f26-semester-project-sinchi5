@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../app/context";
 import { ImportDialog } from "./imports";
+import { RecoveryCode } from "./account";
 import { BRAND } from "../domain";
 import s from "../app/App.module.css";
 export function Onboarding() {
@@ -22,6 +23,11 @@ export function Onboarding() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  const [confirmation, setConfirmation] = useState("");
+  const [recoveryInput, setRecoveryInput] = useState("");
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [message, setMessage] = useState("");
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
   const [code, setCode] = useState("");
@@ -29,23 +35,38 @@ export function Onboarding() {
   const [color, setColor] = useState("#869D7A");
   const [term, setTerm] = useState("Fall 2026");
   async function enter(demo = false) {
+    if (pending.current) return;
+    setError(""); setMessage("");
+    if (!demo && mode !== "signin" && password !== confirmation) { setError("Passwords do not match."); return; }
+    pending.current = true;
     setBusy(true);
     try {
       if (demo) {
-        await repo.auth.signIn("erin@example.edu", "Erin");
-        await repo.auth.completeOnboarding();
+        await repo.auth.startDemo();
         await refresh();
         navigate("/");
         return;
       }
-      await repo.auth.signIn(email, name || undefined);
+      if (mode === "signup") {
+        const result = await repo.auth.signUp(name, email, password);
+        setRecoveryCode(result.recoveryCode);
+      } else if (mode === "recover") {
+        setRecoveryCode(await repo.auth.resetPassword(email, recoveryInput, password));
+      } else {
+        await repo.auth.signIn(email, password);
+        setStep(1);
+      }
+      setPassword(""); setConfirmation(""); setRecoveryInput("");
       await refresh();
-      setStep(1);
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      pending.current = false;
       setBusy(false);
     }
+  }
+  function changeMode(next: string) {
+    setMode(next); setError(""); setMessage(""); setPassword(""); setConfirmation(""); setRecoveryInput("");
   }
   return (
     <div className={s.onboarding}>
@@ -85,7 +106,11 @@ export function Onboarding() {
       </aside>
       <main className={s.onboardingMain}>
         <div className={s.onboardingContent}>
-          {step === 0 ? (
+          {recoveryCode ? <RecoveryCode code={recoveryCode} onDone={() => {
+            setRecoveryCode("");
+            if (mode === "signup") setStep(1);
+            else { setStep(0); changeMode("signin"); setMessage("Password reset. Sign in with your new password."); }
+          }} /> : step === 0 ? (
             <>
               <span className={s.eyebrow}>Your next chapter</span>
               <h2>
@@ -93,7 +118,7 @@ export function Onboarding() {
                   ? "Welcome to your space."
                   : mode === "signup"
                     ? "A fresh start."
-                    : "Good to see you again."}
+                    : mode === "recover" ? "Recover your account." : "Good to see you again."}
               </h2>
               <p className={s.muted}>
                 {mode === "welcome"
@@ -104,13 +129,13 @@ export function Onboarding() {
                 <div className={s.form}>
                   <button
                     className={s.primary}
-                    onClick={() => setMode("signup")}
+                    onClick={() => changeMode("signup")}
                   >
                     Create your workspace <ArrowRight size={17} />
                   </button>
                   <button
                     className={s.secondary}
-                    onClick={() => setMode("signin")}
+                    onClick={() => changeMode("signin")}
                   >
                     I already have an account
                   </button>
@@ -130,12 +155,14 @@ export function Onboarding() {
                     void enter();
                   }}
                 >
+                  <fieldset className={s.accountFields} disabled={busy}>
                   {mode === "signup" && (
                     <label>
                       Your name
                       <input
                         required
                         autoComplete="name"
+                        maxLength={100}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="What should we call you?"
@@ -151,48 +178,50 @@ export function Onboarding() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="you@university.edu"
+                      maxLength={254}
                     />
                   </label>
+                  {mode === "recover" && <label>Recovery code<input required autoComplete="off" spellCheck={false} value={recoveryInput} onChange={e => setRecoveryInput(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" /></label>}
                   <label>
-                    Password
+                    {mode === "recover" ? "New password" : "Password"}
                     <input
                       type="password"
-                      minLength={8}
+                      minLength={mode === "signin" ? undefined : 15}
                       required
                       autoComplete={
-                        mode === "signup" ? "new-password" : "current-password"
+                        mode === "signin" ? "current-password" : "new-password"
                       }
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="At least 8 characters"
+                      placeholder={mode === "signin" ? "Your password" : "At least 15 characters"}
                     />
-                    {password.length > 0 && password.length < 8 && (
-                      <small>Use at least 8 characters.</small>
-                    )}
                   </label>
-                  <small className={s.notice}>
-                    This is a prototype account. Use a sample password;
-                    passwords are never stored.
-                  </small>
+                  {mode !== "signin" && <>
+                    <small>Use at least 15 characters, up to 72 bytes. Spaces are welcome.</small>
+                    <label>Confirm password<input type="password" required autoComplete="new-password" value={confirmation} onChange={e => setConfirmation(e.target.value)} /></label>
+                  </>}
+                  {mode === "recover" && <p className={s.muted}>Enter the code you saved at signup. A successful reset signs out all sessions and gives you a replacement code.</p>}
                   <button disabled={busy} className={s.primary}>
                     {busy
                       ? "Opening your space…"
                       : mode === "signup"
                         ? "Create account"
-                        : "Sign in"}{" "}
+                        : mode === "recover" ? "Reset password" : "Sign in"}{" "}
                     <ArrowRight size={16} />
                   </button>
                   <button
                     type="button"
                     className={s.textLink}
                     onClick={() =>
-                      setMode(mode === "signup" ? "signin" : "signup")
+                      changeMode(mode === "signup" || mode === "recover" ? "signin" : "signup")
                     }
                   >
-                    {mode === "signup"
+                    {mode === "signup" || mode === "recover"
                       ? "Already have an account? Sign in"
                       : "New here? Create an account"}
                   </button>
+                  {mode === "signin" && <button type="button" className={s.textLink} onClick={() => changeMode("recover")}>Forgot your password?</button>}
+                  </fieldset>
                 </form>
               )}
             </>
@@ -345,11 +374,16 @@ export function Onboarding() {
               </button>
             </>
           )}
-          {error && (
+          {message && <p role="status">{message}</p>}
+          {(error || state.error) && (
             <p role="alert" className={s.error}>
-              {error}
+              {error || state.error}
             </p>
           )}
+          {state.user && !recoveryCode && <button className={s.textLink} disabled={busy} onClick={async () => {
+            try { await repo.auth.signOut(); setStep(0); changeMode("signin"); await refresh(); }
+            catch (e) { setError((e as Error).message); }
+          }}>Sign out</button>}
           {step > 1 && step < 3 && (
             <button className={s.textLink} onClick={() => setStep(step - 1)}>
               Back

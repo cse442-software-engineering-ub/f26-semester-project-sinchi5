@@ -88,6 +88,7 @@ export function filterNotes(
 }
 export function createRepositories(
   storage?: Pick<Storage, "getItem" | "setItem">,
+  authenticatedUser?: User | null,
 ): Repositories {
   let db = initial();
   try {
@@ -100,8 +101,9 @@ export function createRepositories(
   } catch {
     /* Recover from unavailable or corrupted storage. */
   }
+  if (authenticatedUser !== undefined) db.user = authenticatedUser;
   // Legacy prototype notes belong to the seeded student account.
-  db.notes = db.notes.map((note) => ({ ...note, ownerId: note.ownerId ?? "student" }));
+  db.notes = db.notes.map((note) => ({ ...note, ownerId: note.ownerId ?? authenticatedUser?.id ?? "student" }));
   let committed = structuredClone(db);
   const persist = () => {
     try {
@@ -126,11 +128,21 @@ export function createRepositories(
       async session() {
         return db.user;
       },
-      async signIn(email, name) {
+      async signIn() {
+        throw new Error("Use the PHP account service to sign in.");
+      },
+      async startDemo() {
+        const email = "erin@example.edu";
+        const name = "Erin";
         db.user = { id: "student", email, name: name || email.split("@")[0] };
         persist();
-        return db.user;
       },
+      async signUp() { throw new Error("Use the PHP account service to create accounts."); },
+      async updateProfile() { throw new Error("Demo accounts cannot be changed."); },
+      async changePassword() { throw new Error("Demo accounts cannot be changed."); },
+      async resetPassword() { throw new Error("Use the PHP account service for recovery."); },
+      async replaceRecoveryCode() { throw new Error("Demo accounts cannot be changed."); },
+      async deleteAccount() { throw new Error("Demo accounts cannot be changed."); },
       async signOut() {
         db.user = null;
         persist();
@@ -358,7 +370,8 @@ export function createRepositories(
     },
     async reset() {
       db = initial();
-      db.notes = db.notes.map((note) => ({ ...note, ownerId: "student" }));
+      db.user = authenticatedUser ?? null;
+      db.notes = db.notes.map((note) => ({ ...note, ownerId: authenticatedUser?.id ?? "student" }));
       Object.assign(repo.notes, createMockCollaborators());
       persist();
     },

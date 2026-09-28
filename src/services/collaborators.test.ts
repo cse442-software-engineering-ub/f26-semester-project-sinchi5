@@ -5,7 +5,7 @@ describe("frontend invitation mock contract", () => {
   it("returns a registered classmate once, scoped to the note, without persistent storage", async () => {
     const repo = createMockCollaborators();
     const response = await repo.inviteCollaborator("note-a", " Jamie@Example.edu ");
-    expect(response.collaborator).toEqual({id: "classmate-jamie",name: "Jamie",email: "jamie@example.edu",status: "Pending",permission: "view",}); 
+    expect(response.collaborator).toEqual({id: "classmate-jamie",name: "Jamie",email: "jamie@example.edu",status: "Pending",permission: "view",});
     await repo.inviteCollaborator("note-a", "jamie@example.edu");
     expect(await repo.collaborators("note-a")).toHaveLength(1);
     expect(await repo.collaborators("note-b")).toEqual([]);

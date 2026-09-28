@@ -90,8 +90,15 @@ export interface NoteQuery {
 }
 export interface AuthRepository {
   session(): Promise<User | null>;
-  signIn(email: string, name?: string): Promise<User>;
+  signIn(email: string, password: string): Promise<User>;
+  signUp(name: string, email: string, password: string): Promise<{ user: User; recoveryCode: string }>;
   signOut(): Promise<void>;
+  startDemo(): Promise<void>;
+  updateProfile(name: string, email: string, currentPassword: string): Promise<User>;
+  changePassword(currentPassword: string, password: string): Promise<void>;
+  resetPassword(email: string, recoveryCode: string, password: string): Promise<string>;
+  replaceRecoveryCode(currentPassword: string): Promise<string>;
+  deleteAccount(currentPassword: string): Promise<void>;
   onboarding(): Promise<OnboardingState>;
   completeOnboarding(): Promise<void>;
 }

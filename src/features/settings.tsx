@@ -1,12 +1,11 @@
+import { AccountSettings } from "./account";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Sun, Moon, Monitor, Plus } from "lucide-react";
 import { useApp } from "../app/context";
 import { Modal, PageHeading } from "../shared/ui";
 import s from "../app/App.module.css";
 export function Settings() {
   const { state, repo, refresh, setTheme } = useApp();
-  const navigate = useNavigate();
   const [reset, setReset] = useState(false);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
@@ -42,21 +41,7 @@ export function Settings() {
             })}
           </div>
         </section>
-        <section className={s.panel}>
-          <h2>Your account</h2>
-          <h3>{state.user?.name}</h3>
-          <p className={s.muted}>{state.user?.email}</p>
-          <button
-            className={s.secondary}
-            onClick={async () => {
-              await repo.auth.signOut();
-              await refresh();
-              navigate("/welcome");
-            }}
-          >
-            Sign out
-          </button>
-        </section>
+        <AccountSettings />
         <section className={s.panel}>
           <div className={s.sectionHeading}>
             <h2>Your courses</h2>
@@ -105,7 +90,7 @@ export function Settings() {
               try {
                 await repo.reset();
                 await refresh();
-                navigate("/welcome");
+                setReset(false);
               } catch (e) {
                 setError((e as Error).message);
               }

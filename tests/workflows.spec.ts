@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+import { test, expect } from "./support/account-fixture";
 import AxeBuilder from "@axe-core/playwright";
 async function demo(page: Page) {
   await page.goto("/");
@@ -23,10 +24,13 @@ test("account and complete onboarding", async ({ page }) => {
   await page.getByRole("button", { name: "Create your workspace" }).click();
   await page.getByLabel("Your name").fill("Jamie");
   await page.getByLabel("Email address").fill("jamie@example.edu");
-  await page.getByLabel("Password", { exact: true }).fill("samplepassword");
+  await page.getByLabel("Password", { exact: true }).fill("Sample meadow password 42!");
+  await page.getByLabel("Confirm password", { exact: true }).fill("Sample meadow password 42!");
   await page
     .getByRole("button", { name: "Create account", exact: true })
     .click();
+  await page.getByLabel("I saved my recovery code").check();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page.getByRole("button", { name: "Add your own course" }).click();
   await page.getByLabel("Course code").fill("ART 101");
   await page.getByLabel("Course name").fill("Ways of Seeing");
