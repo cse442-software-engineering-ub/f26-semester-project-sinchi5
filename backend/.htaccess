@@ -1,0 +1,4 @@
+Options -Indexes
+<FilesMatch "^(config.*|.*\.(sql|md))$">
+    Require all denied
+</FilesMatch>

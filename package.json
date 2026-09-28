@@ -8,10 +8,14 @@
   },
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/copy-backend.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "dev:api": "php -S 127.0.0.1:8080 backend/dev-router.php",
+    "test:php": "php backend/tests/security.php",
+    "test:accounts": "node backend/tests/http.mjs",
+    "test:schema": "php backend/tests/schema.php"
   },
   "dependencies": {
     "@base-ui/react": "^1.0.0",

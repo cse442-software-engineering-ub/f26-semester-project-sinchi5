@@ -42,12 +42,12 @@ describe("repository contracts", () => {
   it("persists notes, sessions and onboarding across repository instances", async () => {
     const storage = memory();
     const r = createRepositories(storage);
-    await r.auth.signIn("student@example.edu", "Student");
+    await r.auth.startDemo();
     await r.auth.completeOnboarding();
     const n = await r.notes.create({ title: "Persistent thought" });
     const next = createRepositories(storage);
     expect((await next.notes.get(n.id)).title).toBe("Persistent thought");
-    expect((await next.auth.session())?.name).toBe("Student");
+    expect((await next.auth.session())?.name).toBe("Erin");
     expect((await next.auth.onboarding()).completed).toBe(true);
     await next.auth.signOut();
     expect(await next.auth.session()).toBeNull();
