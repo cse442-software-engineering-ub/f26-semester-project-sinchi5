@@ -3,22 +3,29 @@ import { Check, Circle } from "lucide-react";
 import { useApp } from "../app/context";
 import { Modal } from "../shared/ui";
 import s from "../app/App.module.css";
+import { PASSWORD_MAX, PASSWORD_MIN, emailError, nameError, passwordCharacterError, passwordError } from "../services/validation";
 
-export const PASSWORD_MIN = 8;
-const passwordBytes = (value: string) => new TextEncoder().encode(value).length;
+export function FieldError({ id, message }: { id: string; message: string }) {
+  return message ? <small id={id} className={s.fieldError}>{message}</small> : null;
+}
 
 export function PasswordRequirements({ id, password, confirmation }: { id: string; password: string; confirmation?: string }) {
+  const characterError = passwordCharacterError(password);
+  const length = [...password].length;
   const rules = [
-    { label: `At least ${PASSWORD_MIN} characters`, met: [...password].length >= PASSWORD_MIN },
-    ...(passwordBytes(password) > 72 ? [{ label: "Too long — use at most 72 bytes", met: false }] : []),
+    { label: `${PASSWORD_MIN}–${PASSWORD_MAX} characters`, met: length >= PASSWORD_MIN && length <= PASSWORD_MAX },
+    { label: "Letters, numbers, spaces, and keyboard symbols only", met: password !== "" && !characterError },
     ...(confirmation === undefined ? [] : [{ label: "Passwords match", met: password !== "" && password === confirmation }]),
   ];
-  return <ul id={id} className={s.passwordRules} aria-live="polite">
-    {rules.map(r => <li key={r.label} data-met={r.met}>
-      {r.met ? <Check size={14} aria-hidden="true" /> : <Circle size={14} aria-hidden="true" />}
-      {r.label}<span className={s.srOnly}>{r.met ? " (met)" : " (not met)"}</span>
-    </li>)}
-  </ul>;
+  return <div id={id} aria-live="polite">
+    <ul className={s.passwordRules}>
+      {rules.map(r => <li key={r.label} data-met={r.met}>
+        {r.met ? <Check size={14} aria-hidden="true" /> : <Circle size={14} aria-hidden="true" />}
+        {r.label}<span className={s.srOnly}>{r.met ? " (met)" : " (not met)"}</span>
+      </li>)}
+    </ul>
+    {characterError && <small className={s.fieldError}>{characterError}</small>}
+  </div>;
 }
 
 export function RecoveryCode({ code, onDone }: { code: string; onDone: () => void }) {
@@ -50,7 +57,10 @@ export function AccountSettings() {
     const form = e.currentTarget;
     const data = new FormData(form);
     const value = (name: string) => String(data.get(name) || "");
-    if (action === "password" && value("password") !== value("confirm")) { setError("Passwords do not match."); return; }
+    const invalid = action === "profile" ? nameError(value("name")) || emailError(value("email"))
+      : action === "password" ? passwordError(value("password")) || (value("password") !== value("confirm") ? "Passwords do not match." : "")
+      : "";
+    if (invalid) { setError(invalid); return; }
     pending.current = true; setBusy(true); setError(""); setMessage("");
     try {
       if (action === "profile") await repo.auth.updateProfile(value("name"), value("email"), value("currentPassword"));

@@ -23,32 +23,116 @@ function field(array $input, string $key): string
     return $input[$key];
 }
 
+// Emoji, pictographs, flags, and the joiners/selectors that build them. Used to explain rejections.
+const EMOJI_PATTERN = '/[\x{1F000}-\x{1FAFF}\x{2600}-\x{27BF}\x{2300}-\x{23FF}\x{2B00}-\x{2BFF}\x{FE0E}\x{FE0F}\x{200D}\x{20E3}\x{E0020}-\x{E007F}]/u';
+// Control, zero-width, bidirectional-override, private-use, and unassigned characters.
+const INVISIBLE_PATTERN = '/\p{C}/u';
+const PASSWORD_MIN = 8;
+const PASSWORD_MAX = 72;
+
+function characterCount(string $value): int
+{
+    return preg_match_all('/./us', $value);
+}
+
+function trimEdges(string $value): string
+{
+    return preg_replace('/^[\s\p{Z}]+|[\s\p{Z}]+$/u', '', $value);
+}
+
 function validName(string $name): string
 {
-    $name = trim($name);
-    if (!preg_match('//u', $name) || preg_match('/[\x00-\x1F\x7F]/u', $name)
-        || preg_match_all('/./us', $name) < 1 || preg_match_all('/./us', $name) > 100) {
-        throw new HttpError(422, 'Use a name between 1 and 100 characters.');
+    if (!preg_match('//u', $name)) {
+        throw new HttpError(422, 'Your name contains characters we could not read. Try typing it again.');
+    }
+    // Pasted non-breaking and other Unicode spaces become ordinary single spaces.
+    $name = preg_replace('/\p{Z}+/u', ' ', trimEdges($name));
+    if (class_exists('Normalizer')) {
+        $name = Normalizer::normalize($name, Normalizer::FORM_C) ?: $name;
+    }
+    $length = characterCount($name);
+    if ($length === 0) {
+        throw new HttpError(422, 'Enter your name.');
+    }
+    if ($length > 100) {
+        throw new HttpError(422, "Your name can be at most 100 characters. It currently has $length.");
+    }
+    if (preg_match(EMOJI_PATTERN, $name)) {
+        throw new HttpError(422, 'Your name can’t include emoji. Use letters only.');
+    }
+    if (preg_match(INVISIBLE_PATTERN, $name)) {
+        throw new HttpError(422, 'Your name contains a hidden character, such as a tab or line break. Try typing it instead of pasting.');
+    }
+    if (preg_match('/\p{N}/u', $name)) {
+        throw new HttpError(422, 'Your name can’t include numbers.');
+    }
+    if (preg_match('/[^\p{L}\p{M} \'’.\-]/u', $name, $match)) {
+        throw new HttpError(422, "Your name can’t include \"{$match[0]}\". Use letters, spaces, hyphens (-), apostrophes ('), and periods (.).");
+    }
+    if (!preg_match('/^\p{L}/u', $name)) {
+        throw new HttpError(422, 'Your name must start with a letter.');
+    }
+    if (preg_match('/\p{M}{3,}/u', $name)) {
+        throw new HttpError(422, 'Your name has too many accent marks stacked on one letter.');
     }
     return $name;
 }
 
 function validEmail(string $email): string
 {
-    $email = strtolower(trim($email));
-    if (strlen($email) > 254 || !filter_var($email, FILTER_VALIDATE_EMAIL)
-        || preg_match('/[^\x20-\x7E]/', $email)) {
-        throw new HttpError(422, 'Enter a valid email address.');
+    if (!preg_match('//u', $email)) {
+        throw new HttpError(422, 'Your email address contains characters we could not read. Try typing it again.');
+    }
+    $email = strtolower(trimEdges($email));
+    if ($email === '') {
+        throw new HttpError(422, 'Enter your email address.');
+    }
+    if (preg_match(EMOJI_PATTERN, $email)) {
+        throw new HttpError(422, 'Email addresses can’t include emoji.');
+    }
+    if (preg_match(INVISIBLE_PATTERN, $email)) {
+        throw new HttpError(422, 'Your email address contains a hidden character, such as a tab or line break. Try typing it instead of pasting.');
+    }
+    if (preg_match('/[\s\p{Z}]/u', $email)) {
+        throw new HttpError(422, 'Email addresses can’t contain spaces.');
+    }
+    if (preg_match('/[^\x21-\x7E]/u', $email, $match)) {
+        throw new HttpError(422, "Email addresses can’t include \"{$match[0]}\". Use unaccented letters, numbers, and symbols such as . _ - +");
+    }
+    if (strlen($email) > 254) {
+        throw new HttpError(422, 'Email addresses can be at most 254 characters.');
+    }
+    if (substr_count($email, '@') !== 1) {
+        throw new HttpError(422, 'Email addresses need exactly one @, like name@university.edu.');
+    }
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        throw new HttpError(422, 'Enter a complete email address, like name@university.edu.');
     }
     return $email;
 }
 
 function validPassword(string $password): string
 {
-    // Consistent with the bcrypt fallback: never silently truncate a password.
-    if (!preg_match('//u', $password) || str_contains($password, "\0")
-        || preg_match_all('/./us', $password) < 8 || strlen($password) > 72) {
-        throw new HttpError(422, 'Use at least 8 characters and at most 72 bytes for your password.');
+    // Messages never repeat the password's own characters back to the screen.
+    if (!preg_match('//u', $password)) {
+        throw new HttpError(422, 'Your password contains characters we could not read. Try typing it again.');
+    }
+    if (preg_match(EMOJI_PATTERN, $password)) {
+        throw new HttpError(422, 'Passwords can’t include emoji. Use letters, numbers, spaces, and keyboard symbols such as ! ? # $');
+    }
+    if (preg_match(INVISIBLE_PATTERN, $password)) {
+        throw new HttpError(422, 'Your password contains a hidden character, such as a tab or line break. Try typing it instead of pasting.');
+    }
+    // Printable ASCII only: the same on every keyboard, and one byte per character so bcrypt never truncates.
+    if (preg_match('/[^\x20-\x7E]/', $password)) {
+        throw new HttpError(422, 'Passwords can’t include accented letters or characters from other alphabets, such as é, ñ, or ß. Use A–Z, numbers, spaces, and keyboard symbols.');
+    }
+    $length = strlen($password);
+    if ($length < PASSWORD_MIN) {
+        throw new HttpError(422, 'Use at least ' . PASSWORD_MIN . " characters for your password. It currently has $length.");
+    }
+    if ($length > PASSWORD_MAX) {
+        throw new HttpError(422, 'Use at most ' . PASSWORD_MAX . " characters for your password. It currently has $length.");
     }
     return $password;
 }
@@ -81,7 +165,8 @@ function recoveryHash(string $code): string
 {
     $code = strtoupper(preg_replace('/[\s-]+/', '', $code));
     if (!preg_match('/^[A-F0-9]{32}$/D', $code)) {
-        throw new HttpError(422, 'Email or recovery code is incorrect.');
+        // The format is public, so a specific message reveals nothing about any account.
+        throw new HttpError(422, 'Recovery codes have 32 characters using only numbers 0–9 and letters A–F, like 1A2B-3C4D-….');
     }
     return hash('sha256', $code);
 }

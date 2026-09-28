@@ -10,7 +10,8 @@ import {
 } from "lucide-react";
 import { useApp } from "../app/context";
 import { ImportDialog } from "./imports";
-import { PASSWORD_MIN, PasswordRequirements, RecoveryCode } from "./account";
+import { FieldError, PasswordRequirements, RecoveryCode } from "./account";
+import { PASSWORD_MIN, emailError, nameError, passwordCharacterError, passwordError, recoveryCodeError } from "../services/validation";
 import { BRAND } from "../domain";
 import s from "../app/App.module.css";
 export function Onboarding() {
@@ -34,10 +35,37 @@ export function Onboarding() {
   const [courseName, setCourseName] = useState("");
   const [color, setColor] = useState("#869D7A");
   const [term, setTerm] = useState("Fall 2026");
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [submitted, setSubmitted] = useState(false);
+  const fieldErrors = {
+    name: mode === "signup" ? nameError(name) : "",
+    email: emailError(email),
+    recovery: mode === "recover" ? recoveryCodeError(recoveryInput) : "",
+    password: mode === "signin" ? (password ? "" : "Enter your password.") : passwordError(password),
+  };
+  const shown = (field: keyof typeof fieldErrors) => {
+    const message = (submitted || touched[field]) ? fieldErrors[field] : "";
+    // The requirements list already explains character problems in new passwords.
+    return field === "password" && mode !== "signin" && passwordCharacterError(password) ? "" : message;
+  };
+  const touch = (field: string) => () => setTouched(t => ({ ...t, [field]: true }));
+  const invalidProps = (field: keyof typeof fieldErrors, describedBy?: string) => ({
+    "aria-invalid": Boolean((submitted || touched[field]) && fieldErrors[field]) || undefined,
+    "aria-describedby": [shown(field) ? `${field}-error` : "", describedBy].filter(Boolean).join(" ") || undefined,
+    onBlur: touch(field),
+  });
   async function enter(demo = false) {
     if (pending.current) return;
     setError(""); setMessage("");
-    if (!demo && mode !== "signin" && password !== confirmation) { setError("Passwords do not match."); return; }
+    if (!demo) {
+      const first = (Object.keys(fieldErrors) as (keyof typeof fieldErrors)[]).find(f => fieldErrors[f]);
+      if (first) {
+        setSubmitted(true);
+        document.getElementById(`${first}-input`)?.focus();
+        return;
+      }
+      if (mode !== "signin" && password !== confirmation) { setError("Passwords do not match."); return; }
+    }
     pending.current = true;
     setBusy(true);
     try {
@@ -67,6 +95,7 @@ export function Onboarding() {
   }
   function changeMode(next: string) {
     setMode(next); setError(""); setMessage(""); setPassword(""); setConfirmation(""); setRecoveryInput("");
+    setTouched({}); setSubmitted(false);
   }
   return (
     <div className={s.onboarding}>
@@ -150,44 +179,53 @@ export function Onboarding() {
               ) : (
                 <form
                   className={s.form}
+                  noValidate
                   onSubmit={(e) => {
                     e.preventDefault();
                     void enter();
                   }}
                 >
                   <fieldset className={s.accountFields} disabled={busy}>
-                  {mode === "signup" && (
+                  {mode === "signup" && (<>
                     <label>
                       Your name
                       <input
+                        id="name-input"
                         required
                         autoComplete="name"
-                        maxLength={100}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="What should we call you?"
+                        {...invalidProps("name")}
                       />
                     </label>
-                  )}
+                    <FieldError id="name-error" message={shown("name")} />
+                  </>)}
                   <label>
                     Email address
                     <input
+                      id="email-input"
                       type="email"
                       required
                       autoComplete="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="you@university.edu"
-                      maxLength={254}
+                      {...invalidProps("email")}
                     />
                   </label>
-                  {mode === "recover" && <label>Recovery code<input required autoComplete="off" spellCheck={false} value={recoveryInput} onChange={e => setRecoveryInput(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" /></label>}
+                  <FieldError id="email-error" message={shown("email")} />
+                  {mode === "recover" && <>
+                    <label>Recovery code<input id="recovery-input" required autoComplete="off" spellCheck={false} value={recoveryInput} onChange={e => setRecoveryInput(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" {...invalidProps("recovery")} /></label>
+                    <FieldError id="recovery-error" message={shown("recovery")} />
+                  </>}
                   <label>
                     {mode === "recover" ? "New password" : "Password"}
                     <input
+                      id="password-input"
                       type="password"
                       minLength={mode === "signin" ? undefined : PASSWORD_MIN}
-                      aria-describedby={mode === "signin" ? undefined : "signup-password-help"}
+                      {...invalidProps("password", mode === "signin" ? undefined : "signup-password-help")}
                       required
                       autoComplete={
                         mode === "signin" ? "current-password" : "new-password"
@@ -197,6 +235,7 @@ export function Onboarding() {
                       placeholder={mode === "signin" ? "Your password" : `At least ${PASSWORD_MIN} characters`}
                     />
                   </label>
+                  <FieldError id="password-error" message={shown("password")} />
                   {mode !== "signin" && <>
                     <label>Confirm password<input type="password" required autoComplete="new-password" aria-describedby="signup-password-help" value={confirmation} onChange={e => setConfirmation(e.target.value)} /></label>
                     <PasswordRequirements id="signup-password-help" password={password} confirmation={confirmation} />

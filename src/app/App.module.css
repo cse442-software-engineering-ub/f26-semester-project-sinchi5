@@ -1632,6 +1632,25 @@
   color: var(--text);
   font-size: 0.8rem;
 }
+.fieldError {
+  display: block;
+  margin-top: -8px;
+  color: #9b392e;
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+.passwordRules + .fieldError {
+  margin-top: 8px;
+}
+.accountFields input[aria-invalid="true"] {
+  border-color: #b4483c;
+}
+:global([data-theme="dark"]) .fieldError {
+  color: #ffb7a9;
+}
+:global([data-theme="dark"]) .accountFields input[aria-invalid="true"] {
+  border-color: #d98a7c;
+}
 .passwordRules {
   list-style: none;
   margin: -6px 0 0;

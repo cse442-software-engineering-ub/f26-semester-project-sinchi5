@@ -69,6 +69,12 @@ try {
   assert.equal(wrong.status, 401); assert.deepEqual(wrong.data, unknown.data);
   assert.equal((await b.call("login", { email, password })).status, 200);
   assert.equal((await a.call("profile", { name: "Changed name", email, currentPassword: "" })).data.user.name, "Changed name");
+  const emojiName = await a.call("profile", { name: "Jamie 😀", email, currentPassword: "" });
+  assert.equal(emojiName.status, 422); assert.match(emojiName.data.error, /emoji/);
+  const hiddenName = await a.call("profile", { name: "Ja\u200Bmie", email, currentPassword: "" });
+  assert.equal(hiddenName.status, 422); assert.match(hiddenName.data.error, /hidden character/);
+  const accented = await a.call("password", { currentPassword: password, password: "pässwort sicher" });
+  assert.equal(accented.status, 422); assert.match(accented.data.error, /accented letters/); assert(!accented.data.error.includes("ä"));
   assert.equal((await a.call("password", { currentPassword: "incorrect", password: changed })).status, 422);
   assert.equal((await a.call("password", { currentPassword: password, password: changed })).status, 200); currentPassword = changed;
   assert.equal((await b.call("session")).data.user, null);
