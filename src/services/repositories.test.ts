@@ -136,6 +136,70 @@ describe("repository contracts", () => {
     expect(await r.notes.list()).toHaveLength(6);
     await expect(r.notes.create({})).rejects.toThrow("storage");
   });
+  it("allows an edit-level collaborator to save note changes", async () => {
+    const r = createRepositories();
+
+    const note = await r.notes.create({
+      title: "Shared Note",
+      body: "Original content",
+      visibility: "shared",
+    });
+
+    await r.notes.inviteCollaborator(
+      note.id,
+      "jamie@example.edu",
+    );
+
+    await r.notes.setCollaboratorPermission(
+      note.id,
+      "classmate-jamie",
+      "edit",
+    );
+
+    await r.auth.signIn("jamie@example.edu", "Jamie");
+
+    const saved = await r.notes.save({
+      ...note,
+      body: "Edited by Jamie",
+    });
+
+    expect(saved.body).toBe("Edited by Jamie");
+    expect((await r.notes.get(note.id)).body).toBe("Edited by Jamie");
+  });
+  it("rejects edits from a view-level collaborator", async () => {
+    const r = createRepositories();
+
+    const note = await r.notes.create({
+      title: "Shared Note",
+      body: "Original content",
+      visibility: "shared",
+    });
+
+    await r.notes.inviteCollaborator(
+      note.id,
+      "jamie@example.edu",
+    );
+
+    await r.notes.setCollaboratorPermission(
+      note.id,
+      "classmate-jamie",
+      "view",
+    );
+
+    await r.auth.signIn("jamie@example.edu", "Jamie");
+
+    await expect(
+      r.notes.save({
+        ...note,
+        body: "This should not be saved",
+      }),
+    ).rejects.toThrow("permission");
+
+    expect((await r.notes.get(note.id)).body).toBe(
+      "Original content",
+    );
+  });
+
 });
 
 describe("note pinning", () => {
