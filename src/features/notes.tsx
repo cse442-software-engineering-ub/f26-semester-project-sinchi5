@@ -542,7 +542,8 @@ export function NoteWorkspace() {
                   className={s.form}
                   onSubmit={async (e) => {
                     e.preventDefault();
-                    if (postingRef.current) return;
+                    if (postingRef.current || note.visibility !== "shared")
+                      return;
                     postingRef.current = true;
                     setPosting(true);
                     setPostError("");
