@@ -204,6 +204,21 @@ export function createRepositories(
       },
       async save(note) {
         const previous = get(note.id);
+
+        const currentEmail = db.user?.email.trim().toLowerCase();
+
+        if (currentEmail) {
+          const collaborators = await repo.notes.collaborators(note.id);
+
+          const collaborator = collaborators.find(
+            (entry) => entry.email.toLowerCase() === currentEmail,
+          );
+
+          if (collaborator && collaborator.permission !== "edit") {
+            throw new Error("You do not have permission to edit this note.");
+          }
+        }
+
         if (previous.title !== note.title || previous.body !== note.body)
           db.versions.unshift({
             id: id(),
@@ -213,6 +228,7 @@ export function createRepositories(
             author: db.user?.name || "You",
             createdAt: previous.updatedAt,
           });
+
         const saved = { ...note, updatedAt: now() };
         db.notes = db.notes.map((n) => (n.id === note.id ? saved : n));
         persist();

@@ -5,7 +5,7 @@ describe("frontend invitation mock contract", () => {
   it("returns a registered classmate once, scoped to the note, without persistent storage", async () => {
     const repo = createMockCollaborators();
     const response = await repo.inviteCollaborator("note-a", " Jamie@Example.edu ");
-    expect(response.collaborator).toEqual({ id: "classmate-jamie", name: "Jamie", email: "jamie@example.edu", status: "Pending" });
+    expect(response.collaborator).toEqual({id: "classmate-jamie",name: "Jamie",email: "jamie@example.edu",status: "Pending",permission: "view",});
     await repo.inviteCollaborator("note-a", "jamie@example.edu");
     expect(await repo.collaborators("note-a")).toHaveLength(1);
     expect(await repo.collaborators("note-b")).toEqual([]);
@@ -30,5 +30,14 @@ describe("frontend invitation mock contract", () => {
       await pending;
       expect(await repo.collaborators("note-a")).toHaveLength(1);
     } finally { vi.useRealTimers(); }
+  });
+  it("stores collaborator permission per note", async () => {
+  const repo = createMockCollaborators();
+  const response = await repo.inviteCollaborator("note-a","jamie@example.edu",);
+  expect(response.collaborator.permission).toBe("view");
+  const updated = await repo.setCollaboratorPermission("note-a","classmate-jamie","edit",);
+  expect(updated.permission).toBe("edit");
+  const collaborators = await repo.collaborators("note-a");
+  expect(collaborators[0].permission).toBe("edit");
   });
 });
