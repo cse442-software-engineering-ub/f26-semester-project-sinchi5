@@ -25,6 +25,10 @@ export interface Category {
 export interface Note {
   id: string;
   ownerId?: string;
+  // Recorded at creation time so comment permission checks (task #65) can
+  // tell the creator apart from anyone else, since every mock user shares
+  // the literal id "student" - ownerId alone can't distinguish people.
+  ownerEmail?: string;
   title: string;
   body: string;
   courseId: string;

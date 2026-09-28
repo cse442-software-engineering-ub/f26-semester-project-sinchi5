@@ -180,6 +180,7 @@ export function createRepositories(
           updatedAt: now(),
           ...data,
           ownerId: db.user?.id ?? "student",
+          ownerEmail: db.user?.email,
         };
         db.notes.unshift(n);
         persist();
