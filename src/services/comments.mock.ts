@@ -1,0 +1,38 @@
+import type { Comment, Note, NoteRepository, User } from "../domain";
+
+const MAX_COMMENT_LENGTH = 2000;
+
+export function createMockComments(
+  db: { comments: Comment[]; user: User | null },
+  get: (noteId: string) => Note,
+  persist: () => void,
+): Pick<NoteRepository, "comments" | "comment"> {
+  return {
+    async comments(noteId) {
+      return db.comments
+        .filter((c) => c.noteId === noteId)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    },
+    async comment(noteId, body) {
+      if (get(noteId).visibility !== "shared")
+        throw new Error("Share this note before adding comments.");
+      const trimmed = body.trim();
+      if (!trimmed) throw new Error("Write a comment first.");
+      if (trimmed.length > MAX_COMMENT_LENGTH)
+        throw new Error(
+          `Comments can be at most ${MAX_COMMENT_LENGTH} characters.`,
+        );
+      const c: Comment = {
+        id: crypto.randomUUID(),
+        noteId,
+        body: trimmed,
+        author: db.user?.name || "You",
+        authorId: db.user?.id || "student",
+        createdAt: new Date().toISOString(),
+      };
+      db.comments.push(c);
+      persist();
+      return c;
+    },
+  };
+}
