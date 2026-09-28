@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { emailError, nameError, normalizeName, passwordError, recoveryCodeError } from "./validation";
 
 describe("names", () => {
-  it.each(["Jamie", "Zoë O'Brien-Smith", "María José", "J. R. R. Tolkien", "Nguyễn Văn An", "李小龙", "Анна", "محمد", "D’Angelo"])(
+  it.each(["Jamie", "Zoë O'Brien-Smith", "María José", "J. R. R. Tolkien", "Nguyễn Văn An", "Nguyễn Thị Ngọc", "李小龙", "Анна", "محمد", "D’Angelo"])(
     "accepts %s", name => expect(nameError(name)).toBe(""));
   it("tidies spaces and accents", () => {
     expect(normalizeName("  Jamie  Lee ")).toBe("Jamie Lee");
@@ -22,7 +22,8 @@ describe("names", () => {
     ["Jamie <script>", '"<"'],
     ["Jamie@home", '"@"'],
     ["-Jamie", "start with a letter"],
-    ["Já́́́mie", "accent marks"],
+    ["Ja\u0301\u0301\u0301mie", "accent marks"],
+    ["J\u00E1\u0301\u0301mie", "accent marks"],
     ["Ja\uD800mie", "hidden character"],
   ])("rejects %j", (name, message) => expect(nameError(name)).toContain(message));
 });

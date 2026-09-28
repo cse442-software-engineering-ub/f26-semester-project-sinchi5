@@ -72,7 +72,9 @@ function validName(string $name): string
     if (!preg_match('/^\p{L}/u', $name)) {
         throw new HttpError(422, 'Your name must start with a letter.');
     }
-    if (preg_match('/\p{M}{3,}/u', $name)) {
+    // Count marks on the fully decomposed form so a precomposed letter can't hide one.
+    $decomposed = class_exists('Normalizer') ? (Normalizer::normalize($name, Normalizer::FORM_D) ?: $name) : $name;
+    if (preg_match('/\p{M}{3,}/u', $decomposed)) {
         throw new HttpError(422, 'Your name has too many accent marks stacked on one letter.');
     }
     return $name;

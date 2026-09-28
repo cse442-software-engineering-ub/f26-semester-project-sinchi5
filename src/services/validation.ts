@@ -33,7 +33,8 @@ export function nameError(raw: string): string {
   const symbol = name.match(/[^\p{L}\p{M} '’.-]/u);
   if (symbol) return `Your name can’t include "${symbol[0]}". Use letters, spaces, hyphens (-), apostrophes ('), and periods (.).`;
   if (!/^\p{L}/u.test(name)) return "Your name must start with a letter.";
-  if (/\p{M}{3,}/u.test(name)) return "Your name has too many accent marks stacked on one letter.";
+  // Count marks on the fully decomposed form so a precomposed letter can't hide one.
+  if (/\p{M}{3,}/u.test(name.normalize("NFD"))) return "Your name has too many accent marks stacked on one letter.";
   return "";
 }
 
