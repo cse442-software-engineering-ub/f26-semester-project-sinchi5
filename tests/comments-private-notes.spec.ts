@@ -26,6 +26,23 @@ test("Test 2 - controls appear after Private to Shared, disappear after switchin
   await expect(page.getByText("Just for you")).toBeVisible();
   await expect(page.getByLabel("Add a comment")).not.toBeVisible();
 });
+test("Test 2b (extra) - switching back to Private creates no comment", async ({
+  page,
+}) => {
+  await demo(page);
+  await page.goto("/notes/note-2");
+  await page.getByRole("button", { name: "Comments" }).click();
+  await page.getByLabel("Visibility").selectOption("shared");
+  await expect(page.getByText("Be the first to add a thought.")).toBeVisible();
+  await page.getByLabel("Visibility").selectOption("private");
+  await expect(page.getByLabel("Add a comment")).not.toBeVisible();
+  // Switch back to Shared and confirm the comment list is still empty -
+  // proves no comment was silently created while the note was private,
+  // not just that the composer was invisible in the meantime.
+  await page.getByLabel("Visibility").selectOption("shared");
+  await expect(page.getByText("Be the first to add a thought.")).toBeVisible();
+  await expect(page.locator("article")).toHaveCount(0);
+});
 test("Test 3 (extra) - posting before the visibility save lands is rejected safely", async ({
   page,
 }) => {
