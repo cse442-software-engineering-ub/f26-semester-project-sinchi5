@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../app/context";
 import { PageHeading, NoteCard, Empty, Modal, EventRow } from "../shared/ui";
-import type { Note, NoteVersion, Comment, CommentLoadScenario } from "../domain";
+import type { Note, NoteVersion, Comment, CommentScenario } from "../domain";
 import s from "../app/App.module.css";
 import { Collaborators } from "./collaborators";
 export function Notes() {
@@ -239,7 +239,7 @@ export function NoteWorkspace() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(true);
   const [commentsError, setCommentsError] = useState("");
-  const [commentScenario, setCommentScenario] = useState<CommentLoadScenario>("success");
+  const [commentScenario, setCommentScenario] = useState<CommentScenario>("success");
   const [commentsRetry, setCommentsRetry] = useState(0);
   const [versions, setVersions] = useState<NoteVersion[]>([]);
   const [comment, setComment] = useState("");
@@ -485,7 +485,7 @@ export function NoteWorkspace() {
                     <select
                       value={commentScenario}
                       onChange={(e) =>
-                        setCommentScenario(e.target.value as CommentLoadScenario)
+                        setCommentScenario(e.target.value as CommentScenario)
                       }
                     >
                       <option value="success">Loads normally</option>
