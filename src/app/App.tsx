@@ -72,7 +72,15 @@ export default function App() {
     );
   return (
     <div className={s.app} key={state.user.id}>
-      <a href="#main" className={s.skip}>
+      <a
+        href="#main"
+        className={s.skip}
+        onClick={(event) => {
+          // Focus content without replacing a hash-based page route.
+          event.preventDefault();
+          document.getElementById("main")?.focus();
+        }}
+      >
         Skip to content
       </a>
       <aside className={s.sidebar}>
@@ -219,7 +227,7 @@ export default function App() {
             </Link>
           </div>
         </header>
-        <main id="main" className={s.main}>
+        <main id="main" tabIndex={-1} className={s.main}>
           {state.error && (
             <div className={s.error} role="alert">
               {state.error}

@@ -53,6 +53,15 @@ BASE_PATH=/notely/ npm run build
 
 Copy the output into that Apache directory. React Router uses the generated base URL. The account API follows this base automatically. Set the PHP cookie path and configured Origin for the corresponding server; details are in the deployment guide.
 
+For aptitude, where SPA rewrite rules are ignored, build with hash routing:
+
+```sh
+VITE_ROUTER_MODE=hash BASE_PATH=/CSE442/2026-Fall/cse-442c/ npm run build
+npm run test:static-build
+```
+
+Page URLs then use `#/welcome` and `#/settings` after the class directory. Assets and PHP API URLs keep the class base path. Follow the deployment guide's upload command to preserve the server-local `api/config-path.php` and `api/.notely-config.*` credentials directory.
+
 ## Design and verification
 
 The interface uses the supplied sage, mint, brown, and slate palette, with semantic neutral surfaces and theme-specific text. CSS motion is limited to press feedback, anchored menus, and dialogs/sheets. Keyboard use bypasses motion, reduced motion removes positional transitions, and reduced transparency uses solid navigation. Base UI provides dialog/menu focus management and dismissal.

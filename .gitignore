@@ -11,3 +11,4 @@ devwork-ai/
 !.env.example
 backend/config.local.php
 backend/config-path.php
+.notely-config.*/
