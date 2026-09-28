@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../app/context";
 import { PageHeading, NoteCard, Empty, Modal, EventRow } from "../shared/ui";
-import type { Note, NoteVersion, Comment } from "../domain";
+import type {Note,NoteVersion,Comment,Collaborator} from "../domain";
 import s from "../app/App.module.css";
 import { Collaborators } from "./collaborators";
 export function Notes() {
@@ -238,6 +238,7 @@ export function NoteWorkspace() {
   const [panel, setPanel] = useState("comments");
   const [comments, setComments] = useState<Comment[]>([]);
   const [versions, setVersions] = useState<NoteVersion[]>([]);
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [comment, setComment] = useState("");
   const [preview, setPreview] = useState<NoteVersion>();
   const [restore, setRestore] = useState(false);
@@ -254,13 +255,15 @@ export function NoteWorkspace() {
       repo.notes.get(id),
       repo.notes.comments(id),
       repo.notes.versions(id),
+      repo.notes.collaborators(id),
     ])
-      .then(([n, c, v]) => {
+      .then(([n, c, v, collaborators]) => {
         if (active) {
           setNote(n);
           noteRef.current = n;
           setComments(c);
           setVersions(v);
+          setCollaborators(collaborators);
         }
       })
       .catch((e) => active && setError(e.message));
@@ -307,7 +310,7 @@ export function NoteWorkspace() {
     };
   }, [id, repo]);
   function edit(patch: Partial<Note>) {
-    if (!note) return;
+    if (!note || !canEdit) return;
     const n = { ...note, ...patch };
     noteRef.current = n;
     dirtyRef.current = true;
@@ -339,6 +342,21 @@ export function NoteWorkspace() {
       </Empty>
     );
   if (!note) return <p role="status">Opening your note…</p>;
+  const currentEmail = state.user?.email.trim().toLowerCase();
+
+  const currentCollaborator = collaborators.find(
+    (entry) => entry.email.trim().toLowerCase() === currentEmail,
+  );
+
+  const isOwner =
+    !!state.user &&
+    !currentCollaborator &&
+    note.ownerId === state.user.id;
+
+  const canEdit =
+    !state.user ||
+    isOwner ||
+    currentCollaborator?.permission === "edit";
   return (
     <>
       <div className={s.editorTop}>
@@ -352,7 +370,7 @@ export function NoteWorkspace() {
           className={note.pinned ? s.primary : s.secondary}
           aria-label={note.pinned ? "Unpin note" : "Pin note"}
           aria-pressed={Boolean(note.pinned)}
-          disabled={pinning}
+          disabled={pinning || !canEdit}
           onClick={togglePin}
         >
           <Pin size={18} aria-hidden="true" />
@@ -371,6 +389,7 @@ export function NoteWorkspace() {
             className={s.noteTitle}
             aria-label="Note title"
             value={note.title}
+            disabled={!canEdit}
             onChange={(e) => edit({ title: e.target.value })}
           />
           <div className={s.noteMetadata}>
@@ -378,6 +397,7 @@ export function NoteWorkspace() {
               Course
               <select
                 value={note.courseId}
+                disabled={!canEdit}
                 onChange={(e) => edit({ courseId: e.target.value })}
               >
                 <option value="">No course</option>
@@ -393,6 +413,7 @@ export function NoteWorkspace() {
               <input
                 type="date"
                 value={note.lectureDate}
+                disabled={!canEdit}
                 onChange={(e) => edit({ lectureDate: e.target.value })}
               />
             </label>
@@ -400,6 +421,7 @@ export function NoteWorkspace() {
               Category
               <select
                 value={note.category}
+                disabled={!canEdit}
                 onChange={(e) => edit({ category: e.target.value })}
               >
                 {["School", "Work", "Meetings", "Personal"].map((c) => (
@@ -411,6 +433,7 @@ export function NoteWorkspace() {
               Visibility
               <select
                 value={note.visibility}
+                disabled={!canEdit}
                 onChange={(e) =>
                   edit({ visibility: e.target.value as Note["visibility"] })
                 }
@@ -425,6 +448,7 @@ export function NoteWorkspace() {
             <input
               placeholder="Add tags, separated by commas"
               value={note.tags.join(", ")}
+              disabled={!canEdit}
               onChange={(e) =>
                 edit({
                   tags: e.target.value.split(",").map((t) => t.trimStart()),
@@ -437,12 +461,17 @@ export function NoteWorkspace() {
             aria-label="Note body"
             placeholder="Start anywhere. This space is yours…"
             value={note.body}
+            disabled={!canEdit}
             onChange={(e) => edit({ body: e.target.value })}
           />
         </section>
         <aside className={s.inspector}>
-          <Collaborators key={`${note.id}:${state.user?.id || ""}`} noteId={note.id}
-            isOwner={!!state.user && note.ownerId === state.user.id} repository={repo.notes} />
+          <Collaborators
+            key={`${note.id}:${state.user?.id || ""}`}
+            noteId={note.id}
+            isOwner={isOwner}
+            repository={repo.notes}
+          />
           <div className={s.segment}>
             <button
               className={panel === "comments" ? s.activeButton : ""}
