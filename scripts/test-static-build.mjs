@@ -81,7 +81,7 @@ try {
       const settings = await context.newPage();
       settings.setDefaultTimeout(20_000);
       assert.equal((await settings.goto(origin + base + "#/settings")).status(), 200);
-      await expect(settings.getByRole("heading", { name: "Your space, your way", exact: true })).toBeVisible();
+      await expect(settings.getByRole("heading", { name: "Settings", level: 1, exact: true })).toBeVisible();
       assert.equal((await settings.reload()).status(), 200);
       await expect(settings.getByRole("button", { name: "Edit account", exact: true })).toBeVisible();
       assert.equal(new URL(settings.url()).hash, "#/settings");
