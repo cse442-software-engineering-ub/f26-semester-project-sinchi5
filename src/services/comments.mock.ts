@@ -8,7 +8,14 @@ export function createMockComments(
   persist: () => void,
 ): Pick<NoteRepository, "comments" | "comment"> {
   return {
-    async comments(noteId) {
+    async comments(noteId, scenario = "success") {
+      if (scenario === "failure") {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        throw new Error("Comments could not be loaded.");
+      }
+      if (scenario === "slow") {
+        await new Promise((resolve) => setTimeout(resolve, 600));
+      }
       return db.comments
         .filter((c) => c.noteId === noteId)
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
