@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../app/context";
 import { PageHeading, NoteCard, Empty, Modal, EventRow } from "../shared/ui";
+import { MAX_COMMENT_LENGTH } from "../domain";
 import type { Note, NoteVersion, Comment, CommentScenario } from "../domain";
 import s from "../app/App.module.css";
 import { Collaborators } from "./collaborators";
@@ -243,6 +244,9 @@ export function NoteWorkspace() {
   const [commentsRetry, setCommentsRetry] = useState(0);
   const [versions, setVersions] = useState<NoteVersion[]>([]);
   const [comment, setComment] = useState("");
+  const [posting, setPosting] = useState(false);
+  const [postError, setPostError] = useState("");
+  const [postScenario, setPostScenario] = useState<CommentScenario>("success");
   const [preview, setPreview] = useState<NoteVersion>();
   const [restore, setRestore] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -493,6 +497,19 @@ export function NoteWorkspace() {
                       <option value="failure">Fails to load</option>
                     </select>
                   </label>
+                  <label>
+                    Comment posting
+                    <select
+                      value={postScenario}
+                      onChange={(e) =>
+                        setPostScenario(e.target.value as CommentScenario)
+                      }
+                    >
+                      <option value="success">Posts normally</option>
+                      <option value="slow">Posts slowly</option>
+                      <option value="failure">Fails to post</option>
+                    </select>
+                  </label>
                 </details>
                 {commentsLoading ? (
                   <p role="status">Loading comments…</p>
@@ -524,12 +541,17 @@ export function NoteWorkspace() {
                   className={s.form}
                   onSubmit={async (e) => {
                     e.preventDefault();
+                    if (posting) return;
+                    setPosting(true);
+                    setPostError("");
                     try {
-                      await repo.notes.comment(id, comment);
+                      await repo.notes.comment(id, comment, postScenario);
                       setComment("");
                       setCommentsRetry((n) => n + 1);
                     } catch (e) {
-                      setError((e as Error).message);
+                      setPostError((e as Error).message);
+                    } finally {
+                      setPosting(false);
                     }
                   }}
                 >
@@ -543,8 +565,23 @@ export function NoteWorkspace() {
                       onChange={(e) => setComment(e.target.value)}
                     />
                   </label>
-                  <button disabled={!comment.trim()} className={s.primary}>
-                    Post comment
+                  <small className={s.muted}>
+                    {comment.length.toLocaleString()} / {MAX_COMMENT_LENGTH.toLocaleString()}
+                  </small>
+                  {postError && (
+                    <p role="alert" className={s.error}>
+                      {postError}
+                    </p>
+                  )}
+                  <button
+                    disabled={
+                      !comment.trim() ||
+                      comment.length > MAX_COMMENT_LENGTH ||
+                      posting
+                    }
+                    className={s.primary}
+                  >
+                    {posting ? "Posting…" : "Post comment"}
                   </button>
                 </form>
               </>
