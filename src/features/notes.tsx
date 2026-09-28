@@ -245,6 +245,7 @@ export function NoteWorkspace() {
   const [versions, setVersions] = useState<NoteVersion[]>([]);
   const [comment, setComment] = useState("");
   const [posting, setPosting] = useState(false);
+  const postingRef = useRef(false);
   const [postError, setPostError] = useState("");
   const [postScenario, setPostScenario] = useState<CommentScenario>("success");
   const [preview, setPreview] = useState<NoteVersion>();
@@ -541,7 +542,8 @@ export function NoteWorkspace() {
                   className={s.form}
                   onSubmit={async (e) => {
                     e.preventDefault();
-                    if (posting) return;
+                    if (postingRef.current) return;
+                    postingRef.current = true;
                     setPosting(true);
                     setPostError("");
                     try {
@@ -551,6 +553,7 @@ export function NoteWorkspace() {
                     } catch (e) {
                       setPostError((e as Error).message);
                     } finally {
+                      postingRef.current = false;
                       setPosting(false);
                     }
                   }}
