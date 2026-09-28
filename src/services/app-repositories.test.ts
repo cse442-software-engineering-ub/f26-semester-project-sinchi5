@@ -56,3 +56,13 @@ it("ignores an older server refresh after switching into the demo", async () => 
   expect((await earlier)?.id).toBe("student");
   expect(await repo.notes.list()).toHaveLength(6);
 });
+it("starts real accounts with an empty workspace while the demo keeps sample content", async () => {
+  const repo = createAppRepositories(memory(), memory(), { session: async () => alice } as unknown as AuthRepository);
+  await repo.auth.session();
+  expect(await repo.courses.list()).toEqual([]);
+  expect(await repo.notes.list()).toEqual([]);
+  await repo.reset();
+  expect(await repo.courses.list()).toEqual([]);
+  await repo.auth.startDemo();
+  expect((await repo.courses.list()).length).toBeGreaterThan(0);
+});

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../app/context";
 import { ImportDialog } from "./imports";
-import { RecoveryCode } from "./account";
+import { PASSWORD_MIN, PasswordRequirements, RecoveryCode } from "./account";
 import { BRAND } from "../domain";
 import s from "../app/App.module.css";
 export function Onboarding() {
@@ -186,19 +186,20 @@ export function Onboarding() {
                     {mode === "recover" ? "New password" : "Password"}
                     <input
                       type="password"
-                      minLength={mode === "signin" ? undefined : 15}
+                      minLength={mode === "signin" ? undefined : PASSWORD_MIN}
+                      aria-describedby={mode === "signin" ? undefined : "signup-password-help"}
                       required
                       autoComplete={
                         mode === "signin" ? "current-password" : "new-password"
                       }
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder={mode === "signin" ? "Your password" : "At least 15 characters"}
+                      placeholder={mode === "signin" ? "Your password" : `At least ${PASSWORD_MIN} characters`}
                     />
                   </label>
                   {mode !== "signin" && <>
-                    <small>Use at least 15 characters, up to 72 bytes. Spaces are welcome.</small>
-                    <label>Confirm password<input type="password" required autoComplete="new-password" value={confirmation} onChange={e => setConfirmation(e.target.value)} /></label>
+                    <label>Confirm password<input type="password" required autoComplete="new-password" aria-describedby="signup-password-help" value={confirmation} onChange={e => setConfirmation(e.target.value)} /></label>
+                    <PasswordRequirements id="signup-password-help" password={password} confirmation={confirmation} />
                   </>}
                   {mode === "recover" && <p className={s.muted}>Enter the code you saved at signup. A successful reset signs out all sessions and gives you a replacement code.</p>}
                   <button disabled={busy} className={s.primary}>
@@ -230,8 +231,16 @@ export function Onboarding() {
               <span className={s.eyebrow}>01 / 03 · Your semester</span>
               <h2>What are you learning?</h2>
               <p className={s.muted}>
-                Start with these sample courses, or add your own.
+                Add the courses you’re taking this term. You can always add
+                more later in Settings.
               </p>
+              {state.courses.length === 0 && !adding && (
+                <div className={s.courseEmpty}>
+                  <BookOpen size={22} aria-hidden="true" />
+                  <strong>No courses yet</strong>
+                  <span>Your courses will appear here as you add them.</span>
+                </div>
+              )}
               <div className={s.courseSetup}>
                 {state.courses.map((c) => (
                   <div key={c.id}>
@@ -252,6 +261,7 @@ export function Onboarding() {
                   className={s.form}
                   onSubmit={async (e) => {
                     e.preventDefault();
+                    setError("");
                     try {
                       await repo.courses.create({
                         code,
@@ -316,11 +326,11 @@ export function Onboarding() {
                 </form>
               ) : (
                 <button className={s.textLink} onClick={() => setAdding(true)}>
-                  <Plus size={16} /> Add your own course
+                  <Plus size={16} /> Add a course
                 </button>
               )}
-              <button className={s.primary} onClick={() => setStep(2)}>
-                Looks good <ArrowRight size={16} />
+              <button className={s.primary} onClick={() => { setAdding(false); setError(""); setStep(2); }}>
+                {state.courses.length ? "Continue" : "Skip for now"} <ArrowRight size={16} />
               </button>
             </>
           ) : step === 2 ? (

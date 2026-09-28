@@ -26,7 +26,16 @@ interface Store {
   comments: Comment[];
   versions: NoteVersion[];
 }
-const initial = (): Store => ({
+const empty = (): Store => ({
+  user: null,
+  completed: false,
+  courses: [],
+  notes: [],
+  events: [],
+  comments: [],
+  versions: [],
+});
+const initial = (sample = true): Store => sample ? ({
   user: null,
   completed: false,
   courses: [...courses],
@@ -49,7 +58,7 @@ const initial = (): Store => ({
     author: "You",
     createdAt: n.createdAt,
   })),
-});
+}) : empty();
 export function filterNotes(
   notes: Note[],
   query: NoteQuery = {},
@@ -89,8 +98,10 @@ export function filterNotes(
 export function createRepositories(
   storage?: Pick<Storage, "getItem" | "setItem">,
   authenticatedUser?: User | null,
+  // Sample content is for the demo; real accounts start with an empty workspace.
+  sample = true,
 ): Repositories {
-  let db = initial();
+  let db = initial(sample);
   try {
     const saved = storage?.getItem("notely-data-v1");
     if (saved) {
@@ -369,7 +380,7 @@ export function createRepositories(
       },
     },
     async reset() {
-      db = initial();
+      db = initial(sample);
       db.user = authenticatedUser ?? null;
       db.notes = db.notes.map((note) => ({ ...note, ownerId: authenticatedUser?.id ?? "student" }));
       Object.assign(repo.notes, createMockCollaborators());

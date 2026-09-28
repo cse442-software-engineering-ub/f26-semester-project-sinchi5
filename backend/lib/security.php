@@ -47,8 +47,8 @@ function validPassword(string $password): string
 {
     // Consistent with the bcrypt fallback: never silently truncate a password.
     if (!preg_match('//u', $password) || str_contains($password, "\0")
-        || preg_match_all('/./us', $password) < 15 || strlen($password) > 72) {
-        throw new HttpError(422, 'Use at least 15 characters and at most 72 bytes for your password.');
+        || preg_match_all('/./us', $password) < 8 || strlen($password) > 72) {
+        throw new HttpError(422, 'Use at least 8 characters and at most 72 bytes for your password.');
     }
     return $password;
 }

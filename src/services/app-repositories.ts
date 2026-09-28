@@ -26,7 +26,7 @@ export function createAppRepositories(storage: Storage, tabStorage: Storage, ser
         storage.setItem(key, JSON.stringify(data));
       },
     } : undefined;
-    workspace = createRepositories(adapter, nextUser);
+    workspace = createRepositories(adapter, nextUser, demo);
   }
   const demoUser: User = { id: "student", name: "Erin", email: "demo@example.edu" };
   const leaveDemo = () => { generation++; demo = false; tabStorage.removeItem("notely-demo"); select(null); };
