@@ -55,6 +55,7 @@ export interface Comment {
 // Prototype-only: lets the UI demo loading/posting success/failure without a
 // real network layer to intercept, same purpose as ImportRepository's scenario.
 export type CommentScenario = "success" | "slow" | "failure";
+export const MAX_COMMENT_LENGTH = 2000;
 export interface CourseEvent {
   id: string;
   courseId: string;

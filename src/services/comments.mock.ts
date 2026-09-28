@@ -1,6 +1,5 @@
+import { MAX_COMMENT_LENGTH } from "../domain";
 import type { Comment, Note, NoteRepository, User } from "../domain";
-
-const MAX_COMMENT_LENGTH = 2000;
 
 export function createMockComments(
   db: { comments: Comment[]; user: User | null },
