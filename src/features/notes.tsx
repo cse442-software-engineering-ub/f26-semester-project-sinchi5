@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../app/context";
 import { PageHeading, NoteCard, Empty, Modal, EventRow } from "../shared/ui";
-import type { Note, NoteVersion, Comment } from "../domain";
+import type { Note, NoteVersion, Comment, CommentLoadScenario } from "../domain";
 import s from "../app/App.module.css";
 import { Collaborators } from "./collaborators";
 export function Notes() {
@@ -237,6 +237,10 @@ export function NoteWorkspace() {
   const [error, setError] = useState("");
   const [panel, setPanel] = useState("comments");
   const [comments, setComments] = useState<Comment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(true);
+  const [commentsError, setCommentsError] = useState("");
+  const [commentScenario, setCommentScenario] = useState<CommentLoadScenario>("success");
+  const [commentsRetry, setCommentsRetry] = useState(0);
   const [versions, setVersions] = useState<NoteVersion[]>([]);
   const [comment, setComment] = useState("");
   const [preview, setPreview] = useState<NoteVersion>();
@@ -250,16 +254,11 @@ export function NoteWorkspace() {
     let active = true;
     setNote(undefined);
     setError("");
-    Promise.all([
-      repo.notes.get(id),
-      repo.notes.comments(id),
-      repo.notes.versions(id),
-    ])
-      .then(([n, c, v]) => {
+    Promise.all([repo.notes.get(id), repo.notes.versions(id)])
+      .then(([n, v]) => {
         if (active) {
           setNote(n);
           noteRef.current = n;
-          setComments(c);
           setVersions(v);
         }
       })
@@ -268,6 +267,19 @@ export function NoteWorkspace() {
       active = false;
     };
   }, [id, repo]);
+  useEffect(() => {
+    let active = true;
+    setCommentsLoading(true);
+    setCommentsError("");
+    repo.notes
+      .comments(id, commentScenario)
+      .then((c) => active && setComments(c))
+      .catch((e) => active && setCommentsError((e as Error).message))
+      .finally(() => active && setCommentsLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [id, repo, commentScenario, commentsRetry]);
   useEffect(() => {
     if (!dirty || !note) return;
     const current = ++generation.current;
@@ -465,15 +477,48 @@ export function NoteWorkspace() {
             ) : (
               <>
                 <h3>Better, together.</h3>
-                {comments.map((c) => (
-                  <article key={c.id} className={s.comment}>
-                    <strong>{c.author}</strong>
-                    <small>{new Date(c.createdAt).toLocaleDateString()}</small>
-                    <p>{c.body}</p>
-                  </article>
-                ))}
-                {!comments.length && (
-                  <p className={s.muted}>Be the first to add a thought.</p>
+                <details className={s.demoDetails}>
+                  <summary>Prototype preview options</summary>
+                  <p>Comments load from this device. Choose how the load behaves.</p>
+                  <label>
+                    Comment loading
+                    <select
+                      value={commentScenario}
+                      onChange={(e) =>
+                        setCommentScenario(e.target.value as CommentLoadScenario)
+                      }
+                    >
+                      <option value="success">Loads normally</option>
+                      <option value="slow">Loads slowly</option>
+                      <option value="failure">Fails to load</option>
+                    </select>
+                  </label>
+                </details>
+                {commentsLoading ? (
+                  <p role="status">Loading comments…</p>
+                ) : commentsError ? (
+                  <div role="alert" className={s.error}>
+                    {commentsError}
+                    <button
+                      className={s.secondary}
+                      onClick={() => setCommentsRetry((n) => n + 1)}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {comments.map((c) => (
+                      <article key={c.id} className={s.comment}>
+                        <strong>{c.author}</strong>
+                        <small>{new Date(c.createdAt).toLocaleDateString()}</small>
+                        <p>{c.body}</p>
+                      </article>
+                    ))}
+                    {!comments.length && (
+                      <p className={s.muted}>Be the first to add a thought.</p>
+                    )}
+                  </>
                 )}
                 <form
                   className={s.form}
@@ -482,7 +527,7 @@ export function NoteWorkspace() {
                     try {
                       await repo.notes.comment(id, comment);
                       setComment("");
-                      setComments(await repo.notes.comments(id));
+                      setCommentsRetry((n) => n + 1);
                     } catch (e) {
                       setError((e as Error).message);
                     }
