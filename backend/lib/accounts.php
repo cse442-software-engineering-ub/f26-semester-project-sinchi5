@@ -1,5 +1,9 @@
 <?php
 declare(strict_types=1);
+if (PHP_SAPI !== 'cli' && !defined('NOTELY_INTERNAL')) {
+    http_response_code(403);
+    exit;
+}
 
 function requireUser(PDO $db, array $session, bool $lock = false): array
 {

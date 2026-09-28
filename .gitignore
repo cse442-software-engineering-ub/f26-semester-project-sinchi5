@@ -10,3 +10,4 @@ devwork-ai/
 .env.*
 !.env.example
 backend/config.local.php
+backend/config-path.php

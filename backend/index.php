@@ -8,6 +8,7 @@ header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: no-referrer');
 header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
+define('NOTELY_INTERNAL', true);
 require_once __DIR__ . '/lib/bootstrap.php';
 require_once __DIR__ . '/lib/accounts.php';
 
