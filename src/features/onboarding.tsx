@@ -83,6 +83,9 @@ export function Onboarding() {
         setRecoveryCode(await repo.auth.resetPassword(email, recoveryInput, password));
       } else {
         await repo.auth.signIn(email, password);
+        if ((await repo.auth.onboarding()).completed) {
+          navigate("/welcome", { replace: true, state: { returningLogin: true } });
+        }
         setStep(1);
       }
       setPassword(""); setConfirmation(""); setRecoveryInput("");
@@ -181,6 +184,7 @@ export function Onboarding() {
                 <form
                   className={s.form}
                   noValidate
+                  aria-busy={busy}
                   onSubmit={(e) => {
                     e.preventDefault();
                     void enter();
@@ -247,7 +251,7 @@ export function Onboarding() {
                       ? "Opening your space…"
                       : mode === "signup"
                         ? "Create account"
-                        : mode === "recover" ? "Reset password" : "Sign in"}{" "}
+                        : mode === "recover" ? "Reset password" : "Log In"}{" "}
                     <ArrowRight size={16} />
                   </button>
                   <button
