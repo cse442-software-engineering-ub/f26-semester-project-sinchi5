@@ -20,6 +20,25 @@ async function register(page: Page) {
   await expect(page.getByRole("heading", { name: /Good .*Jamie/ })).toBeVisible();
   return code!;
 }
+test("navigation logout returns to sign in and blocks notes after Back or direct navigation", async ({ page }) => {
+  await register(page);
+  await page.goto("/notes");
+  await expect(page.getByRole("heading", { name: "Your notes" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log out", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Log out", exact: true }).click();
+  await expect(page).toHaveURL(/\/welcome\?mode=signin$/);
+  await expect(page.getByRole("heading", { name: "Good to see you again." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log out", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Notes", exact: true })).toHaveCount(0);
+
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: "Your notes" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Notes", exact: true })).toHaveCount(0);
+  await page.goto("/notes");
+  await expect(page).toHaveURL(/\/welcome\?mode=signin$/);
+  await expect(page.getByRole("heading", { name: "Good to see you again." })).toBeVisible();
+});
 test("account changes, invalid current password, recovery rotation and deletion", async ({ page }) => {
   const code = await register(page);
   const stored = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
@@ -39,7 +58,7 @@ test("account changes, invalid current password, recovery rotation and deletion"
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Password changed");
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await page.getByRole("button", { name: "I already have an account" }).click();
+  await expect(page.getByRole("heading", { name: "Good to see you again." })).toBeVisible();
   await page.getByRole("button", { name: "Forgot your password?" }).click();
   await page.getByLabel("Email address").fill("jamie@example.edu");
   await page.getByLabel("Recovery code", { exact: true }).fill("invalid-code");
@@ -64,7 +83,7 @@ test("account changes, invalid current password, recovery rotation and deletion"
   await page.getByLabel("Current password").fill("Recovered meadow password 44!");
   await page.getByLabel("I understand that deletion is permanent").check();
   await page.getByRole("button", { name: "Permanently delete account", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Welcome to your space." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Good to see you again." })).toBeVisible();
 });
 test("account forms fit narrow screens, report mismatches, and recovery code remains visible until saved", async ({ page }) => {
   await page.goto("/");

@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
   BookOpen,
@@ -17,7 +17,8 @@ import s from "../app/App.module.css";
 export function Onboarding() {
   const { state, repo, refresh } = useApp();
   const navigate = useNavigate();
-  const [mode, setMode] = useState("welcome");
+  const [searchParams] = useSearchParams();
+  const [mode, setMode] = useState(searchParams.get("mode") === "signin" ? "signin" : "welcome");
   const [step, setStep] = useState(state.user ? 1 : 0);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");

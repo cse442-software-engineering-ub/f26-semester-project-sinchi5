@@ -88,6 +88,16 @@
   color: var(--text) !important;
   font-weight: 600 !important;
 }
+.signOutNav {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  color: var(--muted);
+}
+.signOutNav:hover {
+  color: var(--text);
+  background: var(--nav);
+}
 .sideSection {
   margin-top: 33px;
 }
@@ -2327,17 +2337,23 @@
     backdrop-filter: blur(14px);
     border-top: 1px solid var(--line);
   }
-  .mobileNav a {
+  .mobileNav a,
+  .mobileNav button {
     display: flex;
+    flex: 1;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 5px;
     font-size: 0.6rem;
     min-height: 45px;
-    min-width: 64px;
+    min-width: 48px;
     border-radius: 9px;
     color: var(--muted);
+  }
+  .mobileNav .signOutNav {
+    width: auto;
+    text-align: center;
   }
   .mobileNav .navActive {
     background: transparent;
