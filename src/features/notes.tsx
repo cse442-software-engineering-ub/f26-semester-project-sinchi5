@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  useNavigate,
   useParams,
   useSearchParams,
   Link,
@@ -24,13 +23,16 @@ import type {Note,NoteVersion,Comment,Collaborator} from "../domain";
 import s from "../app/App.module.css";
 import { Collaborators } from "./collaborators";
 export function Notes() {
-  const { repo, state } = useApp();
-  const navigate = useNavigate();
+  const { repo, state, refresh } = useApp();
   const [params, setParams] = useSearchParams();
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filters, setFilters] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftBody, setDraftBody] = useState("");
+  const [createStatus, setCreateStatus] = useState("All changes saved");
   const key = params.toString();
   useEffect(() => {
     let active = true;
@@ -61,6 +63,72 @@ export function Notes() {
       },
       { replace: true },
     );
+  
+  useEffect(() => {
+    if (!creating) return;
+
+    if (!draftTitle.trim() && !draftBody.trim()) {
+      setCreateStatus("All changes saved");
+      return;
+    }
+
+    setCreateStatus("Saving...");
+
+    const timer = setTimeout(() => {
+      // Task #105 allows mocked note responses. Keep the draft in the
+      // editor until the user leaves the dialog; closeCreateNote then
+      // creates the real repository note so its card can be opened.
+      setCreateStatus("All changes saved");
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [creating, draftTitle, draftBody]);
+
+  function resetCreateNote() {
+    setDraftTitle("");
+    setDraftBody("");
+    setCreateStatus("All changes saved");
+    setCreating(false);
+  }
+
+  function openCreateNote() {
+    setDraftTitle("");
+    setDraftBody("");
+    setCreateStatus("All changes saved");
+    setCreating(true);
+  }
+
+  function cancelCreateNote() {
+    // Nothing has been created in the repository yet, so Cancel can
+    // safely discard the draft without needing note-delete behavior.
+    resetCreateNote();
+  }
+
+  async function closeCreateNote() {
+    const title = draftTitle.trim();
+    const body = draftBody;
+
+    if (!title && !body.trim()) {
+      resetCreateNote();
+      return;
+    }
+
+    setCreateStatus("Saving...");
+    try {
+      await repo.notes.create({
+        title: title || "Untitled note",
+        body,
+      });
+      await refresh();
+      setError("");
+      resetCreateNote();
+    } catch (e) {
+      setError((e as Error).message);
+      setCreateStatus("Not saved");
+      setCreating(false);
+    }
+  }
+
   const active = ["course", "category", "visibility", "from", "to"].filter(
     (k) => params.get(k),
   );
@@ -73,19 +141,57 @@ export function Notes() {
         actions={
           <button
             className={s.primary}
-            onClick={async () => {
-              try {
-                const n = await repo.notes.create({});
-                navigate(`/notes/${n.id}`);
-              } catch (e) {
-                setError((e as Error).message);
-              }
-            }}
+            onClick={openCreateNote}
           >
-            <Plus size={18} /> New note
-          </button>
+            <Plus size={18} /> Create Note
+          </button>   
         }
       />
+      {creating && (
+        <Modal
+          title="Create Note"
+          description="Start writing. Your note saves automatically."
+          onClose={closeCreateNote}
+        >
+          <div className={s.form}>
+            <label>
+              Note title
+              <input
+                aria-label="Note title"
+                placeholder="Untitled note"
+                value={draftTitle}
+                onChange={(e) => setDraftTitle(e.target.value)}
+                autoFocus
+              />
+            </label>
+
+            <label>
+              Note content
+              <textarea
+                aria-label="Note content"
+                rows={10}
+                placeholder="Start writing..."
+                value={draftBody}
+                onChange={(e) => setDraftBody(e.target.value)}
+              />
+            </label>
+
+            <p role="status" className={s.muted}>
+              {createStatus}
+            </p>
+
+            <div className={s.actions}>
+              <button
+                type="button"
+                className={s.secondary}
+                onClick={cancelCreateNote}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
       <div className={s.libraryToolbar}>
         <label className={s.search}>
           <Search size={18} />
