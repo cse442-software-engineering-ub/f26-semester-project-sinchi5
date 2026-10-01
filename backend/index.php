@@ -55,6 +55,10 @@ try {
     // Never trust client-supplied forwarding headers for throttling.
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     $session = readSession($db, $config);
+    if (in_array($route, ['onboarding', 'profile', 'password', 'delete', 'recovery-code'], true)
+        && (!$session || !$session['user_id'])) {
+        throw new HttpError(401, 'Sign in to continue.');
+    }
     if ($route === 'session') {
         if (!$session) {
             rateLimit($db, $config, 'new-session', $ip, 120);
