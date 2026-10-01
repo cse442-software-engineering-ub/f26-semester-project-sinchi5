@@ -23,6 +23,7 @@ import {
   ChevronDown,
   ArrowUpRight,
   X,
+  LogOut,
 } from "lucide-react";
 import { useApp } from "./context";
 import { Dashboard } from "../features/dashboard";
@@ -44,6 +45,7 @@ export default function App() {
   const location = useLocation();
   const [importKind, setImportKind] = useState<UploadKind>();
   const [event, setEvent] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   useEffect(() => {
     document.title = `${BRAND} · ${location.pathname.startsWith("/notes") ? "Your notes" : location.pathname.startsWith("/schedule") ? "Your schedule" : "Your study space"}`;
     window.scrollTo(0, 0);
@@ -57,6 +59,20 @@ export default function App() {
       setError((e as Error).message);
     }
   }
+  async function signOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    setError("");
+    try {
+      await repo.auth.signOut();
+      await refresh();
+      navigate("/welcome?mode=signin", { replace: true });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSigningOut(false);
+    }
+  }
   if (!state.ready)
     return (
       <div className={s.boot} role="status">
@@ -67,7 +83,15 @@ export default function App() {
     return (
       <Routes>
         <Route path="/welcome" element={<Onboarding />} />
-        <Route path="*" element={<Navigate to="/welcome" replace />} />
+        <Route
+          path="*"
+          element={
+            <Navigate
+              to={location.pathname === "/" ? "/welcome" : "/welcome?mode=signin"}
+              replace
+            />
+          }
+        />
       </Routes>
     );
   return (
@@ -158,6 +182,14 @@ export default function App() {
         <NavLink to="/settings" className={s.navItem}>
           <SettingsIcon size={18} /> Settings
         </NavLink>
+        <button
+          type="button"
+          className={`${s.navItem} ${s.signOutNav}`}
+          disabled={signingOut}
+          onClick={() => void signOut()}
+        >
+          <LogOut size={18} /> {signingOut ? "Logging out…" : "Log out"}
+        </button>
         <div className={s.sideFooter}>
           <span className={s.avatar}>{state.user.name[0].toUpperCase()}</span>
           <span>
@@ -280,6 +312,15 @@ export default function App() {
             <span>{label}</span>
           </NavLink>
         ))}
+        <button
+          type="button"
+          className={s.signOutNav}
+          disabled={signingOut}
+          onClick={() => void signOut()}
+        >
+          <LogOut size={20} />
+          <span>{signingOut ? "Logging out…" : "Log out"}</span>
+        </button>
       </nav>
       {importKind && (
         <ImportDialog
