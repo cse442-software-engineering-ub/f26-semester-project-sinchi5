@@ -58,7 +58,7 @@ test("account changes, invalid current password, recovery rotation and deletion"
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Password reset");
   await page.getByLabel("Password", { exact: true }).fill("Recovered meadow password 44!");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("button", { name: "Log In", exact: true }).click();
   await page.goto("/settings");
   await page.getByRole("button", { name: "Delete account", exact: true }).click();
   await page.getByLabel("Current password").fill("Recovered meadow password 44!");

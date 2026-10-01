@@ -241,6 +241,7 @@ export default function App() {
             </div>
           )}
           <Routes>
+            <Route path="/welcome" element={<Navigate to={location.state?.returningLogin ? "/notes" : "/"} replace />} />
             <Route
               path="/"
               element={
