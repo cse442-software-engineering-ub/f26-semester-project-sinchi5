@@ -64,10 +64,46 @@ try {
   await b.call("session");
   assert.equal((await b.call("profile", { name: "Intruder", email })).status, 401);
   assert.equal((await b.call("register", { name: "Duplicate", email, password })).status, 409);
-  const wrong = await b.call("login", { email, password: "incorrect password" });
-  const unknown = await b.call("login", { email: "notely-nonexistent@example.edu", password: "incorrect password" });
-  assert.equal(wrong.status, 401); assert.deepEqual(wrong.data, unknown.data);
-  assert.equal((await b.call("login", { email, password })).status, 200);
+  // Task #102: failed logins preserve the anonymous session.
+  const beforeLoginCookie = b.cookie; const beforeLoginCsrf = b.csrf;
+  for (const [body, options, status] of [
+    ["not-json", {}, 400], ["[]", {}, 400], ["x".repeat(8200), {}, 413],
+    [{ email, password }, { headers: { "Content-Type": "text/plain" } }, 415],
+    [{ email, password }, { headers: { Origin: "https://attacker.invalid" } }, 403],
+    [{ email, password }, { headers: { "X-CSRF-Token": "forged" } }, 403],
+    [{ email }, {}, 422], [{ email, password: 123 }, {}, 422],
+    [{ email: "not-an-email", password }, {}, 422],
+  ]) {
+    assert.equal((await b.call("login", body, options)).status, status);
+    assert.equal(b.cookie, beforeLoginCookie);
+    assert.equal((await b.call("session")).data.user, null);
+  }
+  const wrong = await b.call("login", { email, password: "WrongPassword" });
+  assert.equal(wrong.status, 401);
+  assert.deepEqual(wrong.data, { error: "Email or password is incorrect." });
+  assert.equal(wrong.headers.getSetCookie().length, 0);
+  assert.equal(b.cookie, beforeLoginCookie);
+  assert.equal((await b.call("session")).data.user, null);
+  const unknown = await b.call("login", { email: `notely-unknown-${randomUUID()}@example.edu`, password });
+  assert.equal(unknown.status, 401); assert.deepEqual(unknown.data, wrong.data);
+  assert.equal(unknown.headers.getSetCookie().length, 0);
+  assert.equal(b.cookie, beforeLoginCookie);
+  assert.equal((await b.call("session")).data.user, null);
+  const loggedIn = await b.call("login", { email: ` ${email.toUpperCase()} `, password });
+  assert.equal(loggedIn.status, 200);
+  assert.deepEqual(loggedIn.data.user, created.data.user);
+  assert.deepEqual(Object.keys(loggedIn.data).sort(), ["csrfToken", "onboarding", "user"]);
+  assert.deepEqual(Object.keys(loggedIn.data.user).sort(), ["email", "id", "name"]);
+  assert.notEqual(b.cookie, beforeLoginCookie); assert.notEqual(b.csrf, beforeLoginCsrf);
+  const loginCookies = loggedIn.headers.getSetCookie().join(";");
+  assert.match(loginCookies, /HttpOnly/i); assert.match(loginCookies, /SameSite=Lax/i);
+  if (url.protocol === "https:") assert.match(loginCookies, /Secure/i);
+  assert(!JSON.stringify(loggedIn.data).includes(b.cookie.split("=")[1]));
+  // A session read confirms server-side persistence; the old cookie is revoked.
+  assert.deepEqual((await b.call("session")).data.user, created.data.user);
+  const anonymousReplay = client(); anonymousReplay.cookie = beforeLoginCookie;
+  assert.equal((await anonymousReplay.call("session")).data.user, null);
+  assert.notEqual(anonymousReplay.cookie, beforeLoginCookie);
   assert.equal((await a.call("profile", { name: "Changed name", email, currentPassword: "" })).data.user.name, "Changed name");
   const emojiName = await a.call("profile", { name: "Jamie 😀", email, currentPassword: "" });
   assert.equal(emojiName.status, 422); assert.match(emojiName.data.error, /emoji/);
