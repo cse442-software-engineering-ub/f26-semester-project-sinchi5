@@ -1,6 +1,5 @@
+import { MAX_COMMENT_LENGTH } from "../domain";
 import type { Comment, Note, NoteRepository, User } from "../domain";
-
-const MAX_COMMENT_LENGTH = 2000;
 
 export function createMockComments(
   db: { comments: Comment[]; user: User | null },
@@ -20,7 +19,7 @@ export function createMockComments(
         .filter((c) => c.noteId === noteId)
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     },
-    async comment(noteId, body) {
+    async comment(noteId, body, scenario = "success") {
       if (get(noteId).visibility !== "shared")
         throw new Error("Share this note before adding comments.");
       const trimmed = body.trim();
@@ -29,6 +28,13 @@ export function createMockComments(
         throw new Error(
           `Comments can be at most ${MAX_COMMENT_LENGTH} characters.`,
         );
+      if (scenario === "failure") {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        throw new Error("Your comment could not be posted.");
+      }
+      if (scenario === "slow") {
+        await new Promise((resolve) => setTimeout(resolve, 600));
+      }
       const c: Comment = {
         id: crypto.randomUUID(),
         noteId,

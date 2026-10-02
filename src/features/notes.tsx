@@ -19,11 +19,12 @@ import {
 } from "lucide-react";
 import { useApp } from "../app/context";
 import { PageHeading, NoteCard, Empty, Modal, EventRow } from "../shared/ui";
+import { MAX_COMMENT_LENGTH } from "../domain";
 import type {
   Note,
   NoteVersion,
   Comment,
-  CommentLoadScenario,
+  CommentScenario,
   Collaborator,
 } from "../domain";
 import s from "../app/App.module.css";
@@ -351,11 +352,15 @@ export function NoteWorkspace() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(true);
   const [commentsError, setCommentsError] = useState("");
-  const [commentScenario, setCommentScenario] = useState<CommentLoadScenario>("success");
+  const [commentScenario, setCommentScenario] = useState<CommentScenario>("success");
   const [commentsRetry, setCommentsRetry] = useState(0);
   const [versions, setVersions] = useState<NoteVersion[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [comment, setComment] = useState("");
+  const [posting, setPosting] = useState(false);
+  const postingRef = useRef(false);
+  const [postError, setPostError] = useState("");
+  const [postScenario, setPostScenario] = useState<CommentScenario>("success");
   const [preview, setPreview] = useState<NoteVersion>();
   const [restore, setRestore] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -629,12 +634,25 @@ export function NoteWorkspace() {
                     <select
                       value={commentScenario}
                       onChange={(e) =>
-                        setCommentScenario(e.target.value as CommentLoadScenario)
+                        setCommentScenario(e.target.value as CommentScenario)
                       }
                     >
                       <option value="success">Loads normally</option>
                       <option value="slow">Loads slowly</option>
                       <option value="failure">Fails to load</option>
+                    </select>
+                  </label>
+                  <label>
+                    Comment posting
+                    <select
+                      value={postScenario}
+                      onChange={(e) =>
+                        setPostScenario(e.target.value as CommentScenario)
+                      }
+                    >
+                      <option value="success">Posts normally</option>
+                      <option value="slow">Posts slowly</option>
+                      <option value="failure">Fails to post</option>
                     </select>
                   </label>
                 </details>
@@ -668,12 +686,19 @@ export function NoteWorkspace() {
                   className={s.form}
                   onSubmit={async (e) => {
                     e.preventDefault();
+                    if (postingRef.current) return;
+                    postingRef.current = true;
+                    setPosting(true);
+                    setPostError("");
                     try {
-                      await repo.notes.comment(id, comment);
+                      await repo.notes.comment(id, comment, postScenario);
                       setComment("");
                       setCommentsRetry((n) => n + 1);
                     } catch (e) {
-                      setError((e as Error).message);
+                      setPostError((e as Error).message);
+                    } finally {
+                      postingRef.current = false;
+                      setPosting(false);
                     }
                   }}
                 >
@@ -687,8 +712,23 @@ export function NoteWorkspace() {
                       onChange={(e) => setComment(e.target.value)}
                     />
                   </label>
-                  <button disabled={!comment.trim()} className={s.primary}>
-                    Post comment
+                  <small className={s.muted}>
+                    {comment.length.toLocaleString()} / {MAX_COMMENT_LENGTH.toLocaleString()}
+                  </small>
+                  {postError && (
+                    <p role="alert" className={s.error}>
+                      {postError}
+                    </p>
+                  )}
+                  <button
+                    disabled={
+                      !comment.trim() ||
+                      comment.length > MAX_COMMENT_LENGTH ||
+                      posting
+                    }
+                    className={s.primary}
+                  >
+                    {posting ? "Posting…" : "Post comment"}
                   </button>
                 </form>
               </>
