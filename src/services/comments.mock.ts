@@ -5,6 +5,21 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+// Only enforced when the note actually has a recorded owner - legacy/seeded
+// notes never get ownerEmail backfilled (see notes.create()), so they stay
+// open to any signed-in user, matching today's behavior for them.
+async function hasAccess(
+  note: Note,
+  user: User,
+  collaborators: (noteId: string) => Promise<Collaborator[]>,
+): Promise<boolean> {
+  if (!note.ownerEmail) return true;
+  const signedInEmail = normalizeEmail(user.email);
+  if (normalizeEmail(note.ownerEmail) === signedInEmail) return true;
+  const list = await collaborators(note.id);
+  return list.some((c) => normalizeEmail(c.email) === signedInEmail);
+}
+
 export function createMockComments(
   db: { comments: Comment[]; user: User | null },
   get: (noteId: string) => Note,
@@ -13,6 +28,10 @@ export function createMockComments(
 ): Pick<NoteRepository, "comments" | "comment"> {
   return {
     async comments(noteId, scenario = "success") {
+      if (!db.user) throw new Error("You must be signed in to view comments.");
+      const note = get(noteId);
+      if (!(await hasAccess(note, db.user, collaborators)))
+        throw new Error("You don't have access to view these comments.");
       if (scenario === "failure") {
         await new Promise((resolve) => setTimeout(resolve, 300));
         throw new Error("Comments could not be loaded.");
@@ -29,23 +48,8 @@ export function createMockComments(
       const note = get(noteId);
       if (note.visibility !== "shared")
         throw new Error("Share this note before adding comments.");
-      // Only enforced when the note actually has a recorded owner - legacy/
-      // seeded notes never get ownerEmail backfilled (see notes.create()),
-      // so they keep today's signed-in-and-shared-only behavior.
-      if (note.ownerEmail) {
-        const signedInEmail = normalizeEmail(db.user.email);
-        const isOwner = normalizeEmail(note.ownerEmail) === signedInEmail;
-        if (!isOwner) {
-          const list = await collaborators(noteId);
-          const isCollaborator = list.some(
-            (c) => normalizeEmail(c.email) === signedInEmail,
-          );
-          if (!isCollaborator)
-            throw new Error(
-              "You don't have access to comment on this note.",
-            );
-        }
-      }
+      if (!(await hasAccess(note, db.user, collaborators)))
+        throw new Error("You don't have access to comment on this note.");
       const trimmed = body.trim();
       if (!trimmed) throw new Error("Write a comment first.");
       if (trimmed.length > MAX_COMMENT_LENGTH)
