@@ -1,26 +1,29 @@
+import { AccountSettings } from "./account";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Sun, Moon, Monitor, Plus } from "lucide-react";
+import { Sun, Moon, Monitor, Plus, BookOpen } from "lucide-react";
 import { useApp } from "../app/context";
 import { Modal, PageHeading } from "../shared/ui";
 import s from "../app/App.module.css";
 export function Settings() {
   const { state, repo, refresh, setTheme } = useApp();
-  const navigate = useNavigate();
   const [reset, setReset] = useState(false);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
+  const isDemo = state.user?.id === "student";
   return (
     <>
       <PageHeading
         eyebrow="Just the way you like it"
-        title="Your space, your way"
-        description="A few small details that make it feel like you."
+        title="Settings"
+        description="Manage your account, appearance, and courses."
       />
       <div className={s.settingsGrid}>
-        <section className={s.panel}>
-          <h2>Appearance</h2>
-          <p className={s.muted}>Find your comfortable light.</p>
+        <AccountSettings />
+        <section className={s.panel} aria-labelledby="appearance-heading">
+          <div className={s.settingsHeading}>
+            <h2 id="appearance-heading">Appearance</h2>
+            <p className={s.muted}>Choose a theme, or follow your device.</p>
+          </div>
           <div className={s.themeOptions}>
             {[
               ["light", "Light", Sun],
@@ -35,93 +38,118 @@ export function Settings() {
                   className={state.theme === key ? s.activeButton : ""}
                   onClick={() => setTheme(key as string)}
                 >
-                  <I size={24} />
+                  <I size={22} />
                   {label as string}
                 </button>
               );
             })}
           </div>
         </section>
-        <section className={s.panel}>
-          <h2>Your account</h2>
-          <h3>{state.user?.name}</h3>
-          <p className={s.muted}>{state.user?.email}</p>
-          <button
-            className={s.secondary}
-            onClick={async () => {
-              await repo.auth.signOut();
-              await refresh();
-              navigate("/welcome");
-            }}
-          >
-            Sign out
-          </button>
-        </section>
-        <section className={s.panel}>
-          <div className={s.sectionHeading}>
-            <h2>Your courses</h2>
+        <section className={s.panel} aria-labelledby="courses-heading">
+          <div className={s.settingsHeading}>
+            <span>
+              <h2 id="courses-heading">Courses</h2>
+              <p className={s.muted}>The classes you organize notes and events around.</p>
+            </span>
             <button
-              className={s.iconButton}
-              aria-label="Add course"
-              onClick={() => setAdding(true)}
+              className={s.secondary}
+              onClick={() => {
+                setError("");
+                setAdding(true);
+              }}
             >
-              <Plus size={18} />
+              <Plus size={16} /> Add course
             </button>
           </div>
-          {state.courses.map((c) => (
-            <div className={s.settingCourse} key={c.id}>
-              <span className={s.courseDot} style={{ background: c.color }} />
-              <strong>{c.code}</strong>
-              <span>{c.name}</span>
-              <small>{c.term}</small>
+          {state.courses.length ? (
+            <ul className={s.settingRows}>
+              {state.courses.map((c) => (
+                <li className={s.settingCourse} key={c.id}>
+                  <span className={s.courseDot} style={{ background: c.color }} />
+                  <span>
+                    <strong>{c.code}</strong>
+                    <small>{c.name}</small>
+                  </span>
+                  <small>{c.term}</small>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className={s.courseEmpty}>
+              <BookOpen size={22} aria-hidden="true" />
+              <strong>No courses yet</strong>
+              <span>Add a course to start organizing your notes by class.</span>
             </div>
-          ))}
+          )}
         </section>
-        <section className={s.panel}>
-          <h2>Prototype workspace</h2>
-          <p className={s.muted}>
-            Notes and changes are saved in this browser. Reset to start again
-            with the sample workspace.
-          </p>
-          <button className={s.secondary} onClick={() => setReset(true)}>
-            Reset sample data
-          </button>
+        <section className={s.panel} aria-labelledby="data-heading">
+          <div className={s.settingsHeading}>
+            <h2 id="data-heading">Workspace data</h2>
+            <p className={s.muted}>
+              Notes, courses, and events are saved in this browser.
+            </p>
+          </div>
+          <ul className={s.settingRows}>
+            <li>
+              <span>
+                <strong>{isDemo ? "Reset sample data" : "Clear workspace"}</strong>
+                <small>
+                  {isDemo
+                    ? "Start again with the original sample workspace."
+                    : "Remove every note, course, and event in this browser."}
+                </small>
+              </span>
+              <button className={s.secondary} onClick={() => { setError(""); setReset(true); }}>
+                {isDemo ? "Reset sample data" : "Clear workspace"}
+              </button>
+            </li>
+          </ul>
+          {error && !adding && !reset && (
+            <p className={s.error} role="alert">
+              {error}
+            </p>
+          )}
         </section>
       </div>
-      {error && (
-        <p className={s.error} role="alert">
-          {error}
-        </p>
-      )}
       {reset && (
         <Modal
           title="Start fresh?"
-          description="This removes notes, comments, and events you created in this browser. It cannot be undone."
+          description={`This removes notes, ${isDemo ? "comments" : "courses"}, and events you created in this browser. It cannot be undone.`}
           onClose={() => setReset(false)}
         >
+          {error && (
+            <p className={s.error} role="alert">
+              {error}
+            </p>
+          )}
           <button
             className={s.danger}
             onClick={async () => {
               try {
                 await repo.reset();
                 await refresh();
-                navigate("/welcome");
+                setReset(false);
               } catch (e) {
                 setError((e as Error).message);
               }
             }}
           >
-            Reset workspace
+            {isDemo ? "Reset workspace" : "Clear workspace"}
           </button>
         </Modal>
       )}
       {adding && (
-        <Modal title="Something new to learn" onClose={() => setAdding(false)}>
+        <Modal
+          title="Add a course"
+          description="Give it a code and a name. You can pick a color to spot it at a glance."
+          onClose={() => setAdding(false)}
+        >
           <form
             className={s.form}
             onSubmit={async (e) => {
               e.preventDefault();
               const data = new FormData(e.currentTarget);
+              setError("");
               try {
                 await repo.courses.create({
                   code: String(data.get("code")),
@@ -136,22 +164,29 @@ export function Settings() {
               }
             }}
           >
-            <label>
-              Course code
-              <input name="code" required />
-            </label>
+            <div className={s.formRow}>
+              <label>
+                Course code
+                <input name="code" required placeholder="CSE 250" />
+              </label>
+              <label>
+                Term
+                <input name="term" required defaultValue="Fall 2026" />
+              </label>
+            </div>
             <label>
               Course name
-              <input name="name" required />
-            </label>
-            <label>
-              Term
-              <input name="term" required defaultValue="Fall 2026" />
+              <input name="name" required placeholder="Data Structures" />
             </label>
             <label>
               Color
               <input name="color" type="color" defaultValue="#869D7A" />
             </label>
+            {error && (
+              <p className={s.error} role="alert">
+                {error}
+              </p>
+            )}
             <button className={s.primary}>Add course</button>
           </form>
         </Modal>
