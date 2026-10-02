@@ -55,9 +55,10 @@ describe("repository contracts", () => {
   it("keeps history when restoring and refuses private-note comments", async () => {
     const r = createRepositories();
     // Task #65 requires an authenticated user for every comment attempt,
-    // so this test now signs in first - it previously exercised commenting
-    // as no one at all, which the new permission gate no longer allows.
-    await r.auth.signIn("student@example.edu", "Student");
+    // so this test now starts as the demo user first - it previously
+    // exercised commenting as no one at all, which the new permission gate
+    // no longer allows.
+    await r.auth.startDemo();
     const n = await r.notes.create({ title: "Original", body: "first" });
     await expect(r.notes.comment(n.id, "hello")).rejects.toThrow("Share");
     await r.notes.save({
