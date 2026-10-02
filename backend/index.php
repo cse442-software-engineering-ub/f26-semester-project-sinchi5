@@ -11,6 +11,7 @@ header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
 define('NOTELY_INTERNAL', true);
 require_once __DIR__ . '/lib/bootstrap.php';
 require_once __DIR__ . '/lib/accounts.php';
+require_once __DIR__ . '/lib/notes.php';
 
 try {
     $config = configuration();
@@ -19,11 +20,11 @@ try {
     }
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
     $route = $_GET['route'] ?? 'session';
-    $routes = ['session', 'register', 'login', 'logout', 'onboarding', 'profile', 'password', 'delete', 'reset-password', 'recovery-code'];
+    $routes = ['session', 'register', 'login', 'logout', 'onboarding', 'profile', 'password', 'delete', 'reset-password', 'recovery-code', 'notes', 'create-note',];
     if (!is_string($route) || !in_array($route, $routes, true)) {
         throw new HttpError(404, 'This account action was not found.');
     }
-    $expected = $route === 'session' ? 'GET' : 'POST';
+    $expected = in_array($route, ['session', 'notes'], true)? 'GET' : 'POST';
     if ($method !== $expected) {
         header('Allow: ' . $expected);
         throw new HttpError(405, 'This request method is not supported.');
@@ -55,7 +56,7 @@ try {
     // Never trust client-supplied forwarding headers for throttling.
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     $session = readSession($db, $config);
-    if (in_array($route, ['onboarding', 'profile', 'password', 'delete', 'recovery-code'], true)
+    if (in_array($route, ['onboarding', 'profile', 'password', 'delete', 'recovery-code', 'notes', 'create-note',], true)
         && (!$session || !$session['user_id'])) {
         throw new HttpError(401, 'Sign in to continue.');
     }
@@ -64,10 +65,41 @@ try {
             rateLimit($db, $config, 'new-session', $ip, 120);
             $session = newSession($db, $config, null);
         }
+
         $result = sessionResponse($db, $config, $session);
-    } else {
+
+    } elseif ($route === 'notes') {
+
+        $result = noteAction(
+            $db,
+            $session,
+            $route,
+            $input
+        );
+
+    } elseif ($route === 'create-note') {
+
         requireCsrf($session, $config);
-        $result = accountAction($db, $config, $session, $route, $input, $ip);
+
+        $result = noteAction(
+            $db,
+            $session,
+            $route,
+            $input
+        );
+
+    } else {
+
+        requireCsrf($session, $config);
+
+        $result = accountAction(
+            $db,
+            $config,
+            $session,
+            $route,
+            $input,
+            $ip
+        );
     }
     echo json_encode($result, JSON_THROW_ON_ERROR);
 } catch (HttpError $e) {
