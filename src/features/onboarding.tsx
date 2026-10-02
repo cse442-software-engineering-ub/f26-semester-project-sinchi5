@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
   BookOpen,
@@ -10,42 +10,96 @@ import {
 } from "lucide-react";
 import { useApp } from "../app/context";
 import { ImportDialog } from "./imports";
+import { FieldError, PasswordRequirements, RecoveryCode } from "./account";
+import { PASSWORD_MIN, emailError, nameError, passwordCharacterError, passwordError, recoveryCodeError } from "../services/validation";
 import { BRAND } from "../domain";
 import s from "../app/App.module.css";
 export function Onboarding() {
   const { state, repo, refresh } = useApp();
   const navigate = useNavigate();
-  const [mode, setMode] = useState("welcome");
+  const [searchParams] = useSearchParams();
+  const [mode, setMode] = useState(searchParams.get("mode") === "signin" ? "signin" : "welcome");
   const [step, setStep] = useState(state.user ? 1 : 0);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  const [confirmation, setConfirmation] = useState("");
+  const [recoveryInput, setRecoveryInput] = useState("");
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [message, setMessage] = useState("");
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
   const [code, setCode] = useState("");
   const [courseName, setCourseName] = useState("");
   const [color, setColor] = useState("#869D7A");
   const [term, setTerm] = useState("Fall 2026");
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [submitted, setSubmitted] = useState(false);
+  const fieldErrors = {
+    name: mode === "signup" ? nameError(name) : "",
+    email: emailError(email),
+    recovery: mode === "recover" ? recoveryCodeError(recoveryInput) : "",
+    password: mode === "signin" ? (password ? "" : "Enter your password.") : passwordError(password),
+  };
+  const shown = (field: keyof typeof fieldErrors) => {
+    const message = (submitted || touched[field]) ? fieldErrors[field] : "";
+    // The requirements list already explains character problems in new passwords.
+    return field === "password" && mode !== "signin" && passwordCharacterError(password) ? "" : message;
+  };
+  const touch = (field: string) => () => setTouched(t => ({ ...t, [field]: true }));
+  const invalidProps = (field: keyof typeof fieldErrors, describedBy?: string) => ({
+    "aria-invalid": Boolean((submitted || touched[field]) && fieldErrors[field]) || undefined,
+    "aria-describedby": [shown(field) ? `${field}-error` : "", describedBy].filter(Boolean).join(" ") || undefined,
+    onBlur: touch(field),
+  });
   async function enter(demo = false) {
+    if (pending.current) return;
+    setError(""); setMessage("");
+    if (!demo) {
+      const first = (Object.keys(fieldErrors) as (keyof typeof fieldErrors)[]).find(f => fieldErrors[f]);
+      if (first) {
+        setSubmitted(true);
+        document.getElementById(`${first}-input`)?.focus();
+        return;
+      }
+      if (mode !== "signin" && password !== confirmation) { setError("Passwords do not match."); return; }
+    }
+    pending.current = true;
     setBusy(true);
     try {
       if (demo) {
-        await repo.auth.signIn("erin@example.edu", "Erin");
-        await repo.auth.completeOnboarding();
+        await repo.auth.startDemo();
         await refresh();
         navigate("/");
         return;
       }
-      await repo.auth.signIn(email, name || undefined);
+      if (mode === "signup") {
+        const result = await repo.auth.signUp(name, email, password);
+        setRecoveryCode(result.recoveryCode);
+      } else if (mode === "recover") {
+        setRecoveryCode(await repo.auth.resetPassword(email, recoveryInput, password));
+      } else {
+        await repo.auth.signIn(email, password);
+        if ((await repo.auth.onboarding()).completed) {
+          navigate("/welcome", { replace: true, state: { returningLogin: true } });
+        }
+        setStep(1);
+      }
+      setPassword(""); setConfirmation(""); setRecoveryInput("");
       await refresh();
-      setStep(1);
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      pending.current = false;
       setBusy(false);
     }
+  }
+  function changeMode(next: string) {
+    setMode(next); setError(""); setMessage(""); setPassword(""); setConfirmation(""); setRecoveryInput("");
+    setTouched({}); setSubmitted(false);
   }
   return (
     <div className={s.onboarding}>
@@ -85,7 +139,11 @@ export function Onboarding() {
       </aside>
       <main className={s.onboardingMain}>
         <div className={s.onboardingContent}>
-          {step === 0 ? (
+          {recoveryCode ? <RecoveryCode code={recoveryCode} onDone={() => {
+            setRecoveryCode("");
+            if (mode === "signup") setStep(1);
+            else { setStep(0); changeMode("signin"); setMessage("Password reset. Sign in with your new password."); }
+          }} /> : step === 0 ? (
             <>
               <span className={s.eyebrow}>Your next chapter</span>
               <h2>
@@ -93,7 +151,7 @@ export function Onboarding() {
                   ? "Welcome to your space."
                   : mode === "signup"
                     ? "A fresh start."
-                    : "Good to see you again."}
+                    : mode === "recover" ? "Recover your account." : "Good to see you again."}
               </h2>
               <p className={s.muted}>
                 {mode === "welcome"
@@ -104,13 +162,13 @@ export function Onboarding() {
                 <div className={s.form}>
                   <button
                     className={s.primary}
-                    onClick={() => setMode("signup")}
+                    onClick={() => changeMode("signup")}
                   >
                     Create your workspace <ArrowRight size={17} />
                   </button>
                   <button
                     className={s.secondary}
-                    onClick={() => setMode("signin")}
+                    onClick={() => changeMode("signin")}
                   >
                     I already have an account
                   </button>
@@ -125,74 +183,90 @@ export function Onboarding() {
               ) : (
                 <form
                   className={s.form}
+                  noValidate
+                  aria-busy={busy}
                   onSubmit={(e) => {
                     e.preventDefault();
                     void enter();
                   }}
                 >
-                  {mode === "signup" && (
+                  <fieldset className={s.accountFields} disabled={busy}>
+                  {mode === "signup" && (<>
                     <label>
                       Your name
                       <input
+                        id="name-input"
                         required
                         autoComplete="name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="What should we call you?"
+                        {...invalidProps("name")}
                       />
                     </label>
-                  )}
+                    <FieldError id="name-error" message={shown("name")} />
+                  </>)}
                   <label>
                     Email address
                     <input
+                      id="email-input"
                       type="email"
                       required
                       autoComplete="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="you@university.edu"
+                      {...invalidProps("email")}
                     />
                   </label>
+                  <FieldError id="email-error" message={shown("email")} />
+                  {mode === "recover" && <>
+                    <label>Recovery code<input id="recovery-input" required autoComplete="off" spellCheck={false} value={recoveryInput} onChange={e => setRecoveryInput(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" {...invalidProps("recovery")} /></label>
+                    <FieldError id="recovery-error" message={shown("recovery")} />
+                  </>}
                   <label>
-                    Password
+                    {mode === "recover" ? "New password" : "Password"}
                     <input
+                      id="password-input"
                       type="password"
-                      minLength={8}
+                      minLength={mode === "signin" ? undefined : PASSWORD_MIN}
+                      {...invalidProps("password", mode === "signin" ? undefined : "signup-password-help")}
                       required
                       autoComplete={
-                        mode === "signup" ? "new-password" : "current-password"
+                        mode === "signin" ? "current-password" : "new-password"
                       }
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="At least 8 characters"
+                      placeholder={mode === "signin" ? "Your password" : `At least ${PASSWORD_MIN} characters`}
                     />
-                    {password.length > 0 && password.length < 8 && (
-                      <small>Use at least 8 characters.</small>
-                    )}
                   </label>
-                  <small className={s.notice}>
-                    This is a prototype account. Use a sample password;
-                    passwords are never stored.
-                  </small>
+                  <FieldError id="password-error" message={shown("password")} />
+                  {mode !== "signin" && <>
+                    <label>Confirm password<input type="password" required autoComplete="new-password" aria-describedby="signup-password-help" value={confirmation} onChange={e => setConfirmation(e.target.value)} /></label>
+                    <PasswordRequirements id="signup-password-help" password={password} confirmation={confirmation} />
+                  </>}
+                  {mode === "recover" && <p className={s.muted}>Enter the code you saved at signup. A successful reset signs out all sessions and gives you a replacement code.</p>}
                   <button disabled={busy} className={s.primary}>
                     {busy
                       ? "Opening your space…"
                       : mode === "signup"
                         ? "Create account"
-                        : "Sign in"}{" "}
+                        : mode === "recover" ? "Reset password" : "Log In"}{" "}
                     <ArrowRight size={16} />
                   </button>
                   <button
                     type="button"
                     className={s.textLink}
                     onClick={() =>
-                      setMode(mode === "signup" ? "signin" : "signup")
+                      changeMode(mode === "signup" || mode === "recover" ? "signin" : "signup")
                     }
                   >
-                    {mode === "signup"
+                    {mode === "signup" || mode === "recover"
                       ? "Already have an account? Sign in"
                       : "New here? Create an account"}
                   </button>
+                  {mode === "signin" && <button type="button" className={s.textLink} onClick={() => changeMode("recover")}>Forgot your password?</button>}
+                  </fieldset>
                 </form>
               )}
             </>
@@ -201,8 +275,16 @@ export function Onboarding() {
               <span className={s.eyebrow}>01 / 03 · Your semester</span>
               <h2>What are you learning?</h2>
               <p className={s.muted}>
-                Start with these sample courses, or add your own.
+                Add the courses you’re taking this term. You can always add
+                more later in Settings.
               </p>
+              {state.courses.length === 0 && !adding && (
+                <div className={s.courseEmpty}>
+                  <BookOpen size={22} aria-hidden="true" />
+                  <strong>No courses yet</strong>
+                  <span>Your courses will appear here as you add them.</span>
+                </div>
+              )}
               <div className={s.courseSetup}>
                 {state.courses.map((c) => (
                   <div key={c.id}>
@@ -223,6 +305,7 @@ export function Onboarding() {
                   className={s.form}
                   onSubmit={async (e) => {
                     e.preventDefault();
+                    setError("");
                     try {
                       await repo.courses.create({
                         code,
@@ -287,11 +370,11 @@ export function Onboarding() {
                 </form>
               ) : (
                 <button className={s.textLink} onClick={() => setAdding(true)}>
-                  <Plus size={16} /> Add your own course
+                  <Plus size={16} /> Add a course
                 </button>
               )}
-              <button className={s.primary} onClick={() => setStep(2)}>
-                Looks good <ArrowRight size={16} />
+              <button className={s.primary} onClick={() => { setAdding(false); setError(""); setStep(2); }}>
+                {state.courses.length ? "Continue" : "Skip for now"} <ArrowRight size={16} />
               </button>
             </>
           ) : step === 2 ? (
@@ -345,11 +428,16 @@ export function Onboarding() {
               </button>
             </>
           )}
-          {error && (
+          {message && <p role="status">{message}</p>}
+          {(error || state.error) && (
             <p role="alert" className={s.error}>
-              {error}
+              {error || state.error}
             </p>
           )}
+          {state.user && !recoveryCode && <button className={s.textLink} disabled={busy} onClick={async () => {
+            try { await repo.auth.signOut(); setStep(0); changeMode("signin"); await refresh(); }
+            catch (e) { setError((e as Error).message); }
+          }}>Sign out</button>}
           {step > 1 && step < 3 && (
             <button className={s.textLink} onClick={() => setStep(step - 1)}>
               Back

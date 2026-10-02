@@ -1,4 +1,5 @@
 export const BRAND = "Notely";
+export type CollaboratorPermission = "view" | "edit";
 export type Visibility = "private" | "shared";
 export type EventKind =
   "lecture" | "assignment" | "quiz" | "exam" | "deadline" | "other";
@@ -98,8 +99,15 @@ export interface NoteQuery {
 }
 export interface AuthRepository {
   session(): Promise<User | null>;
-  signIn(email: string, name?: string): Promise<User>;
+  signIn(email: string, password: string): Promise<User>;
+  signUp(name: string, email: string, password: string): Promise<{ user: User; recoveryCode: string }>;
   signOut(): Promise<void>;
+  startDemo(): Promise<void>;
+  updateProfile(name: string, email: string, currentPassword: string): Promise<User>;
+  changePassword(currentPassword: string, password: string): Promise<void>;
+  resetPassword(email: string, recoveryCode: string, password: string): Promise<string>;
+  replaceRecoveryCode(currentPassword: string): Promise<string>;
+  deleteAccount(currentPassword: string): Promise<void>;
   onboarding(): Promise<OnboardingState>;
   completeOnboarding(): Promise<void>;
 }
@@ -109,6 +117,7 @@ export interface CourseRepository {
   folders(id: string): Promise<Record<string, Note[]>>;
 }
 export interface NoteRepository {
+  setCollaboratorPermission(id: string,collaboratorId: string,permission: CollaboratorPermission,): Promise<Collaborator>;
   collaborators(id: string): Promise<Collaborator[]>;
   inviteCollaborator(id: string, email: string): Promise<{ collaborator: Collaborator }>;
   list(query?: NoteQuery): Promise<Note[]>;
@@ -126,6 +135,7 @@ export interface Collaborator {
   name: string;
   email: string;
   status?: "Pending" | "Invited" | "Accepted";
+  permission: CollaboratorPermission;
 }
 export interface ScheduleRepository {
   list(from?: string, to?: string): Promise<CourseEvent[]>;

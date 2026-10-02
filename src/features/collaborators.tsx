@@ -17,6 +17,8 @@ export function Collaborators({ noteId, isOwner, repository }: {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [success, setSuccess] = useState("");
+  const [changingPermission, setChangingPermission] = useState<string | null>(null);
+  const [permissionError, setPermissionError] = useState("");
   const pending = useRef(false);
   const active = useRef(true);
 
@@ -59,21 +61,87 @@ export function Collaborators({ noteId, isOwner, repository }: {
     }
   }
 
+  async function changePermission(
+    collaboratorId: string,
+    permission: "view" | "edit",
+  ) {
+    setChangingPermission(collaboratorId);
+    setPermissionError("");
+
+    try {
+      const updated = await repository.setCollaboratorPermission(
+        noteId,
+        collaboratorId,
+        permission,
+      );
+
+      if (!active.current) return;
+
+      setEntries((items) =>
+        items.map((entry) =>
+          entry.id === collaboratorId ? updated : entry,
+        ),
+      );
+    } catch (failure) {
+      if (active.current) {
+        setPermissionError(
+          failure instanceof Error
+            ? failure.message
+            : "Could not update collaborator permission.",
+        );
+      }
+    } finally {
+      if (active.current) {
+        setChangingPermission(null);
+      }
+    }
+  }
+
   return (
     <section aria-label="Collaborators" className={s.collaborators}>
       <h3>Collaborators</h3>
       {loading && <p role="status">Loading collaborators...</p>}
       {listError && <p role="alert" className={s.error}>{listError}</p>}
       {!loading && !listError && !entries.length && <p className={s.muted}>No collaborators yet.</p>}
-      <ul className={s.collaboratorList}>
-        {entries.map((entry) => (
-          <li key={entry.id}>
-            <strong>{entry.name}</strong>
-            <span>{entry.email}</span>
-            {entry.status && <small>{entry.status}</small>}
-          </li>
-        ))}
-      </ul>
+    <ul className={s.collaboratorList}>
+      {entries.map((entry) => (
+        <li key={entry.id}>
+          <strong>{entry.name}</strong>
+          <span>{entry.email}</span>
+          {entry.status && <small>{entry.status}</small>}
+
+          {isOwner ? (
+            <label>
+              Permission
+              <select
+                aria-label={`Permission for ${entry.name}`}
+                value={entry.permission}
+                disabled={changingPermission === entry.id}
+                onChange={(event) =>
+                  changePermission(
+                    entry.id,
+                    event.target.value as "view" | "edit",
+                  )
+                }
+              >
+                <option value="edit">Can edit</option>
+                <option value="view">Can view</option>
+              </select>
+            </label>
+          ) : (
+            <small>
+              {entry.permission === "edit" ? "Can edit" : "Can view"}
+            </small>
+          )}
+        </li>
+      ))}
+    </ul>
+
+    {permissionError && (
+      <p role="alert" className={s.error}>
+        {permissionError}
+      </p>
+    )}
       {success && <p role="status">{success}</p>}
       {isOwner && <button className={s.secondary} disabled={loading || !!listError || sending} onClick={() => {
         setEmail(""); setError(""); setSuccess(""); setOpen(true);
