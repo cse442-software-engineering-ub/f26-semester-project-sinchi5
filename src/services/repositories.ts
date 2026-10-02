@@ -10,10 +10,12 @@ import type {
   NoteQuery,
 } from "../domain";
 import { createMockCollaborators } from "./collaborators.mock";
+import { createMockComments } from "./comments.mock";
 import {
   courses,
   seedNotes,
   seedEvents,
+  seedComments,
   dateKey,
   offsetDate,
 } from "./fixtures";
@@ -41,15 +43,7 @@ const initial = (sample = true): Store => sample ? ({
   courses: [...courses],
   notes: seedNotes(),
   events: seedEvents(),
-  comments: [
-    {
-      id: "comment-1",
-      noteId: "note-1",
-      author: "Alex Morgan",
-      body: "The distinction between a sprint review and retrospective finally clicked. Thanks for sharing!",
-      createdAt: new Date().toISOString(),
-    },
-  ],
+  comments: seedComments(),
   versions: seedNotes().map((n) => ({
     id: `version-${n.id}`,
     noteId: n.id,
@@ -187,6 +181,7 @@ export function createRepositories(
     },
     notes: {
       ...createMockCollaborators(),
+      ...createMockComments(db, get, persist),
       async list(q) {
         return filterNotes(db.notes, q, db.courses);
       },
@@ -251,24 +246,6 @@ export function createRepositories(
         db.notes = db.notes.map((n) => (n.id === noteId ? saved : n));
         persist();
         return { ...saved };
-      },
-      async comments(noteId) {
-        return db.comments.filter((c) => c.noteId === noteId);
-      },
-      async comment(noteId, body) {
-        if (get(noteId).visibility !== "shared")
-          throw new Error("Share this note before adding comments.");
-        if (!body.trim()) throw new Error("Write a comment first.");
-        const c = {
-          id: id(),
-          noteId,
-          body: body.trim(),
-          author: db.user?.name || "You",
-          createdAt: now(),
-        };
-        db.comments.push(c);
-        persist();
-        return c;
       },
       async versions(noteId) {
         return db.versions.filter((v) => v.noteId === noteId);
@@ -384,6 +361,7 @@ export function createRepositories(
       db.user = authenticatedUser ?? null;
       db.notes = db.notes.map((note) => ({ ...note, ownerId: authenticatedUser?.id ?? "student" }));
       Object.assign(repo.notes, createMockCollaborators());
+      Object.assign(repo.notes, createMockComments(db, get, persist));
       persist();
     },
   };

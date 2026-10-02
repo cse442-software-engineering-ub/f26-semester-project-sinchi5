@@ -50,6 +50,7 @@ export interface Comment {
   noteId: string;
   body: string;
   author: string;
+  authorId: string;
   createdAt: string;
 }
 export interface CourseEvent {
