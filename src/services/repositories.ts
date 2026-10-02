@@ -28,7 +28,16 @@ interface Store {
   comments: Comment[];
   versions: NoteVersion[];
 }
-const initial = (): Store => ({
+const empty = (): Store => ({
+  user: null,
+  completed: false,
+  courses: [],
+  notes: [],
+  events: [],
+  comments: [],
+  versions: [],
+});
+const initial = (sample = true): Store => sample ? ({
   user: null,
   completed: false,
   courses: [...courses],
@@ -43,7 +52,7 @@ const initial = (): Store => ({
     author: "You",
     createdAt: n.createdAt,
   })),
-});
+}) : empty();
 export function filterNotes(
   notes: Note[],
   query: NoteQuery = {},
@@ -82,8 +91,11 @@ export function filterNotes(
 }
 export function createRepositories(
   storage?: Pick<Storage, "getItem" | "setItem">,
+  authenticatedUser?: User | null,
+  // Sample content is for the demo; real accounts start with an empty workspace.
+  sample = true,
 ): Repositories {
-  let db = initial();
+  let db = initial(sample);
   try {
     const saved = storage?.getItem("notely-data-v1");
     if (saved) {
@@ -94,8 +106,9 @@ export function createRepositories(
   } catch {
     /* Recover from unavailable or corrupted storage. */
   }
+  if (authenticatedUser !== undefined) db.user = authenticatedUser;
   // Legacy prototype notes belong to the seeded student account.
-  db.notes = db.notes.map((note) => ({ ...note, ownerId: note.ownerId ?? "student" }));
+  db.notes = db.notes.map((note) => ({ ...note, ownerId: note.ownerId ?? authenticatedUser?.id ?? "student" }));
   let committed = structuredClone(db);
   const persist = () => {
     try {
@@ -120,11 +133,21 @@ export function createRepositories(
       async session() {
         return db.user;
       },
-      async signIn(email, name) {
+      async signIn() {
+        throw new Error("Use the PHP account service to sign in.");
+      },
+      async startDemo() {
+        const email = "erin@example.edu";
+        const name = "Erin";
         db.user = { id: "student", email, name: name || email.split("@")[0] };
         persist();
-        return db.user;
       },
+      async signUp() { throw new Error("Use the PHP account service to create accounts."); },
+      async updateProfile() { throw new Error("Demo accounts cannot be changed."); },
+      async changePassword() { throw new Error("Demo accounts cannot be changed."); },
+      async resetPassword() { throw new Error("Use the PHP account service for recovery."); },
+      async replaceRecoveryCode() { throw new Error("Demo accounts cannot be changed."); },
+      async deleteAccount() { throw new Error("Demo accounts cannot be changed."); },
       async signOut() {
         db.user = null;
         persist();
@@ -187,6 +210,21 @@ export function createRepositories(
       },
       async save(note) {
         const previous = get(note.id);
+
+        const currentEmail = db.user?.email.trim().toLowerCase();
+
+        if (currentEmail) {
+          const collaborators = await repo.notes.collaborators(note.id);
+
+          const collaborator = collaborators.find(
+            (entry) => entry.email.toLowerCase() === currentEmail,
+          );
+
+          if (collaborator && collaborator.permission !== "edit") {
+            throw new Error("You do not have permission to edit this note.");
+          }
+        }
+
         if (previous.title !== note.title || previous.body !== note.body)
           db.versions.unshift({
             id: id(),
@@ -196,6 +234,7 @@ export function createRepositories(
             author: db.user?.name || "You",
             createdAt: previous.updatedAt,
           });
+
         const saved = { ...note, updatedAt: now() };
         db.notes = db.notes.map((n) => (n.id === note.id ? saved : n));
         persist();
@@ -318,8 +357,9 @@ export function createRepositories(
       },
     },
     async reset() {
-      db = initial();
-      db.notes = db.notes.map((note) => ({ ...note, ownerId: "student" }));
+      db = initial(sample);
+      db.user = authenticatedUser ?? null;
+      db.notes = db.notes.map((note) => ({ ...note, ownerId: authenticatedUser?.id ?? "student" }));
       Object.assign(repo.notes, createMockCollaborators());
       Object.assign(repo.notes, createMockComments(db, get, persist));
       persist();

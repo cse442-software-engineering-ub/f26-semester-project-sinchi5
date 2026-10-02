@@ -5,7 +5,7 @@ const registeredClassmates = [
   { id: "classmate-jamie", name: "Jamie", email: "jamie@example.edu" },
 ];
 
-export function createMockCollaborators(): Pick<NoteRepository, "collaborators" | "inviteCollaborator"> {
+export function createMockCollaborators(): Pick<NoteRepository, "collaborators" | "inviteCollaborator" | "setCollaboratorPermission"> {
   const invitations = new Map<string, Collaborator[]>();
   return {
     async collaborators(noteId) {
@@ -15,10 +15,18 @@ export function createMockCollaborators(): Pick<NoteRepository, "collaborators" 
       await new Promise((resolve) => setTimeout(resolve, 400));
       const account = registeredClassmates.find((user) => user.email === email.trim().toLowerCase());
       if (!account) throw new Error("No registered account was found for this email.");
-      const collaborator: Collaborator = { ...account, status: "Pending" };
+      const collaborator: Collaborator = { ...account, status: "Pending", permission: "view",};
       const current = invitations.get(noteId) || [];
       invitations.set(noteId, [...current.filter((entry) => entry.id !== collaborator.id), collaborator]);
       return { collaborator: { ...collaborator } };
+    },
+     async setCollaboratorPermission(noteId, collaboratorId, permission) {
+      const current = invitations.get(noteId) || [];
+      const collaborator = current.find( (entry) => entry.id === collaboratorId,);
+      if (!collaborator) {throw new Error("Collaborator not found.");}
+      const updated: Collaborator = {...collaborator,permission,};
+      invitations.set(noteId,current.map((entry) =>entry.id === collaboratorId ? updated : entry,),);
+      return structuredClone(updated);
     },
   };
 }
