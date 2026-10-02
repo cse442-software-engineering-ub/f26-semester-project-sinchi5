@@ -181,7 +181,7 @@ export function createRepositories(
     },
     notes: {
       ...createMockCollaborators(),
-      ...createMockComments(db, get, persist),
+      ...createMockComments(db, get, persist, (noteId) => repo.notes.collaborators(noteId)),
       async list(q) {
         return filterNotes(db.notes, q, db.courses);
       },
@@ -203,6 +203,7 @@ export function createRepositories(
           updatedAt: now(),
           ...data,
           ownerId: db.user?.id ?? "student",
+          ownerEmail: db.user?.email,
         };
         db.notes.unshift(n);
         persist();
@@ -361,7 +362,7 @@ export function createRepositories(
       db.user = authenticatedUser ?? null;
       db.notes = db.notes.map((note) => ({ ...note, ownerId: authenticatedUser?.id ?? "student" }));
       Object.assign(repo.notes, createMockCollaborators());
-      Object.assign(repo.notes, createMockComments(db, get, persist));
+      Object.assign(repo.notes, createMockComments(db, get, persist, (noteId) => repo.notes.collaborators(noteId)));
       persist();
     },
   };

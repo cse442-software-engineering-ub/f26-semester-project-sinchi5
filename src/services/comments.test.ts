@@ -25,7 +25,10 @@ function setup(user: User | null = { id: "student-1", name: "Jamie", email: "jam
     return n;
   };
   const persist = vi.fn();
-  const repo = createMockComments(db, get, persist);
+  // This fixture's note has no ownerEmail (matches an existing/legacy
+  // note), so the #65 permission gate never consults collaborators here.
+  const collaborators = async () => [];
+  const repo = createMockComments(db, get, persist, collaborators);
   return { db, repo, persist };
 }
 
