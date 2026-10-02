@@ -53,6 +53,9 @@ export interface Comment {
   authorId: string;
   createdAt: string;
 }
+// Prototype-only: lets the UI demo loading/success/failure without a real
+// network layer to intercept, same purpose as ImportRepository's scenario.
+export type CommentLoadScenario = "success" | "slow" | "failure";
 export interface CourseEvent {
   id: string;
   courseId: string;
@@ -117,7 +120,7 @@ export interface NoteRepository {
   save(note: Note): Promise<Note>;
   setPinned(id: string, pinned: boolean): Promise<Note>;
   create(data: Partial<Note>): Promise<Note>;
-  comments(id: string): Promise<Comment[]>;
+  comments(id: string, scenario?: CommentLoadScenario): Promise<Comment[]>;
   comment(id: string, body: string): Promise<Comment>;
   versions(id: string): Promise<NoteVersion[]>;
   restore(id: string, versionId: string): Promise<Note>;
