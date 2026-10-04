@@ -22,7 +22,7 @@ try {
     $route = $_GET['route'] ?? 'session';
     $routes = ['session', 'register', 'login', 'logout', 'onboarding', 'profile', 'password', 'delete', 'reset-password', 'recovery-code', 'note-create', 'note', 'note-title'];
     if (!is_string($route) || !in_array($route, $routes, true)) {
-        throw new HttpError(404, 'This account action was not found.');
+        throw new HttpError(404, 'This action was not found.');
     }
     $expected = in_array($route, ['session', 'note'], true) ? 'GET' : 'POST';
     if ($method !== $expected) {
@@ -35,7 +35,7 @@ try {
             throw new HttpError(403, 'This request did not come from your workspace.');
         }
         if (strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '')[0])) !== 'application/json') {
-            throw new HttpError(415, 'Send account requests as JSON.');
+            throw new HttpError(415, 'Send requests as JSON.');
         }
         // Cap reads even when the client omits or lies about Content-Length.
         $body = file_get_contents('php://input', false, null, 0, 8193);

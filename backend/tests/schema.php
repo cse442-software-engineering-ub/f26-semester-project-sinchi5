@@ -17,6 +17,14 @@ $tables = [
     'notely_rate_limits' => [
         'bucket_hash' => ['char(64)', 'NO'], 'window_start' => ['bigint unsigned', 'NO'], 'attempts' => ['int unsigned', 'NO'],
     ],
+    'notely_notes' => [
+        'id' => ['bigint unsigned', 'NO'], 'owner_user_id' => ['bigint unsigned', 'NO'],
+        'title' => ['varchar(255)', 'NO'], 'created_at' => ['datetime', 'NO'], 'updated_at' => ['datetime', 'NO'],
+    ],
+    'notely_note_editors' => [
+        'note_id' => ['bigint unsigned', 'NO'], 'user_id' => ['bigint unsigned', 'NO'],
+        'permission' => ["enum('view','edit')", 'NO'],
+    ],
 ];
 foreach ($tables as $table => $columns) {
     $rows = query($db, 'SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION', [$table])->fetchAll();
@@ -35,4 +43,9 @@ $index = query($db, "SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TA
 if ((int) $index !== 1) { throw new RuntimeException('Missing unique email index'); }
 $fk = query($db, "SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'notely_sessions_user_fk'")->fetchColumn();
 if ($fk !== 'CASCADE') { throw new RuntimeException('Missing session cascade'); }
-echo "PASS: schema, unique email, and session cascade\n";
+foreach (['notely_notes_owner_fk', 'notely_note_editors_note_fk', 'notely_note_editors_user_fk'] as $constraint) {
+    $rule = query($db, 'SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS
+        WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = ?', [$constraint])->fetchColumn();
+    if ($rule !== 'CASCADE') { throw new RuntimeException('Missing note cascade: ' . $constraint); }
+}
+echo "PASS: schema, unique email, and account/note cascades\n";

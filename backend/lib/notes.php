@@ -7,7 +7,8 @@ if (PHP_SAPI !== 'cli' && !defined('NOTELY_INTERNAL')) {
 
 function noteId(mixed $value): string
 {
-    if (!is_string($value) || !preg_match('/^[1-9][0-9]{0,19}$/D', $value)) {
+    if (!is_string($value) || !preg_match('/^[1-9][0-9]{0,19}$/D', $value)
+        || (strlen($value) === 20 && strcmp($value, '18446744073709551615') > 0)) {
         throw new HttpError(422, 'Choose a valid note.');
     }
     return $value;
@@ -54,7 +55,7 @@ function noteAction(PDO $db, array $session, string $route, array $input): array
     $note = query($db, 'SELECT owner_user_id FROM notely_notes WHERE id = ? FOR UPDATE', [$id])->fetch();
     if (!$note) throw new HttpError(404, 'This note could not be found.');
     if ((string) $note['owner_user_id'] !== (string) $user['id']) {
-        $editor = query($db, "SELECT 1 FROM notely_note_editors WHERE note_id = ? AND user_id = ? AND permission = 'edit'",
+        $editor = query($db, "SELECT 1 FROM notely_note_editors WHERE note_id = ? AND user_id = ? AND permission = 'edit' FOR UPDATE",
             [$id, $user['id']])->fetchColumn();
         if (!$editor) throw new HttpError(403, 'You do not have permission to edit this note.');
     }

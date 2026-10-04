@@ -16,9 +16,9 @@ Accounts are server-backed. Notes, courses, events, and imports are still a **br
 - [Features](#features)
 - [Tech stack](#tech-stack)
 - [Quick start (frontend only)](#quick-start-frontend-only)
-- [Running the account service locally](#running-the-account-service-locally)
+- [Running the PHP service locally](#running-the-php-service-locally)
 - [Configuration reference](#configuration-reference)
-- [Account API](#account-api)
+- [API](#api)
 - [Database schema](#database-schema)
 - [Security model](#security-model)
 - [Where data lives](#where-data-lives)
@@ -100,7 +100,7 @@ npm run preview    # Serve the production build locally
 
 ---
 
-## Running the account service locally
+## Running the PHP service locally
 
 You need PHP 8 with `pdo_mysql`, and a local MySQL or MariaDB server (XAMPP works; see [Notes/XAMPP.md](Notes/XAMPP.md)).
 
@@ -108,6 +108,7 @@ You need PHP 8 with `pdo_mysql`, and a local MySQL or MariaDB server (XAMPP work
 
    ```sh
    mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/001_accounts.sql
+   mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/002_note_titles.sql
    ```
 
    You can also import the file through phpMyAdmin.
@@ -163,7 +164,7 @@ A missing or invalid configuration **fails closed**: the API returns HTTP 503 an
 
 ---
 
-## Account API
+## API
 
 The API has a single entry point, `api/index.php?route=<name>`. Every response is JSON with `Cache-Control: no-store`.
 
@@ -342,9 +343,10 @@ On the server:
 | `npm run test:php` | PHP validation, hashing, and configuration checks. No database needed. |
 | `npm run test:schema` | Read-only check that a live DEV/TEST database matches the expected schema |
 | `npm run test:accounts` | Full HTTP contract test against a running API. Creates and then deletes uniquely named test accounts. |
+| `npm run test:note-titles` | HTTP tests for the three card 108 scenarios against a running DEV/TEST API with migration 002 applied. |
 | `php backend/tests/note-titles.php` | Owner, editor, viewer, and missing-note title tests against a DEV/TEST database with migration 002 applied. Creates and deletes test accounts. |
 
-`test:accounts` refuses any host except `localhost`, `127.0.0.1`, or aptitude. Point it with `NOTELY_TEST_URL` (and `NOTELY_TEST_ORIGIN` if needed). **Never run it against production.**
+The HTTP contract tests refuse any host except `localhost`, `127.0.0.1`, or aptitude. Point them with `NOTELY_TEST_URL` (and `NOTELY_TEST_ORIGIN` if needed). **Never run them against production.**
 
 Browser tests mock the account API ([tests/support/account-fixture.ts](tests/support/account-fixture.ts)). They cover:
 - onboarding and sign-up validation
