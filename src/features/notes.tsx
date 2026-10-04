@@ -363,6 +363,10 @@ export function NoteWorkspace() {
   const [postScenario, setPostScenario] = useState<CommentScenario>("success");
   const [preview, setPreview] = useState<NoteVersion>();
   const [restore, setRestore] = useState(false);
+  const [draftBody, setDraftBody] = useState("");
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const pendingSave = useRef<Promise<Note>>();
   const [dirty, setDirty] = useState(false);
   const [pinning, setPinning] = useState(false);
   const noteRef = useRef<Note>();
@@ -371,6 +375,12 @@ export function NoteWorkspace() {
   useEffect(() => {
     let active = true;
     setNote(undefined);
+    noteRef.current = undefined;
+    dirtyRef.current = false;
+    setDirty(false);
+    setDraftBody("");
+    setStatus("All changes saved");
+    generation.current++;
     setError("");
     Promise.all([
       repo.notes.get(id),
@@ -380,6 +390,7 @@ export function NoteWorkspace() {
       .then(([n, v, collaborators]) => {
         if (active) {
           setNote(n);
+          setDraftBody(n.body);
           noteRef.current = n;
           setVersions(v);
           setCollaborators(collaborators);
@@ -404,11 +415,12 @@ export function NoteWorkspace() {
     };
   }, [id, repo, commentScenario, commentsRetry]);
   useEffect(() => {
-    if (!dirty || !note) return;
+    if (!dirty || !note || saving) return;
     const current = ++generation.current;
     const timer = setTimeout(async () => {
       try {
-        await repo.notes.save(note);
+        pendingSave.current = repo.notes.save(note);
+        await pendingSave.current;
         if (current === generation.current) {
           dirtyRef.current = false;
           setDirty(false);
@@ -422,10 +434,10 @@ export function NoteWorkspace() {
       }
     }, 600);
     return () => clearTimeout(timer);
-  }, [note, dirty]);
+  }, [note, dirty, saving]);
   useEffect(() => {
     const save = () => {
-      if (noteRef.current && dirtyRef.current) {
+      if (noteRef.current && dirtyRef.current && !savingRef.current) {
         void repo.notes
           .save(noteRef.current)
           .then(() => {
@@ -441,14 +453,49 @@ export function NoteWorkspace() {
       save();
     };
   }, [id, repo]);
+  // note.body always holds the persisted baseline; only draftBody contains typing.
   function edit(patch: Partial<Note>) {
-    if (!note || !canEdit) return;
+    if (!note || !canEdit || savingRef.current) return;
     const n = { ...note, ...patch };
     noteRef.current = n;
     dirtyRef.current = true;
     setNote(n);
     setDirty(true);
     setStatus("Saving…");
+  }
+  async function saveBody() {
+    if (!noteRef.current || !canEdit || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    setError("");
+    setStatus("Saving…");
+    generation.current++;
+    try {
+      // Finish any metadata save before submitting the body, so an older
+      // autosave cannot overwrite the explicitly saved content.
+      await pendingSave.current?.catch(() => undefined);
+      const saved = await repo.notes.save({ ...noteRef.current!, body: draftBody });
+      noteRef.current = saved;
+      setNote(saved);
+      setDraftBody(saved.body);
+      dirtyRef.current = false;
+      setDirty(false);
+      setStatus("All changes saved");
+    } catch (e) {
+      setError("Changes could not be saved. Please try again. " + (e as Error).message);
+      setStatus("Not saved");
+      return;
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+    // A refresh failure must not report a successfully persisted body as lost.
+    try {
+      setVersions(await repo.notes.versions(id));
+      await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    }
   }
   async function togglePin() {
     if (!noteRef.current || pinning) return;
@@ -496,13 +543,13 @@ export function NoteWorkspace() {
           <ArrowLeft size={16} /> All notes
         </Link>
         <span role="status" className={s.muted}>
-          <Check size={14} /> {status}
+          <Check size={14} /> {saving ? "Saving…" : draftBody !== note.body ? "Unsaved body changes" : status}
         </span>
         <button
           className={note.pinned ? s.primary : s.secondary}
           aria-label={note.pinned ? "Unpin note" : "Pin note"}
           aria-pressed={Boolean(note.pinned)}
-          disabled={pinning || !canEdit}
+          disabled={pinning || !canEdit || saving}
           onClick={togglePin}
         >
           <Pin size={18} aria-hidden="true" />
@@ -521,7 +568,7 @@ export function NoteWorkspace() {
             className={s.noteTitle}
             aria-label="Note title"
             value={note.title}
-            disabled={!canEdit}
+            disabled={!canEdit || saving}
             onChange={(e) => edit({ title: e.target.value })}
           />
           <div className={s.noteMetadata}>
@@ -529,7 +576,7 @@ export function NoteWorkspace() {
               Course
               <select
                 value={note.courseId}
-                disabled={!canEdit}
+                disabled={!canEdit || saving}
                 onChange={(e) => edit({ courseId: e.target.value })}
               >
                 <option value="">No course</option>
@@ -545,7 +592,7 @@ export function NoteWorkspace() {
               <input
                 type="date"
                 value={note.lectureDate}
-                disabled={!canEdit}
+                disabled={!canEdit || saving}
                 onChange={(e) => edit({ lectureDate: e.target.value })}
               />
             </label>
@@ -553,7 +600,7 @@ export function NoteWorkspace() {
               Category
               <select
                 value={note.category}
-                disabled={!canEdit}
+                disabled={!canEdit || saving}
                 onChange={(e) => edit({ category: e.target.value })}
               >
                 {["School", "Work", "Meetings", "Personal"].map((c) => (
@@ -565,7 +612,7 @@ export function NoteWorkspace() {
               Visibility
               <select
                 value={note.visibility}
-                disabled={!canEdit}
+                disabled={!canEdit || saving}
                 onChange={(e) =>
                   edit({ visibility: e.target.value as Note["visibility"] })
                 }
@@ -580,7 +627,7 @@ export function NoteWorkspace() {
             <input
               placeholder="Add tags, separated by commas"
               value={note.tags.join(", ")}
-              disabled={!canEdit}
+              disabled={!canEdit || saving}
               onChange={(e) =>
                 edit({
                   tags: e.target.value.split(",").map((t) => t.trimStart()),
@@ -592,10 +639,20 @@ export function NoteWorkspace() {
             className={s.noteBody}
             aria-label="Note body"
             placeholder="Start anywhere. This space is yours…"
-            value={note.body}
-            disabled={!canEdit}
-            onChange={(e) => edit({ body: e.target.value })}
+            value={draftBody}
+            disabled={!canEdit || saving}
+            onChange={(e) => setDraftBody(e.target.value)}
           />
+          <div className={s.actions}>
+            <button type="button" className={s.primary}
+              disabled={!canEdit || saving || pinning || draftBody === note.body}
+              onClick={saveBody}>{saving ? "Saving…" : "Save"}</button>
+            <button type="button" className={s.secondary}
+              disabled={!canEdit || saving || draftBody === note.body}
+              onClick={() => { setDraftBody(note.body); setError(""); }}>
+              Cancel
+            </button>
+          </div>
         </section>
         <aside className={s.inspector}>
           <Collaborators
@@ -779,16 +836,20 @@ export function NoteWorkspace() {
           <button
             className={s.primary}
             onClick={async () => {
+              if (!canEdit || savingRef.current) return;
               if (!restore) {
                 setRestore(true);
                 return;
               }
               try {
-                if (dirty) await repo.notes.save(note);
+                generation.current++;
+                await pendingSave.current?.catch(() => undefined);
+                if (dirtyRef.current) await repo.notes.save(noteRef.current!);
                 const restored = await repo.notes.restore(id, preview.id);
                 dirtyRef.current = false;
                 setDirty(false);
                 setNote(restored);
+                setDraftBody(restored.body);
                 noteRef.current = restored;
                 setVersions(await repo.notes.versions(id));
                 setPreview(undefined);
