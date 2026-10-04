@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   useParams,
   useSearchParams,
+  useLocation,
   Link,
 } from "react-router-dom";
 import {
@@ -344,8 +345,12 @@ export function Notes() {
 }
 export function NoteWorkspace() {
   const { id = "" } = useParams();
+  // The quick-create editor still autosaves its first title; reopened notes use Save/Cancel.
+  const isNewNote = useLocation().state?.newNote === true;
   const { repo, state, refresh } = useApp();
   const [note, setNote] = useState<Note>();
+  const [titleDraft, setTitleDraft] = useState("");
+  const [savingTitle, setSavingTitle] = useState(false);
   const [status, setStatus] = useState("All changes saved");
   const [error, setError] = useState("");
   const [panel, setPanel] = useState("comments");
@@ -380,6 +385,7 @@ export function NoteWorkspace() {
       .then(([n, v, collaborators]) => {
         if (active) {
           setNote(n);
+          setTitleDraft(n.title);
           noteRef.current = n;
           setVersions(v);
           setCollaborators(collaborators);
@@ -450,6 +456,38 @@ export function NoteWorkspace() {
     setDirty(true);
     setStatus("Saving…");
   }
+  async function saveTitle() {
+    if (!note || savingTitle || !canEdit || titleDraft === note.title) return;
+    setSavingTitle(true);
+    setError("");
+    try {
+      const title = titleDraft.trim();
+      if (!title || Array.from(title).length > 255) {
+        throw new Error("Enter a note title of 1 to 255 characters.");
+      }
+      const saved = await repo.notes.save({ ...noteRef.current!, title });
+      generation.current++;
+      dirtyRef.current = false;
+      setDirty(false);
+      noteRef.current = saved;
+      setNote(saved);
+      setTitleDraft(saved.title);
+      setVersions(await repo.notes.versions(id));
+      setStatus("All changes saved");
+      await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+      setStatus("Not saved");
+    } finally {
+      setSavingTitle(false);
+    }
+  }
+  function cancelTitle() {
+    if (!note) return;
+    setTitleDraft(note.title);
+    setError("");
+    setStatus("All changes saved");
+  }
   async function togglePin() {
     if (!noteRef.current || pinning) return;
     setPinning(true);
@@ -496,8 +534,18 @@ export function NoteWorkspace() {
           <ArrowLeft size={16} /> All notes
         </Link>
         <span role="status" className={s.muted}>
-          <Check size={14} /> {status}
+          <Check size={14} /> {titleDraft !== note.title && !savingTitle ? "Unsaved title" : status}
         </span>
+        {canEdit && !isNewNote && (
+          <div className={s.actions}>
+            <button className={s.primary} onClick={saveTitle} disabled={savingTitle || titleDraft === note.title}>
+              Save
+            </button>
+            <button className={s.secondary} onClick={cancelTitle} disabled={savingTitle || titleDraft === note.title}>
+              Cancel
+            </button>
+          </div>
+        )}
         <button
           className={note.pinned ? s.primary : s.secondary}
           aria-label={note.pinned ? "Unpin note" : "Pin note"}
@@ -520,9 +568,12 @@ export function NoteWorkspace() {
           <input
             className={s.noteTitle}
             aria-label="Note title"
-            value={note.title}
+            value={titleDraft}
             disabled={!canEdit}
-            onChange={(e) => edit({ title: e.target.value })}
+            onChange={(e) => {
+              setTitleDraft(e.target.value);
+              if (isNewNote) edit({ title: e.target.value });
+            }}
           />
           <div className={s.noteMetadata}>
             <label>
@@ -789,6 +840,7 @@ export function NoteWorkspace() {
                 dirtyRef.current = false;
                 setDirty(false);
                 setNote(restored);
+                setTitleDraft(restored.title);
                 noteRef.current = restored;
                 setVersions(await repo.notes.versions(id));
                 setPreview(undefined);

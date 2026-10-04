@@ -54,7 +54,7 @@ export default function App() {
     try {
       const n = await repo.notes.create({});
       await refresh();
-      navigate(`/notes/${n.id}`);
+      navigate(`/notes/${n.id}`, { state: { newNote: true } });
     } catch (e) {
       setError((e as Error).message);
     }
