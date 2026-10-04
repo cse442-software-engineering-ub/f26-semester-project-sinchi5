@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   useParams,
   useSearchParams,
+  useLocation,
   Link,
 } from "react-router-dom";
 import {
@@ -344,6 +345,8 @@ export function Notes() {
 }
 export function NoteWorkspace() {
   const { id = "" } = useParams();
+  // The quick-create editor still autosaves its first title; reopened notes use Save/Cancel.
+  const isNewNote = useLocation().state?.newNote === true;
   const { repo, state, refresh } = useApp();
   const [note, setNote] = useState<Note>();
   const [titleDraft, setTitleDraft] = useState("");
@@ -533,7 +536,7 @@ export function NoteWorkspace() {
         <span role="status" className={s.muted}>
           <Check size={14} /> {titleDraft !== note.title && !savingTitle ? "Unsaved title" : status}
         </span>
-        {canEdit && (
+        {canEdit && !isNewNote && (
           <div className={s.actions}>
             <button className={s.primary} onClick={saveTitle} disabled={savingTitle || titleDraft === note.title}>
               Save
@@ -567,7 +570,10 @@ export function NoteWorkspace() {
             aria-label="Note title"
             value={titleDraft}
             disabled={!canEdit}
-            onChange={(e) => setTitleDraft(e.target.value)}
+            onChange={(e) => {
+              setTitleDraft(e.target.value);
+              if (isNewNote) edit({ title: e.target.value });
+            }}
           />
           <div className={s.noteMetadata}>
             <label>
