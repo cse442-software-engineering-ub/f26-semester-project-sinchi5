@@ -5,7 +5,7 @@ Notely is a responsive study workspace for university students. It brings course
 The project has two halves:
 
 - **Frontend**: a React + TypeScript single-page app built with Vite. It runs entirely in the browser and ships with a populated demo workspace.
-- **Account service**: a small PHP + MySQL API that handles real accounts: sign-up, sign-in, sessions, password changes, recovery codes, and account deletion.
+- **PHP service**: a PHP + MySQL API for real accounts and the initial server-side note title endpoints.
 
 Accounts are server-backed. Notes, courses, events, and imports are still a **browser prototype** stored in `localStorage` (see [Where data lives](#where-data-lives)).
 
@@ -179,6 +179,9 @@ The API has a single entry point, `api/index.php?route=<name>`. Every response i
 | POST | `password` | `currentPassword`, `password` | yes |
 | POST | `recovery-code` | `currentPassword` | yes |
 | POST | `delete` | `currentPassword` | yes |
+| POST | `note-create` | `title` | yes |
+| GET | `note&id=<id>` | none | yes (owner or collaborator) |
+| POST | `note-title` | `id`, `title` | yes (owner or editor) |
 
 Every POST must include:
 - `Content-Type: application/json` (body at most 8 KB)
@@ -195,6 +198,8 @@ Successful responses have this shape:
 }
 ```
 
+The note routes return `{ "note": { "id": "…", "title": "…" } }` instead. `note-create` returns 201. `note-title` returns 403 for a user without edit permission and 404 for a missing note. Note titles must contain 1–255 visible characters. These endpoints are the first server-side note contract; the current React workspace still stores its notes in the browser and does not call them yet.
+
 Errors return `{ "error": "<message>" }` with one of these statuses: 400 (bad JSON or plain HTTP in secure mode), 401 (not signed in, or wrong login), 403 (Origin or CSRF failure), 404 (unknown route), 405 (wrong method), 409 (email conflict), 413 (body too large), 415 (wrong content type), 422 (validation failure), 429 (rate limited, with `Retry-After`), 503 (service or configuration failure).
 
 The browser client is [src/services/auth.ts](src/services/auth.ts). It sends requests one at a time, refreshes the CSRF token after each response, and never caches recovery codes.
@@ -203,13 +208,15 @@ The browser client is [src/services/auth.ts](src/services/auth.ts). It sends req
 
 ## Database schema
 
-Defined in [backend/migrations/001_accounts.sql](backend/migrations/001_accounts.sql). Apply it separately to each environment. All timestamps are UTC.
+Defined in [backend/migrations/001_accounts.sql](backend/migrations/001_accounts.sql) and [backend/migrations/002_note_titles.sql](backend/migrations/002_note_titles.sql). Apply them in order, separately to each environment. All timestamps are UTC.
 
 | Table | Contents |
 | --- | --- |
 | `notely_users` | `id`, `name` (utf8mb4, at most 100 characters), `email` (ASCII, unique, lowercased), `password_hash`, `recovery_code_hash` (SHA-256), `onboarding_completed`, timestamps |
 | `notely_sessions` | `token_hash` (SHA-256 of the cookie token), `user_id` (null for anonymous sessions; cascades on user delete), `created_at`, `last_seen_at`, `expires_at` |
 | `notely_rate_limits` | `bucket_hash` (HMAC of scope plus IP, email, or user), `window_start`, `attempts` |
+| `notely_notes` | Server-side note ID, owner, title, timestamps |
+| `notely_note_editors` | Per-note user permission (`view` or `edit`) |
 
 The database never stores a plaintext password, recovery code, session token, email-to-IP pairing, or raw IP address.
 
@@ -270,6 +277,7 @@ These controls follow the [OWASP authentication](https://cheatsheetseries.owasp.
 | Data | Storage |
 | --- | --- |
 | Account identity, password hash, recovery-code hash, sessions, onboarding status | MySQL (server) |
+| Notes created through the note API | MySQL (server) |
 | Demo workspace content | `localStorage["notely-data-v1"]` |
 | A signed-in account's notes, courses, events, comments, and history | `localStorage["notely-workspace-v1-<user-id>"]` |
 | Theme preference | `localStorage["notely-theme"]` |
@@ -334,6 +342,7 @@ On the server:
 | `npm run test:php` | PHP validation, hashing, and configuration checks. No database needed. |
 | `npm run test:schema` | Read-only check that a live DEV/TEST database matches the expected schema |
 | `npm run test:accounts` | Full HTTP contract test against a running API. Creates and then deletes uniquely named test accounts. |
+| `php backend/tests/note-titles.php` | Owner, editor, viewer, and missing-note title tests against a DEV/TEST database with migration 002 applied. Creates and deletes test accounts. |
 
 `test:accounts` refuses any host except `localhost`, `127.0.0.1`, or aptitude. Point it with `NOTELY_TEST_URL` (and `NOTELY_TEST_ORIGIN` if needed). **Never run it against production.**
 
