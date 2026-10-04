@@ -11,6 +11,7 @@ header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
 define('NOTELY_INTERNAL', true);
 require_once __DIR__ . '/lib/bootstrap.php';
 require_once __DIR__ . '/lib/accounts.php';
+require_once __DIR__ . '/lib/notes.php';
 
 try {
     $config = configuration();
@@ -19,11 +20,11 @@ try {
     }
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
     $route = $_GET['route'] ?? 'session';
-    $routes = ['session', 'register', 'login', 'logout', 'onboarding', 'profile', 'password', 'delete', 'reset-password', 'recovery-code'];
+    $routes = ['session', 'register', 'login', 'logout', 'onboarding', 'profile', 'password', 'delete', 'reset-password', 'recovery-code', 'note-create', 'note', 'note-title'];
     if (!is_string($route) || !in_array($route, $routes, true)) {
-        throw new HttpError(404, 'This account action was not found.');
+        throw new HttpError(404, 'This action was not found.');
     }
-    $expected = $route === 'session' ? 'GET' : 'POST';
+    $expected = in_array($route, ['session', 'note'], true) ? 'GET' : 'POST';
     if ($method !== $expected) {
         header('Allow: ' . $expected);
         throw new HttpError(405, 'This request method is not supported.');
@@ -34,7 +35,7 @@ try {
             throw new HttpError(403, 'This request did not come from your workspace.');
         }
         if (strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '')[0])) !== 'application/json') {
-            throw new HttpError(415, 'Send account requests as JSON.');
+            throw new HttpError(415, 'Send requests as JSON.');
         }
         // Cap reads even when the client omits or lies about Content-Length.
         $body = file_get_contents('php://input', false, null, 0, 8193);
@@ -55,7 +56,7 @@ try {
     // Never trust client-supplied forwarding headers for throttling.
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     $session = readSession($db, $config);
-    if (in_array($route, ['onboarding', 'profile', 'password', 'delete', 'recovery-code'], true)
+    if (in_array($route, ['onboarding', 'profile', 'password', 'delete', 'recovery-code', 'note-create', 'note', 'note-title'], true)
         && (!$session || !$session['user_id'])) {
         throw new HttpError(401, 'Sign in to continue.');
     }
@@ -65,6 +66,9 @@ try {
             $session = newSession($db, $config, null);
         }
         $result = sessionResponse($db, $config, $session);
+    } elseif (in_array($route, ['note-create', 'note', 'note-title'], true)) {
+        if ($method === 'POST') requireCsrf($session, $config);
+        $result = noteAction($db, $session, $route, $input);
     } else {
         requireCsrf($session, $config);
         $result = accountAction($db, $config, $session, $route, $input, $ip);

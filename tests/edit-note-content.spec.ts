@@ -18,8 +18,17 @@ test.beforeEach(async ({ page }) => {
 test("existing content is editable but typing and metadata saves do not persist the body", async ({ page }) => {
   await expect(page.getByLabel("Note body")).toBeEditable();
   await page.getByLabel("Note body").fill("Unsaved draft.");
-  await page.getByLabel("Note title").fill("Metadata still saves");
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("notely-data-v1")!).notes.find((n: { id: string }) => n.id === "note-1").title)).toBe("Metadata still saves");
+  await page.getByRole("combobox", { name: "Category", exact: true }).selectOption("Work");
+  await expect
+  .poll(() =>
+    page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem("notely-data-v1")!).notes.find(
+          (n: { id: string }) => n.id === "note-1",
+        ).category,
+    ),
+  )
+  .toBe("Work");
   await page.getByRole("button", { name: "Pin note", exact: true }).click();
   await expect(page.getByLabel("Note body")).toHaveValue("Unsaved draft.");
   await page.getByRole("link", { name: "All notes", exact: true }).click();
