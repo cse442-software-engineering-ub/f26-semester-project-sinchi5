@@ -95,6 +95,7 @@ test("note edits, comments, history and reload", async ({ page }) => {
   await demo(page);
   await page.goto("/notes/note-1");
   await page.getByLabel("Note body").fill("A revised explanation of Scrum.");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(
     page.getByText("All changes saved", { exact: true }),
   ).toBeVisible();
@@ -187,13 +188,15 @@ test("responsive layout and accessibility", async ({ page }) => {
     )
     .toBe(true);
 });
-test("new note saves when leaving immediately", async ({ page }) => {
+test("new note saves explicitly before leaving", async ({ page }) => {
   await demo(page);
   await page.getByRole("button", { name: "New note", exact: true }).click();
   await page.getByLabel("Note title").fill("A brand-new idea");
   await page
     .getByLabel("Note body")
     .fill("Keep this even if I leave right away.");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("All changes saved", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "All notes", exact: true }).click();
   await page.getByRole("heading", { name: "A brand-new idea" }).click();
   await expect(page.getByLabel("Note body")).toHaveValue(

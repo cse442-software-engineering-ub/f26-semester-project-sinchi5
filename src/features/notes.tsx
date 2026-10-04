@@ -350,7 +350,6 @@ export function NoteWorkspace() {
   const { repo, state, refresh } = useApp();
   const [note, setNote] = useState<Note>();
   const [titleDraft, setTitleDraft] = useState("");
-  const [savingTitle, setSavingTitle] = useState(false);
   const [status, setStatus] = useState("All changes saved");
   const [error, setError] = useState("");
   const [panel, setPanel] = useState("comments");
@@ -368,6 +367,10 @@ export function NoteWorkspace() {
   const [postScenario, setPostScenario] = useState<CommentScenario>("success");
   const [preview, setPreview] = useState<NoteVersion>();
   const [restore, setRestore] = useState(false);
+  const [draftBody, setDraftBody] = useState("");
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const pendingSave = useRef<Promise<Note>>();
   const [dirty, setDirty] = useState(false);
   const [pinning, setPinning] = useState(false);
   const noteRef = useRef<Note>();
@@ -376,6 +379,13 @@ export function NoteWorkspace() {
   useEffect(() => {
     let active = true;
     setNote(undefined);
+    noteRef.current = undefined;
+    dirtyRef.current = false;
+    setDirty(false);
+    setDraftBody("");
+    setTitleDraft("");
+    setStatus("All changes saved");
+    generation.current++;
     setError("");
     Promise.all([
       repo.notes.get(id),
@@ -385,6 +395,7 @@ export function NoteWorkspace() {
       .then(([n, v, collaborators]) => {
         if (active) {
           setNote(n);
+          setDraftBody(n.body);
           setTitleDraft(n.title);
           noteRef.current = n;
           setVersions(v);
@@ -410,11 +421,12 @@ export function NoteWorkspace() {
     };
   }, [id, repo, commentScenario, commentsRetry]);
   useEffect(() => {
-    if (!dirty || !note) return;
+    if (!dirty || !note || saving) return;
     const current = ++generation.current;
     const timer = setTimeout(async () => {
       try {
-        await repo.notes.save(note);
+        pendingSave.current = repo.notes.save(note);
+        await pendingSave.current;
         if (current === generation.current) {
           dirtyRef.current = false;
           setDirty(false);
@@ -428,10 +440,10 @@ export function NoteWorkspace() {
       }
     }, 600);
     return () => clearTimeout(timer);
-  }, [note, dirty]);
+  }, [note, dirty, saving]);
   useEffect(() => {
     const save = () => {
-      if (noteRef.current && dirtyRef.current) {
+      if (noteRef.current && dirtyRef.current && !savingRef.current) {
         void repo.notes
           .save(noteRef.current)
           .then(() => {
@@ -447,8 +459,9 @@ export function NoteWorkspace() {
       save();
     };
   }, [id, repo]);
+  // Drafts stay out of metadata autosaves. Quick-create alone updates note.title.
   function edit(patch: Partial<Note>) {
-    if (!note || !canEdit) return;
+    if (!note || !canEdit || savingRef.current) return;
     const n = { ...note, ...patch };
     noteRef.current = n;
     dirtyRef.current = true;
@@ -456,37 +469,57 @@ export function NoteWorkspace() {
     setDirty(true);
     setStatus("Saving…");
   }
-  async function saveTitle() {
-    if (!note || savingTitle || !canEdit || titleDraft === note.title) return;
-    setSavingTitle(true);
+  async function saveNote() {
+    if (!noteRef.current || !canEdit || savingRef.current) return;
+    const title = titleDraft.trim();
+    if (!title || Array.from(title).length > 255) {
+      setError("Enter a note title of 1 to 255 characters.");
+      setStatus("Not saved");
+      return;
+    }
+    savingRef.current = true;
+    setSaving(true);
     setError("");
+    setStatus("Saving…");
+    generation.current++;
     try {
-      const title = titleDraft.trim();
-      if (!title || Array.from(title).length > 255) {
-        throw new Error("Enter a note title of 1 to 255 characters.");
-      }
-      const saved = await repo.notes.save({ ...noteRef.current!, title });
-      generation.current++;
-      dirtyRef.current = false;
-      setDirty(false);
+      // Finish metadata autosave before submitting both drafts, so an older
+      // write cannot overwrite the explicitly saved title or body.
+      await pendingSave.current?.catch(() => undefined);
+      const saved = await repo.notes.save({
+        ...noteRef.current!,
+        title,
+        body: draftBody,
+      });
       noteRef.current = saved;
       setNote(saved);
       setTitleDraft(saved.title);
-      setVersions(await repo.notes.versions(id));
+      setDraftBody(saved.body);
+      dirtyRef.current = false;
+      setDirty(false);
       setStatus("All changes saved");
+    } catch (e) {
+      setError("Changes could not be saved. Please try again. " + (e as Error).message);
+      setStatus("Not saved");
+      return;
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+    // A refresh failure must not report a successfully persisted body as lost.
+    try {
+      setVersions(await repo.notes.versions(id));
       await refresh();
     } catch (e) {
       setError((e as Error).message);
-      setStatus("Not saved");
-    } finally {
-      setSavingTitle(false);
     }
   }
-  function cancelTitle() {
-    if (!note) return;
+  function cancelEdits() {
+    if (!note || savingRef.current) return;
     setTitleDraft(note.title);
+    setDraftBody(note.body);
     setError("");
-    setStatus("All changes saved");
+    setStatus(dirtyRef.current ? "Saving…" : "All changes saved");
   }
   async function togglePin() {
     if (!noteRef.current || pinning) return;
@@ -527,6 +560,7 @@ export function NoteWorkspace() {
     !state.user ||
     isOwner ||
     currentCollaborator?.permission === "edit";
+  const hasDraftChanges = titleDraft !== note.title || draftBody !== note.body;
   return (
     <>
       <div className={s.editorTop}>
@@ -534,23 +568,13 @@ export function NoteWorkspace() {
           <ArrowLeft size={16} /> All notes
         </Link>
         <span role="status" className={s.muted}>
-          <Check size={14} /> {titleDraft !== note.title && !savingTitle ? "Unsaved title" : status}
+          <Check size={14} /> {saving ? "Saving…" : hasDraftChanges ? "Unsaved changes" : status}
         </span>
-        {canEdit && !isNewNote && (
-          <div className={s.actions}>
-            <button className={s.primary} onClick={saveTitle} disabled={savingTitle || titleDraft === note.title}>
-              Save
-            </button>
-            <button className={s.secondary} onClick={cancelTitle} disabled={savingTitle || titleDraft === note.title}>
-              Cancel
-            </button>
-          </div>
-        )}
         <button
           className={note.pinned ? s.primary : s.secondary}
           aria-label={note.pinned ? "Unpin note" : "Pin note"}
           aria-pressed={Boolean(note.pinned)}
-          disabled={pinning || !canEdit}
+          disabled={pinning || !canEdit || saving}
           onClick={togglePin}
         >
           <Pin size={18} aria-hidden="true" />
@@ -569,7 +593,7 @@ export function NoteWorkspace() {
             className={s.noteTitle}
             aria-label="Note title"
             value={titleDraft}
-            disabled={!canEdit}
+            disabled={!canEdit || saving}
             onChange={(e) => {
               setTitleDraft(e.target.value);
               if (isNewNote) edit({ title: e.target.value });
@@ -580,7 +604,7 @@ export function NoteWorkspace() {
               Course
               <select
                 value={note.courseId}
-                disabled={!canEdit}
+                disabled={!canEdit || saving}
                 onChange={(e) => edit({ courseId: e.target.value })}
               >
                 <option value="">No course</option>
@@ -596,7 +620,7 @@ export function NoteWorkspace() {
               <input
                 type="date"
                 value={note.lectureDate}
-                disabled={!canEdit}
+                disabled={!canEdit || saving}
                 onChange={(e) => edit({ lectureDate: e.target.value })}
               />
             </label>
@@ -604,7 +628,7 @@ export function NoteWorkspace() {
               Category
               <select
                 value={note.category}
-                disabled={!canEdit}
+                disabled={!canEdit || saving}
                 onChange={(e) => edit({ category: e.target.value })}
               >
                 {["School", "Work", "Meetings", "Personal"].map((c) => (
@@ -616,7 +640,7 @@ export function NoteWorkspace() {
               Visibility
               <select
                 value={note.visibility}
-                disabled={!canEdit}
+                disabled={!canEdit || saving}
                 onChange={(e) =>
                   edit({ visibility: e.target.value as Note["visibility"] })
                 }
@@ -631,7 +655,7 @@ export function NoteWorkspace() {
             <input
               placeholder="Add tags, separated by commas"
               value={note.tags.join(", ")}
-              disabled={!canEdit}
+              disabled={!canEdit || saving}
               onChange={(e) =>
                 edit({
                   tags: e.target.value.split(",").map((t) => t.trimStart()),
@@ -643,10 +667,28 @@ export function NoteWorkspace() {
             className={s.noteBody}
             aria-label="Note body"
             placeholder="Start anywhere. This space is yours…"
-            value={note.body}
-            disabled={!canEdit}
-            onChange={(e) => edit({ body: e.target.value })}
+            value={draftBody}
+            disabled={!canEdit || saving}
+            onChange={(e) => setDraftBody(e.target.value)}
           />
+          <div className={s.actions}>
+            <button
+              type="button"
+              className={s.primary}
+              disabled={!canEdit || saving || pinning || (!hasDraftChanges && !dirty)}
+              onClick={saveNote}
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button
+              type="button"
+              className={s.secondary}
+              disabled={!canEdit || saving || !hasDraftChanges}
+              onClick={cancelEdits}
+            >
+              Cancel
+            </button>
+          </div>
         </section>
         <aside className={s.inspector}>
           <Collaborators
@@ -830,16 +872,22 @@ export function NoteWorkspace() {
           <button
             className={s.primary}
             onClick={async () => {
+              if (!canEdit || savingRef.current) return;
               if (!restore) {
                 setRestore(true);
                 return;
               }
+              savingRef.current = true;
+              setSaving(true);
               try {
-                if (dirty) await repo.notes.save(note);
+                generation.current++;
+                await pendingSave.current?.catch(() => undefined);
+                if (dirtyRef.current) await repo.notes.save(noteRef.current!);
                 const restored = await repo.notes.restore(id, preview.id);
                 dirtyRef.current = false;
                 setDirty(false);
                 setNote(restored);
+                setDraftBody(restored.body);
                 setTitleDraft(restored.title);
                 noteRef.current = restored;
                 setVersions(await repo.notes.versions(id));
@@ -848,6 +896,9 @@ export function NoteWorkspace() {
                 await refresh();
               } catch (e) {
                 setError((e as Error).message);
+              } finally {
+                savingRef.current = false;
+                setSaving(false);
               }
             }}
           >
