@@ -52,10 +52,12 @@ says(fn() => validName('Jamie <script>'), '"<"', 'markup in name names the chara
 says(fn() => validName('Jamie@home'), '"@"', 'symbol in name names the character');
 says(fn() => validName('-Jamie'), 'start with a letter', 'leading punctuation');
 says(fn() => validName("Ja\u{0301}\u{0301}\u{0301}mie"), 'accent marks', 'stacked combining marks');
-says(fn() => validName("J\u{00E1}\u{0301}\u{0301}mie"), 'accent marks', 'marks stacked on a precomposed letter');
 check(validName('Nguyễn Thị Ngọc') !== '', 'Vietnamese double diacritics accepted');
 says(fn() => validName("Jamie\xFF"), 'could not read', 'invalid UTF-8 name');
+// Both checks need the intl extension's Normalizer, which aptitude's PHP doesn't have.
+// Without it, validName still rejects three separate marks but can't split a precomposed letter.
 if (class_exists('Normalizer')) {
+    says(fn() => validName("J\u{00E1}\u{0301}\u{0301}mie"), 'accent marks', 'marks stacked on a precomposed letter');
     check(validName("Zoe\u{0308}") === 'Zoë', 'decomposed accents normalized');
 }
 
