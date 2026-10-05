@@ -19,7 +19,8 @@ $tables = [
     ],
     'notely_notes' => [
         'id' => ['bigint unsigned', 'NO'], 'owner_user_id' => ['bigint unsigned', 'NO'],
-        'title' => ['varchar(255)', 'NO'], 'created_at' => ['datetime', 'NO'], 'updated_at' => ['datetime', 'NO'],
+        'title' => ['varchar(255)', 'NO'], 'body' => ['text', 'NO'],
+        'created_at' => ['datetime', 'NO'], 'updated_at' => ['datetime', 'NO'],
     ],
     'notely_note_editors' => [
         'note_id' => ['bigint unsigned', 'NO'], 'user_id' => ['bigint unsigned', 'NO'],

@@ -109,6 +109,7 @@ You need PHP 8 with `pdo_mysql`, and a local MySQL or MariaDB server (XAMPP work
    ```sh
    mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/001_accounts.sql
    mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/002_note_titles.sql
+   mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/003_note_content.sql
    ```
 
    You can also import the file through phpMyAdmin.
@@ -183,6 +184,7 @@ The API has a single entry point, `api/index.php?route=<name>`. Every response i
 | POST | `note-create` | `title` | yes |
 | GET | `note&id=<id>` | none | yes (owner or collaborator) |
 | POST | `note-title` | `id`, `title` | yes (owner or editor) |
+| POST | `note-content` | `id`, `body` | yes (owner or editor) |
 
 Every POST must include:
 - `Content-Type: application/json` (body at most 8 KB)
@@ -201,6 +203,8 @@ Successful responses have this shape:
 
 The note routes return `{ "note": { "id": "…", "title": "…" } }` instead. `note-create` returns 201. `note-title` returns 403 for a user without edit permission and 404 for a missing note. Note titles must contain 1–255 visible characters. These endpoints are the first server-side note contract; the current React workspace still stores its notes in the browser and does not call them yet.
 
+GET `note` additionally returns `body`. POST `note-content` returns `{ "note": { "id": "…", "body": "…" } }` and uses the same owner/edit-collaborator authorization and error statuses as `note-title`. Body text must be a UTF-8 string; empty bodies are allowed and whitespace is preserved exactly. The existing 8 KB JSON request limit applies. Title-only creation initializes an empty body. Apply migration 003 before deploying this backend, with note writes paused during the migration.
+
 Errors return `{ "error": "<message>" }` with one of these statuses: 400 (bad JSON or plain HTTP in secure mode), 401 (not signed in, or wrong login), 403 (Origin or CSRF failure), 404 (unknown route), 405 (wrong method), 409 (email conflict), 413 (body too large), 415 (wrong content type), 422 (validation failure), 429 (rate limited, with `Retry-After`), 503 (service or configuration failure).
 
 The browser client is [src/services/auth.ts](src/services/auth.ts). It sends requests one at a time, refreshes the CSRF token after each response, and never caches recovery codes.
@@ -209,14 +213,14 @@ The browser client is [src/services/auth.ts](src/services/auth.ts). It sends req
 
 ## Database schema
 
-Defined in [backend/migrations/001_accounts.sql](backend/migrations/001_accounts.sql) and [backend/migrations/002_note_titles.sql](backend/migrations/002_note_titles.sql). Apply them in order, separately to each environment. All timestamps are UTC.
+Defined in [backend/migrations/001_accounts.sql](backend/migrations/001_accounts.sql) and [backend/migrations/002_note_titles.sql](backend/migrations/002_note_titles.sql). Also apply [backend/migrations/003_note_content.sql](backend/migrations/003_note_content.sql), which backfills existing notes with an empty body. Apply all three in order, separately to each environment. All timestamps are UTC.
 
 | Table | Contents |
 | --- | --- |
 | `notely_users` | `id`, `name` (utf8mb4, at most 100 characters), `email` (ASCII, unique, lowercased), `password_hash`, `recovery_code_hash` (SHA-256), `onboarding_completed`, timestamps |
 | `notely_sessions` | `token_hash` (SHA-256 of the cookie token), `user_id` (null for anonymous sessions; cascades on user delete), `created_at`, `last_seen_at`, `expires_at` |
 | `notely_rate_limits` | `bucket_hash` (HMAC of scope plus IP, email, or user), `window_start`, `attempts` |
-| `notely_notes` | Server-side note ID, owner, title, timestamps |
+| `notely_notes` | Server-side note ID, owner, title, body (non-null TEXT), timestamps |
 | `notely_note_editors` | Per-note user permission (`view` or `edit`) |
 
 The database never stores a plaintext password, recovery code, session token, email-to-IP pairing, or raw IP address.
@@ -345,6 +349,8 @@ On the server:
 | `npm run test:accounts` | Full HTTP contract test against a running API. Creates and then deletes uniquely named test accounts. |
 | `npm run test:note-titles` | HTTP tests for the three card 108 scenarios against a running DEV/TEST API with migration 002 applied. |
 | `php backend/tests/note-titles.php` | Owner, editor, viewer, and missing-note title tests against a DEV/TEST database with migration 002 applied. Creates and deletes test accounts. |
+| `php backend/tests/note-content.php` | Body validation plus owner/editor/viewer, persistence, and title-preservation tests against a DEV/TEST database with all three migrations applied. |
+| `node backend/tests/note-content-http.mjs` | Task 110 HTTP persistence, access, CSRF/Origin, validation, and request-limit checks against a running DEV/TEST API. |
 
 The HTTP contract tests refuse any host except `localhost`, `127.0.0.1`, or aptitude. Point them with `NOTELY_TEST_URL` (and `NOTELY_TEST_ORIGIN` if needed). **Never run them against production.**
 

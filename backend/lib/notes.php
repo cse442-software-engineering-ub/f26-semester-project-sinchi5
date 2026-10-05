@@ -28,13 +28,22 @@ function noteTitle(array $input): string
     return $title;
 }
 
+function noteBody(array $input): string
+{
+    $body = field($input, 'body');
+    if (!preg_match('//u', $body)) {
+        throw new HttpError(422, 'The note body contains characters we could not read.');
+    }
+    return $body;
+}
+
 function noteAction(PDO $db, array $session, string $route, array $input): array
 {
     if ($route !== 'note') $db->beginTransaction();
     $user = requireUser($db, $session, $route !== 'note');
     if ($route === 'note-create') {
         $title = noteTitle($input);
-        query($db, 'INSERT INTO notely_notes (owner_user_id, title) VALUES (?, ?)', [$user['id'], $title]);
+        query($db, 'INSERT INTO notely_notes (owner_user_id, title, body) VALUES (?, ?, ?)', [$user['id'], $title, '']);
         $id = $db->lastInsertId();
         $db->commit();
         http_response_code(201);
@@ -43,15 +52,15 @@ function noteAction(PDO $db, array $session, string $route, array $input): array
 
     $id = noteId($route === 'note' ? ($_GET['id'] ?? null) : ($input['id'] ?? null));
     if ($route === 'note') {
-        $note = query($db, 'SELECT n.id, n.title FROM notely_notes n
+        $note = query($db, 'SELECT n.id, n.title, n.body FROM notely_notes n
             LEFT JOIN notely_note_editors e ON e.note_id = n.id AND e.user_id = ?
             WHERE n.id = ? AND (n.owner_user_id = ? OR e.user_id IS NOT NULL)',
             [$user['id'], $id, $user['id']])->fetch();
         if (!$note) throw new HttpError(404, 'This note could not be found.');
-        return ['note' => ['id' => (string) $note['id'], 'title' => $note['title']]];
+        return ['note' => ['id' => (string) $note['id'], 'title' => $note['title'], 'body' => $note['body']]];
     }
 
-    $title = noteTitle($input);
+    $value = $route === 'note-content' ? noteBody($input) : noteTitle($input);
     $note = query($db, 'SELECT owner_user_id FROM notely_notes WHERE id = ? FOR UPDATE', [$id])->fetch();
     if (!$note) throw new HttpError(404, 'This note could not be found.');
     if ((string) $note['owner_user_id'] !== (string) $user['id']) {
@@ -59,7 +68,11 @@ function noteAction(PDO $db, array $session, string $route, array $input): array
             [$id, $user['id']])->fetchColumn();
         if (!$editor) throw new HttpError(403, 'You do not have permission to edit this note.');
     }
-    query($db, 'UPDATE notely_notes SET title = ? WHERE id = ?', [$title, $id]);
+    if ($route === 'note-content') {
+        query($db, 'UPDATE notely_notes SET body = ? WHERE id = ?', [$value, $id]);
+    } else {
+        query($db, 'UPDATE notely_notes SET title = ? WHERE id = ?', [$value, $id]);
+    }
     $db->commit();
-    return ['note' => ['id' => $id, 'title' => $title]];
+    return ['note' => ['id' => $id, $route === 'note-content' ? 'body' : 'title' => $value]];
 }
