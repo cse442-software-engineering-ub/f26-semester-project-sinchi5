@@ -5,8 +5,10 @@ const registeredClassmates = [
   { id: "classmate-jamie", name: "Jamie", email: "jamie@example.edu" },
 ];
 
-export function createMockCollaborators(): Pick<NoteRepository, "collaborators" | "inviteCollaborator" | "setCollaboratorPermission"> {
-  const invitations = new Map<string, Collaborator[]>();
+// The repository passes its own map so deleting a note can drop its invitations.
+export function createMockCollaborators(
+  invitations = new Map<string, Collaborator[]>(),
+): Pick<NoteRepository, "collaborators" | "inviteCollaborator" | "setCollaboratorPermission"> {
   return {
     async collaborators(noteId) {
       return structuredClone(invitations.get(noteId) || []);

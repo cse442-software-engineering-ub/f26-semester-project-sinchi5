@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createRepositories, filterNotes } from "./repositories";
 import { seedNotes, dateKey } from "./fixtures";
+import type { Repositories } from "../domain";
 function memory() {
   const data = new Map<string, string>();
   return {
@@ -282,5 +283,86 @@ describe("note pinning", () => {
     expect(await r.notes.get(n.id)).toEqual(n);
     expect(await createRepositories(data).notes.get(n.id)).toEqual(n);
     await expect(r.notes.setPinned("missing", true)).rejects.toThrow("found");
+  });
+});
+
+describe("note deletion (task #115)", () => {
+  const student = { id: "student-a", name: "Student A", email: "a@example.edu" };
+  const titles = async (r: Repositories) =>
+    (await r.notes.list()).map((n) => n.title).sort();
+
+  it("Test 1 - a deleted note is no longer listed or returned by ID", async () => {
+    const r = createRepositories(memory(), student, false);
+    const biology = await r.notes.create({ title: "Biology lab draft" });
+    await r.notes.create({ title: "Calculus review" });
+    await r.notes.create({ title: "Meeting agenda" });
+    await expect(r.notes.delete(biology.id)).resolves.toBeUndefined();
+    expect(await titles(r)).toEqual(["Calculus review", "Meeting agenda"]);
+    await expect(r.notes.get(biology.id)).rejects.toThrow("This note could not be found.");
+  });
+
+  it("Test 2 - removes the note's comments, versions, and collaborators and nothing else", async () => {
+    const storage = memory();
+    const stored = () => JSON.parse(storage.getItem("notely-data-v1")!);
+    const r = createRepositories(storage, student, false);
+    const shared = await r.notes.create({ title: "Group project plan", visibility: "shared" });
+    for (const body of ["Draft one", "Draft two", "Draft three"])
+      await r.notes.save({ ...(await r.notes.get(shared.id)), body });
+    await r.notes.comment(shared.id, "Looks good.");
+    await r.notes.comment(shared.id, "Added the timeline.");
+    await r.notes.inviteCollaborator(shared.id, "jamie@example.edu");
+    const other = await r.notes.create({ title: "Calculus review", visibility: "shared" });
+    await r.notes.save({ ...other, body: "Limits" });
+    await r.notes.comment(other.id, "Keep this one.");
+    const before = stored();
+    expect(before.comments.filter((c: { noteId: string }) => c.noteId === shared.id)).toHaveLength(2);
+    expect(await r.notes.versions(shared.id)).toHaveLength(3);
+    expect(await r.notes.collaborators(shared.id)).toHaveLength(1);
+
+    await r.notes.delete(shared.id);
+
+    const after = stored();
+    expect(JSON.stringify(after)).not.toContain(shared.id);
+    expect(await r.notes.collaborators(shared.id)).toEqual([]);
+    expect(after.comments).toEqual(before.comments.filter((c: { noteId: string }) => c.noteId === other.id));
+    expect(after.versions).toEqual(before.versions.filter((v: { noteId: string }) => v.noteId === other.id));
+    expect(after.comments).toHaveLength(1);
+    expect(after.versions).toHaveLength(1);
+  });
+
+  it("Test 3 - deleting a missing note rejects and leaves other notes alone", async () => {
+    const r = createRepositories(memory(), student, false);
+    await r.notes.create({ title: "Biology lab draft" });
+    await r.notes.create({ title: "Calculus review" });
+    await expect(r.notes.delete("missing-note")).rejects.toThrow("This note could not be found.");
+    expect(await titles(r)).toEqual(["Biology lab draft", "Calculus review"]);
+  });
+
+  it("Test 4 - a failed storage write keeps the note, its comment, and its version", async () => {
+    const data = memory();
+    let failNext = false;
+    const r = createRepositories({
+      getItem: data.getItem,
+      setItem: (key, value) => {
+        if (failNext) {
+          failNext = false;
+          throw Error("quota");
+        }
+        data.setItem(key, value);
+      },
+    }, student, false);
+    const note = await r.notes.create({ title: "Calculus review", visibility: "shared" });
+    await r.notes.save({ ...note, body: "Limits" });
+    await r.notes.comment(note.id, "Great summary.");
+    failNext = true;
+    await expect(r.notes.delete(note.id)).rejects.toThrow(
+      "Your browser storage is full or unavailable. Changes could not be saved.",
+    );
+    expect(await titles(r)).toEqual(["Calculus review"]);
+    expect(await r.notes.comments(note.id)).toHaveLength(1);
+    expect(await r.notes.versions(note.id)).toHaveLength(1);
+    const reloaded = createRepositories(data, student, false);
+    expect(await titles(reloaded)).toEqual(["Calculus review"]);
+    expect(await reloaded.notes.comments(note.id)).toHaveLength(1);
   });
 });
