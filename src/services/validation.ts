@@ -10,6 +10,14 @@ const EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u
 // Control, zero-width, bidirectional-override, private-use, unassigned, and lone surrogate characters.
 const INVISIBLE = /\p{C}/u;
 const HIDDEN = "contains a hidden character, such as a tab or line break. Try typing it instead of pasting.";
+// Same list as COMMON_PASSWORDS in security.php.
+const COMMON_PASSWORDS = new Set(["password", "password1", "password12", "password123", "password1!", "password123!",
+  "passw0rd", "p@ssw0rd", "p@ssword", "12345678", "123456789", "1234567890", "0987654321", "87654321",
+  "11111111", "00000000", "12341234", "11223344", "qwertyui", "qwertyuiop", "qwerty12", "qwerty123",
+  "1q2w3e4r", "1q2w3e4r5t", "1qaz2wsx", "zaq12wsx", "q1w2e3r4", "asdfghjk", "asdfghjkl", "abcd1234",
+  "abc12345", "abcdefgh", "a1b2c3d4", "aa123456", "iloveyou", "sunshine", "princess", "football",
+  "baseball", "superman", "starwars", "trustno1", "welcome1", "welcome123", "letmein1", "changeme",
+  "admin123", "whatever", "computer", "internet", "notely123", "notely2026"]);
 
 const count = (value: string) => [...value].length;
 const trimEdges = (value: string) => value.replace(/^[\s\p{Z}]+|[\s\p{Z}]+$/gu, "");
@@ -69,6 +77,7 @@ export function passwordError(password: string): string {
   if (character) return character;
   if (password.length < PASSWORD_MIN) return `Use at least ${PASSWORD_MIN} characters for your password. It currently has ${password.length}.`;
   if (password.length > PASSWORD_MAX) return `Use at most ${PASSWORD_MAX} characters for your password. It currently has ${password.length}.`;
+  if (COMMON_PASSWORDS.has(password.toLowerCase())) return "This password is too common and easy to guess. Try a short phrase instead.";
   return "";
 }
 

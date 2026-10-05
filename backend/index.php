@@ -60,6 +60,10 @@ try {
         && (!$session || !$session['user_id'])) {
         throw new HttpError(401, 'Sign in to continue.');
     }
+    // Every note route name starts with "note". Bounds how fast one account can write to the shared database.
+    if ($method === 'POST' && str_starts_with($route, 'note')) {
+        rateLimit($db, $config, 'note-write', (string) $session['user_id'], 1000);
+    }
     if ($route === 'session') {
         if (!$session) {
             rateLimit($db, $config, 'new-session', $ip, 120);
