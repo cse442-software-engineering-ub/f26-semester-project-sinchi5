@@ -66,6 +66,57 @@ export function Modal({
     </Dialog.Root>
   );
 }
+export function DeleteNoteDialog({
+  title,
+  onDelete,
+  onClose,
+}: {
+  title: string;
+  // Resolves once the note is gone; the caller then unmounts the dialog.
+  onDelete: () => Promise<void>;
+  onClose: () => void;
+}) {
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+  const pending = useRef(false);
+  async function confirm() {
+    if (pending.current) return;
+    pending.current = true;
+    setDeleting(true);
+    setError("");
+    try {
+      await onDelete();
+    } catch (e) {
+      // Stay disabled after success until the caller removes the dialog.
+      pending.current = false;
+      setDeleting(false);
+      setError(`This note could not be deleted. ${(e as Error).message}`);
+    }
+  }
+  return (
+    <Modal
+      title="Delete this note?"
+      description={`“${title}” and its comments and history will be permanently removed. This can’t be undone.`}
+      dismissible={!deleting}
+      onClose={onClose}
+    >
+      {error && (
+        <p className={s.error} role="alert">
+          {error}
+        </p>
+      )}
+      {deleting && <p role="status">Deleting note…</p>}
+      <div className={s.actions}>
+        <Dialog.Close className={s.secondary} disabled={deleting}>
+          Cancel
+        </Dialog.Close>
+        <button className={s.danger} disabled={deleting} onClick={confirm}>
+          Delete note
+        </button>
+      </div>
+    </Modal>
+  );
+}
 export function Empty({
   title,
   children,
