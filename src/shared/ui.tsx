@@ -8,6 +8,7 @@ import {
   ArrowUpRight,
   BookOpen,
   CalendarDays,
+  Trash2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useRef, useState, type ReactNode } from "react";
@@ -132,10 +133,16 @@ export function Empty({
     </div>
   );
 }
-export function NoteCard({ note }: { note: Note }) {
+export function NoteCard({
+  note,
+  onDelete,
+}: {
+  note: Note;
+  onDelete?: () => void;
+}) {
   const { state } = useApp();
   const course = state.courses.find((c) => c.id === note.courseId);
-  return (
+  const card = (
     <Link to={`/notes/${note.id}`} className={s.noteCard}>
       <div className={s.cardTop}>
         <span
@@ -174,6 +181,21 @@ export function NoteCard({ note }: { note: Note }) {
         </span>
       </div>
     </Link>
+  );
+  if (!onDelete) return card;
+  // The card is one link, so its action sits beside it instead of inside it.
+  return (
+    <div className={s.noteItem}>
+      {card}
+      <button
+        type="button"
+        className={s.cardAction}
+        aria-label={`Delete ${note.title}`}
+        onClick={onDelete}
+      >
+        <Trash2 size={14} aria-hidden="true" /> Delete
+      </button>
+    </div>
   );
 }
 export function EventRow({

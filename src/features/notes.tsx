@@ -19,7 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { useApp } from "../app/context";
-import { PageHeading, NoteCard, Empty, Modal, EventRow } from "../shared/ui";
+import { PageHeading, NoteCard, Empty, Modal, EventRow, DeleteNoteDialog } from "../shared/ui";
 import { MAX_COMMENT_LENGTH } from "../domain";
 import type {
   Note,
@@ -41,6 +41,8 @@ export function Notes() {
   const [draftTitle, setDraftTitle] = useState("");
   const [draftBody, setDraftBody] = useState("");
   const [createStatus, setCreateStatus] = useState("All changes saved");
+  const [noteToDelete, setNoteToDelete] = useState<Note>();
+  const [announcement, setAnnouncement] = useState("");
   const key = params.toString();
   useEffect(() => {
     let active = true;
@@ -135,6 +137,15 @@ export function Notes() {
       setCreateStatus("Not saved");
       setCreating(false);
     }
+  }
+
+  async function deleteNote(note: Note) {
+    await repo.notes.delete(note.id);
+    // Search, filters, sort, and view live in the URL and stay untouched.
+    setNotes((list) => list.filter((n) => n.id !== note.id));
+    setNoteToDelete(undefined);
+    setAnnouncement("Note deleted.");
+    await refresh();
   }
 
   const active = ["course", "category", "visibility", "from", "to"].filter(
@@ -321,6 +332,11 @@ export function Notes() {
           )}
         </div>
       </div>
+      {announcement && (
+        <p role="status" className={s.notice}>
+          {announcement}
+        </p>
+      )}
       {error ? (
         <p role="alert" className={s.error}>
           {error}
@@ -332,13 +348,31 @@ export function Notes() {
           className={`${s.noteGrid} ${params.get("view") === "list" ? s.noteList : ""}`}
         >
           {notes.map((n) => (
-            <NoteCard key={n.id} note={n} />
+            <NoteCard
+              key={n.id}
+              note={n}
+              onDelete={
+                n.ownerId === state.user?.id
+                  ? () => {
+                      setAnnouncement("");
+                      setNoteToDelete(n);
+                    }
+                  : undefined
+              }
+            />
           ))}
         </div>
       ) : (
         <Empty title="No notes found">
           Try another keyword or clear a filter to find your way back.
         </Empty>
+      )}
+      {noteToDelete && (
+        <DeleteNoteDialog
+          title={noteToDelete.title}
+          onClose={() => setNoteToDelete(undefined)}
+          onDelete={() => deleteNote(noteToDelete)}
+        />
       )}
     </>
   );
