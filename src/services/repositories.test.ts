@@ -366,3 +366,57 @@ describe("note deletion (task #115)", () => {
     expect(await reloaded.notes.comments(note.id)).toHaveLength(1);
   });
 });
+
+describe("owner-only note deletion (task #116)", () => {
+  const studentA = { id: "student-a", name: "Student A", email: "a@example.edu" };
+  // The collaborator mock only knows Jamie, so Jamie plays Student B. Its
+  // invitations are kept in memory per repository instance, so each signed-in
+  // instance records the share itself, as in the edit-permission tests above.
+  const studentB = { id: "classmate-jamie", name: "Jamie", email: "jamie@example.edu" };
+
+  it("Test 1 - the owner can delete their own note", async () => {
+    const r = createRepositories(memory(), studentA, false);
+    const note = await r.notes.create({ title: "Owner's note" });
+    await expect(r.notes.delete(note.id)).resolves.toBeUndefined();
+    expect((await r.notes.list()).map((n) => n.title)).not.toContain("Owner's note");
+  });
+
+  it("Test 2 - edit and view collaborators cannot delete a note they do not own", async () => {
+    const storage = memory();
+    const a = createRepositories(storage, studentA, false);
+    const note = await a.notes.create({ title: "Group project plan", body: "Milestones", visibility: "shared" });
+    await a.notes.comment(note.id, "Please review the timeline.");
+    await a.notes.inviteCollaborator(note.id, studentB.email);
+    await a.notes.setCollaboratorPermission(note.id, studentB.id, "edit");
+    const collaborators = await a.notes.collaborators(note.id);
+
+    const b = createRepositories(storage, studentB, false);
+    await b.notes.inviteCollaborator(note.id, studentB.email);
+    for (const permission of ["edit", "view"] as const) {
+      await b.notes.setCollaboratorPermission(note.id, studentB.id, permission);
+      await expect(b.notes.delete(note.id)).rejects.toThrow("Only the note's owner can delete it.");
+    }
+
+    const reloaded = createRepositories(storage, studentA, false);
+    expect(await reloaded.notes.get(note.id)).toEqual(note);
+    expect((await reloaded.notes.comments(note.id)).map((c) => c.body)).toEqual(["Please review the timeline."]);
+    expect(await a.notes.collaborators(note.id)).toEqual(collaborators);
+  });
+
+  it("Test 3 - signed-out and forged requests cannot delete a note", async () => {
+    const storage = memory();
+    const a = createRepositories(storage, studentA, false);
+    const note = await a.notes.create({ title: "Calculus review" });
+
+    const signedOut = createRepositories(storage, null, false);
+    await expect(signedOut.notes.delete(note.id)).rejects.toThrow("Sign in to continue.");
+
+    // delete(id) has no owner parameter; this cast smuggles one in anyway.
+    const b = createRepositories(storage, studentB, false);
+    const forged = b.notes.delete as unknown as (id: string, request: { ownerId: string }) => Promise<void>;
+    await expect(forged(note.id, { ownerId: studentA.id })).rejects.toThrow("Only the note's owner can delete it.");
+
+    const reloaded = createRepositories(storage, studentA, false);
+    expect((await reloaded.notes.list()).map((n) => n.title)).toEqual(["Calculus review"]);
+  });
+});
