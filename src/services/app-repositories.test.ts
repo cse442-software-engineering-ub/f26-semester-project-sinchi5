@@ -1,9 +1,18 @@
 import { expect, it, vi } from "vitest";
-import type { AuthRepository, User } from "../domain";
+import type { AuthRepository, NoteRepository, User } from "../domain";
 import { createAppRepositories } from "./app-repositories";
+import { createRepositories } from "./repositories";
 function memory(): Storage {
   const data = new Map<string, string>();
   return { getItem: key => data.get(key) ?? null, setItem: (key, value) => { data.set(key, value); }, removeItem: key => { data.delete(key); }, clear: () => data.clear(), key: index => [...data.keys()][index], get length() { return data.size; } };
+}
+// Stands in for the PHP note API: one note store per account.
+function fakeServer() {
+  const stores = new Map<string, NoteRepository>();
+  return (user: User) => {
+    if (!stores.has(user.id)) stores.set(user.id, createRepositories(undefined, user, false).notes);
+    return stores.get(user.id)!;
+  };
 }
 const alice = { id: "1", name: "Alice", email: "alice@example.edu" };
 const bob = { id: "2", name: "Bob", email: "bob@example.edu" };
@@ -24,10 +33,11 @@ it("rejects legacy localStorage identity and keeps demo independent of server ac
 it("isolates account workspaces and does not persist account or credential data", async () => {
   const storage = memory(); let current: User | null = alice;
   const auth = { session: async () => current, signOut: async () => { current = null; }, deleteAccount: async () => { current = null; } } as unknown as AuthRepository;
-  const repo = createAppRepositories(storage, memory(), auth);
+  const repo = createAppRepositories(storage, memory(), auth, fakeServer());
   await repo.auth.session();
   const note = await repo.notes.create({ title: "Alice only" });
   expect(note.ownerId).toBe("1");
+  await repo.courses.create({ code: "CSE 442", name: "Software Engineering", color: "#869D7A", term: "Fall" });
   expect(JSON.parse(storage.getItem("notely-workspace-v1-1")!)).not.toHaveProperty("user");
   current = bob; await repo.auth.session();
   expect((await repo.notes.list()).some(n => n.title === "Alice only")).toBe(false);
@@ -41,7 +51,7 @@ it("isolates account workspaces and does not persist account or credential data"
 });
 it("clears selected workspace on server failure", async () => {
   const session = vi.fn().mockResolvedValueOnce(alice).mockRejectedValueOnce(new Error("unavailable"));
-  const repo = createAppRepositories(memory(), memory(), { session } as unknown as AuthRepository);
+  const repo = createAppRepositories(memory(), memory(), { session } as unknown as AuthRepository, fakeServer());
   await repo.auth.session();
   await expect(repo.auth.session()).rejects.toThrow("unavailable");
   await expect(repo.notes.list()).rejects.toThrow("Sign in");
@@ -57,7 +67,7 @@ it("ignores an older server refresh after switching into the demo", async () => 
   expect(await repo.notes.list()).toHaveLength(6);
 });
 it("starts real accounts with an empty workspace while the demo keeps sample content", async () => {
-  const repo = createAppRepositories(memory(), memory(), { session: async () => alice } as unknown as AuthRepository);
+  const repo = createAppRepositories(memory(), memory(), { session: async () => alice } as unknown as AuthRepository, fakeServer());
   await repo.auth.session();
   expect(await repo.courses.list()).toEqual([]);
   expect(await repo.notes.list()).toEqual([]);
@@ -65,4 +75,23 @@ it("starts real accounts with an empty workspace while the demo keeps sample con
   expect(await repo.courses.list()).toEqual([]);
   await repo.auth.startDemo();
   expect((await repo.courses.list()).length).toBeGreaterThan(0);
+});
+
+it("keeps signed-in notes on the server and demo notes in the browser (task #120)", async () => {
+  const storage = memory();
+  const server = vi.fn(fakeServer());
+  const repo = createAppRepositories(storage, memory(), { session: async () => alice } as unknown as AuthRepository, server);
+  await repo.auth.session();
+  expect(server).toHaveBeenCalledWith(alice, expect.any(Function));
+  const course = await repo.courses.create({ code: "CSE 442", name: "Software Engineering", color: "#869D7A", term: "Fall" });
+  const note = await repo.notes.create({ title: "Server note", courseId: course.id });
+  expect(storage.getItem("notely-workspace-v1-1")).not.toContain("Server note");
+  expect(Object.values(await repo.courses.folders(course.id)).flat().map((n) => n.title)).toEqual(["Server note"]);
+  expect((await repo.schedule.lectureNotes({ id: "", courseId: course.id, title: "Lecture", kind: "lecture", date: note.lectureDate,
+    time: "10:00", location: "", description: "", source: "manual" })).map((n) => n.title)).toEqual(["Server note"]);
+  await repo.reset();
+  expect(await repo.notes.list()).toEqual([]);
+  await repo.auth.startDemo();
+  expect(await repo.notes.list()).toHaveLength(6);
+  expect(server).toHaveBeenCalledTimes(1);
 });
