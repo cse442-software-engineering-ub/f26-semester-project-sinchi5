@@ -3,6 +3,7 @@ import {
   useParams,
   useSearchParams,
   useLocation,
+  useNavigate,
   Link,
 } from "react-router-dom";
 import {
@@ -17,6 +18,7 @@ import {
   Check,
   Pin,
   X,
+  Trash2,
 } from "lucide-react";
 import { useApp } from "../app/context";
 import { PageHeading, NoteCard, Empty, Modal, EventRow, DeleteNoteDialog } from "../shared/ui";
@@ -42,7 +44,17 @@ export function Notes() {
   const [draftBody, setDraftBody] = useState("");
   const [createStatus, setCreateStatus] = useState("All changes saved");
   const [noteToDelete, setNoteToDelete] = useState<Note>();
-  const [announcement, setAnnouncement] = useState("");
+  const location = useLocation();
+  const navigate = useNavigate();
+  // The editor sends the owner here after deleting, with a one-time message.
+  const [announcement, setAnnouncement] = useState(
+    location.state?.noteDeleted ? "Note deleted." : "",
+  );
+  useEffect(() => {
+    // Drop the message from history so a reload doesn't repeat it.
+    if (location.state?.noteDeleted)
+      navigate({ pathname: location.pathname, search: location.search }, { replace: true });
+  }, []);
   const key = params.toString();
   useEffect(() => {
     let active = true;
@@ -381,7 +393,9 @@ export function NoteWorkspace() {
   const { id = "" } = useParams();
   // The quick-create editor still autosaves its first title; reopened notes use Save/Cancel.
   const isNewNote = useLocation().state?.newNote === true;
+  const navigate = useNavigate();
   const { repo, state, refresh } = useApp();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [note, setNote] = useState<Note>();
   const [titleDraft, setTitleDraft] = useState("");
   const [status, setStatus] = useState("All changes saved");
@@ -458,6 +472,8 @@ export function NoteWorkspace() {
     if (!dirty || !note || saving) return;
     const current = ++generation.current;
     const timer = setTimeout(async () => {
+      // A newer save, restore, or delete has taken over.
+      if (current !== generation.current) return;
       try {
         pendingSave.current = repo.notes.save(note);
         await pendingSave.current;
@@ -555,6 +571,25 @@ export function NoteWorkspace() {
     setError("");
     setStatus(dirtyRef.current ? "Saving…" : "All changes saved");
   }
+  async function deleteNote() {
+    // Stop the autosave timer and the unmount/pagehide save so nothing
+    // writes the note back after it is gone.
+    const wasDirty = dirtyRef.current;
+    dirtyRef.current = false;
+    setDirty(false);
+    generation.current++;
+    try {
+      await pendingSave.current?.catch(() => undefined);
+      await repo.notes.delete(id);
+    } catch (e) {
+      // Stay in the editor with unsaved changes; autosave resumes.
+      dirtyRef.current = wasDirty;
+      setDirty(wasDirty);
+      throw e;
+    }
+    await refresh();
+    navigate("/notes", { state: { noteDeleted: true } });
+  }
   async function togglePin() {
     if (!noteRef.current || pinning) return;
     setPinning(true);
@@ -614,6 +649,15 @@ export function NoteWorkspace() {
           <Pin size={18} aria-hidden="true" />
           {note.pinned ? "Unpin" : "Pin"}
         </button>
+        {isOwner && (
+          <button
+            className={s.dangerOutline}
+            disabled={saving}
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2 size={18} aria-hidden="true" /> Delete note
+          </button>
+        )}
       </div>
       {error && (
         <p role="alert" className={s.error}>
@@ -891,6 +935,13 @@ export function NoteWorkspace() {
           )}
         </aside>
       </div>
+      {confirmDelete && (
+        <DeleteNoteDialog
+          title={note.title}
+          onClose={() => setConfirmDelete(false)}
+          onDelete={deleteNote}
+        />
+      )}
       {preview && (
         <Modal
           title={restore ? "Restore this version?" : "A look back"}
