@@ -125,6 +125,8 @@ export interface NoteRepository {
   save(note: Note): Promise<Note>;
   setPinned(id: string, pinned: boolean): Promise<Note>;
   create(data: Partial<Note>): Promise<Note>;
+  // Removes the note with its comments, versions, and collaborator entries.
+  delete(id: string): Promise<void>;
   comments(id: string, scenario?: CommentScenario): Promise<Comment[]>;
   comment(id: string, body: string, scenario?: CommentScenario): Promise<Comment>;
   versions(id: string): Promise<NoteVersion[]>;

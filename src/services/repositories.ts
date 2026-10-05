@@ -8,6 +8,7 @@ import type {
   User,
   Course,
   NoteQuery,
+  Collaborator,
 } from "../domain";
 import { createMockCollaborators } from "./collaborators.mock";
 import { createMockComments } from "./comments.mock";
@@ -115,7 +116,8 @@ export function createRepositories(
       storage?.setItem("notely-data-v1", JSON.stringify(db));
       committed = structuredClone(db);
     } catch {
-      db = structuredClone(committed);
+      // Restore in place: the comment mock holds this same object.
+      Object.assign(db, structuredClone(committed));
       throw new Error(
         "Your browser storage is full or unavailable. Changes could not be saved.",
       );
@@ -128,6 +130,7 @@ export function createRepositories(
     if (!n) throw new Error("This note could not be found.");
     return n;
   };
+  let invitations = new Map<string, Collaborator[]>();
   const repo: Repositories = {
     auth: {
       async session() {
@@ -180,7 +183,7 @@ export function createRepositories(
       },
     },
     notes: {
-      ...createMockCollaborators(),
+      ...createMockCollaborators(invitations),
       ...createMockComments(db, get, persist, (noteId) => repo.notes.collaborators(noteId)),
       async list(q) {
         return filterNotes(db.notes, q, db.courses);
@@ -208,6 +211,15 @@ export function createRepositories(
         db.notes.unshift(n);
         persist();
         return n;
+      },
+      async delete(noteId) {
+        get(noteId);
+        db.notes = db.notes.filter((n) => n.id !== noteId);
+        db.comments = db.comments.filter((c) => c.noteId !== noteId);
+        db.versions = db.versions.filter((v) => v.noteId !== noteId);
+        // persist() restores every record if the write fails.
+        persist();
+        invitations.delete(noteId);
       },
       async save(note) {
         const previous = get(note.id);
@@ -361,7 +373,8 @@ export function createRepositories(
       db = initial(sample);
       db.user = authenticatedUser ?? null;
       db.notes = db.notes.map((note) => ({ ...note, ownerId: authenticatedUser?.id ?? "student" }));
-      Object.assign(repo.notes, createMockCollaborators());
+      invitations = new Map();
+      Object.assign(repo.notes, createMockCollaborators(invitations));
       Object.assign(repo.notes, createMockComments(db, get, persist, (noteId) => repo.notes.collaborators(noteId)));
       persist();
     },
