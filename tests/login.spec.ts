@@ -11,6 +11,11 @@ async function mockLogin(page: Page, options: { fail?: boolean; completed?: bool
   const credentials: unknown[] = [];
   await page.route("**/api/index.php?route=*", async route => {
     const action = new URL(route.request().url()).searchParams.get("route");
+    // Signed-in accounts load their notes from the server (task #120).
+    if (action === "notes") {
+      await route.fulfill({ json: { notes: [] } });
+      return;
+    }
     if (action === "login") {
       expect(route.request().method()).toBe("POST");
       credentials.push(route.request().postDataJSON());
