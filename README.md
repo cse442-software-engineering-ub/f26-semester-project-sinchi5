@@ -7,7 +7,7 @@ The project has two halves:
 - **Frontend**: a React + TypeScript single-page app built with Vite. It runs entirely in the browser and ships with a populated demo workspace.
 - **PHP service**: a PHP + MySQL API for real accounts and the initial server-side note title endpoints.
 
-Accounts are server-backed. Notes, courses, events, and imports are still a **browser prototype** stored in `localStorage` (see [Where data lives](#where-data-lives)).
+Accounts and signed-in users' notes (with their history, comments, and collaborators) are server-backed. Courses, events, imports, and the demo workspace are still a **browser prototype** stored in `localStorage` (see [Where data lives](#where-data-lives)).
 
 ---
 
@@ -181,10 +181,20 @@ The API has a single entry point, `api/index.php?route=<name>`. Every response i
 | POST | `password` | `currentPassword`, `password` | yes |
 | POST | `recovery-code` | `currentPassword` | yes |
 | POST | `delete` | `currentPassword` | yes |
-| POST | `note-create` | `title` | yes |
+| GET | `notes` | none | yes (notes the caller owns or collaborates on) |
+| POST | `note-create` | `title`, optional `body`, `courseId`, `lectureDate`, `category`, `visibility`, `tags` | yes |
 | GET | `note&id=<id>` | none | yes (owner or collaborator) |
 | POST | `note-title` | `id`, `title` | yes (owner or editor) |
 | POST | `note-content` | `id`, `body` | yes (owner or editor) |
+| POST | `note-save` | `id`, `title`, `body`, optional `courseId`, `lectureDate`, `category`, `visibility`, `tags` | yes (owner or editor) |
+| POST | `note-pin` | `id`, `pinned` (boolean) | yes (owner or editor) |
+| GET | `note-versions&id=<id>` | none | yes (owner or collaborator) |
+| POST | `note-restore` | `id`, `versionId` | yes (owner or editor) |
+| GET | `note-comments&id=<id>` | none | yes (owner or collaborator) |
+| POST | `note-comment` | `id`, `body` | yes (owner or collaborator, shared notes only) |
+| GET | `note-collaborators&id=<id>` | none | yes (owner or collaborator) |
+| POST | `note-invite` | `id`, `email` | yes (owner only, rate limited) |
+| POST | `note-permission` | `id`, `userId`, `permission` (`view` or `edit`) | yes (owner only) |
 | POST | `note-delete` | `id` | yes (owner only) |
 
 Every POST must include:
@@ -202,11 +212,13 @@ Successful responses have this shape:
 }
 ```
 
-The note routes return `{ "note": { "id": "…", "title": "…" } }` instead. `note-create` returns 201. `note-title` returns 403 for a user without edit permission and 404 for a missing note. Note titles must contain 1–255 visible characters. These endpoints are the first server-side note contract; the current React workspace still stores its notes in the browser and does not call them yet.
+The note routes return `{ "note": { "id": "…", "title": "…" } }` instead. `note-create` returns 201. `note-title` returns 403 for a user without edit permission and 404 for a missing note. Note titles must contain 1–255 visible characters.
 
 GET `note` additionally returns `body`. POST `note-content` returns `{ "note": { "id": "…", "body": "…" } }` and uses the same owner/edit-collaborator authorization and error statuses as `note-title`. Body text must be a UTF-8 string; empty bodies are allowed and whitespace is preserved exactly. The existing 8 KB JSON request limit applies. Title-only creation initializes an empty body. Apply migration 003 before deploying this backend, with note writes paused during the migration.
 
 POST `note-delete` returns `{ "note": { "id": "…" } }` and permanently removes the note and its collaborator rows. Only the owner, taken from the session, can delete; any owner ID sent with the request is ignored. Collaborators with `edit` or `view` permission get 403, signed-out users get 401, and a missing note gets 404.
+
+Since task 120, signed-in accounts use these routes for every note through [src/services/notes-http.ts](src/services/notes-http.ts). GET `note`, `notes`, `note-create`, `note-save`, `note-pin`, and `note-restore` return whole notes: `id`, `ownerId`, `title`, `body`, `courseId`, `lectureDate`, `category` (`School`, `Work`, `Meetings`, or `Personal`), `visibility` (`private` or `shared`), `tags` (at most 30 strings of up to 100 characters), `pinned`, `createdAt`, and `updatedAt` (ISO 8601, UTC). `note-save` keeps the current value of any field it doesn't receive, and saves the previous title and body as a version when either changes. Pinning doesn't change `updatedAt`. Notes the caller can't open return 404 from every read route, so their existence isn't revealed. Deleting a note also deletes its versions and comments. `note-invite` returns 404 for an unregistered email and is limited to 30 invitations per user every 15 minutes. Apply migration 004 before deploying this backend.
 
 Errors return `{ "error": "<message>" }` with one of these statuses: 400 (bad JSON or plain HTTP in secure mode), 401 (not signed in, or wrong login), 403 (Origin or CSRF failure), 404 (unknown route), 405 (wrong method), 409 (email conflict), 413 (body too large), 415 (wrong content type), 422 (validation failure), 429 (rate limited, with `Retry-After`), 503 (service or configuration failure).
 
@@ -216,15 +228,17 @@ The browser client is [src/services/auth.ts](src/services/auth.ts). It sends req
 
 ## Database schema
 
-Defined in [backend/migrations/001_accounts.sql](backend/migrations/001_accounts.sql) and [backend/migrations/002_note_titles.sql](backend/migrations/002_note_titles.sql). Also apply [backend/migrations/003_note_content.sql](backend/migrations/003_note_content.sql), which backfills existing notes with an empty body. Apply all three in order, separately to each environment. All timestamps are UTC.
+Defined in [backend/migrations/001_accounts.sql](backend/migrations/001_accounts.sql) and [backend/migrations/002_note_titles.sql](backend/migrations/002_note_titles.sql). Also apply [backend/migrations/003_note_content.sql](backend/migrations/003_note_content.sql), which backfills existing notes with an empty body, and [backend/migrations/004_server_notes.sql](backend/migrations/004_server_notes.sql), which adds note metadata, history, and comments. Apply all four in order, once each, separately to each environment. All timestamps are UTC.
 
 | Table | Contents |
 | --- | --- |
 | `notely_users` | `id`, `name` (utf8mb4, at most 100 characters), `email` (ASCII, unique, lowercased), `password_hash`, `recovery_code_hash` (SHA-256), `onboarding_completed`, timestamps |
 | `notely_sessions` | `token_hash` (SHA-256 of the cookie token), `user_id` (null for anonymous sessions; cascades on user delete), `created_at`, `last_seen_at`, `expires_at` |
 | `notely_rate_limits` | `bucket_hash` (HMAC of scope plus IP, email, or user), `window_start`, `attempts` |
-| `notely_notes` | Server-side note ID, owner, title, body (non-null TEXT), timestamps |
+| `notely_notes` | Server-side note ID, owner, title, body (non-null TEXT), course ID, lecture date, category, visibility, tags (JSON text), pinned, timestamps |
 | `notely_note_editors` | Per-note user permission (`view` or `edit`) |
+| `notely_note_versions` | Earlier title and body of a note, who saved over them, and when (cascades on note delete) |
+| `notely_note_comments` | Comment body, note, and author (cascades on note or author delete) |
 
 The database never stores a plaintext password, recovery code, session token, email-to-IP pairing, or raw IP address.
 
@@ -285,13 +299,13 @@ These controls follow the [OWASP authentication](https://cheatsheetseries.owasp.
 | Data | Storage |
 | --- | --- |
 | Account identity, password hash, recovery-code hash, sessions, onboarding status | MySQL (server) |
-| Notes created through the note API | MySQL (server) |
+| A signed-in account's notes, their history, comments, and collaborators | MySQL (server) |
 | Demo workspace content | `localStorage["notely-data-v1"]` |
-| A signed-in account's notes, courses, events, comments, and history | `localStorage["notely-workspace-v1-<user-id>"]` |
+| A signed-in account's courses and events | `localStorage["notely-workspace-v1-<user-id>"]` |
 | Theme preference | `localStorage["notely-theme"]` |
 | Demo mode flag for this tab | `sessionStorage["notely-demo"]` |
 
-Workspace content is kept separate for each account in the same browser, and is removed locally when the account is deleted. It is **not** synced between devices and is **not** protected by the server. Browser storage is a prototype convenience, not an authorization boundary. Seed dates are relative to when the workspace is created, so the demo dashboard always has upcoming items. **Settings → Reset sample data** (or **Clear workspace** for an account) recreates that content and leaves the server account alone.
+Workspace content is kept separate for each account in the same browser, and is removed locally when the account is deleted. It is **not** synced between devices and is **not** protected by the server. Browser storage is a prototype convenience, not an authorization boundary. Seed dates are relative to when the workspace is created, so the demo dashboard always has upcoming items. **Settings → Reset sample data** recreates the demo content. **Clear workspace** for an account deletes the notes it owns on the server and clears its courses and events in this browser; the account itself stays. Notes a signed-in account saved in this browser before task 120 are not copied to the server.
 
 Real accounts start with an empty workspace. Only the demo is pre-filled.
 
@@ -356,6 +370,8 @@ On the server:
 | `node backend/tests/note-content-http.mjs` | Task 110 HTTP persistence, access, CSRF/Origin, validation, and request-limit checks against a running DEV/TEST API. |
 | `php backend/tests/note-delete.php` | Task 116 owner-only deletion: owner delete, edit/view collaborator, signed-out, and forged-owner rejection, and collaborator cascade, against a DEV/TEST database with migrations 002 and 003 applied. |
 | `node backend/tests/note-delete-http.mjs` | Task 116 HTTP deletion, ownership, CSRF/Origin, and validation checks against a running DEV/TEST API. |
+| `php backend/tests/server-notes.php` | Task 120 metadata, listing, versions, pinning, restore, sharing, permissions, comments, delete cascade, and lost collaborator access, against a DEV/TEST database with migrations 002–004 applied. |
+| `node backend/tests/server-notes-http.mjs` | Task 120 HTTP sharing, collaborator access, owner-only delete, and lost access after delete against a running DEV/TEST API. |
 
 The HTTP contract tests refuse any host except `localhost`, `127.0.0.1`, or aptitude. Point them with `NOTELY_TEST_URL` (and `NOTELY_TEST_ORIGIN` if needed). **Never run them against production.**
 
@@ -401,7 +417,8 @@ src/
   services/
     auth.ts               HTTP client for the PHP account API
     app-repositories.ts   Combines server auth with per-account local workspaces and demo mode
-    repositories.ts       localStorage-backed courses/notes/schedule/imports (prototype)
+    repositories.ts       localStorage-backed courses/schedule/imports, and the demo's notes (prototype)
+    notes-http.ts         Server-backed notes for signed-in accounts (task 120)
     collaborators.mock.ts Frontend-only collaborator invitations
     fixtures.ts           Demo courses, notes, and events
     validation.ts         Client-side copy of the server's validation rules
@@ -435,8 +452,8 @@ Every screen talks to data through the interfaces in `domain.ts`. To replace a l
 
 ## Known limitations and next steps
 
-- Notes, courses, events, comments, and history are stored in the browser only. They need server storage and server-side authorization.
-- Collaborator invitations use a fixed frontend mock (`collaborators.mock.ts`), which is planned to become an HTTP adapter. Comments and shared notes are not real-time.
+- Courses and events are stored in the browser only. A collaborator sees a shared note's course as its category, because course IDs belong to the owner's browser.
+- The demo still uses the frontend collaborator mock (`collaborators.mock.ts`). Comments and shared notes are not real-time.
 - OCR, document parsing, and file storage are simulated. Uploaded files are never stored.
 - Email addresses are not verified, and no email is ever sent.
 - Accounts cannot be recovered without the recovery code.
