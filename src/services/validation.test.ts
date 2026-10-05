@@ -63,6 +63,8 @@ describe("passwords", () => {
     ["tab\tpassword", "hidden character"],
     ["zero​width pass", "hidden character"],
     ["long password\0example", "hidden character"],
+    ["password123", "too common"],
+    ["QwertyUIOP", "too common"],
   ])("rejects %j", (password, message) => expect(passwordError(password)).toContain(message));
   it("never repeats the password's characters", () => {
     expect(passwordError("pässwort sicher")).not.toContain("ä");

@@ -76,6 +76,8 @@ says(fn() => validPassword("zero\u{200B}width pass"), 'hidden character', 'zero-
 rejects(fn() => validPassword("long password\0example"), 'null bytes');
 says(fn() => validPassword("bad\xFFbytes password"), 'could not read', 'invalid UTF-8 password');
 check(!str_contains(message(fn() => validPassword('pässwort sicher')), 'ä'), 'password characters never echoed');
+says(fn() => validPassword('password123'), 'too common', 'common password rejected');
+says(fn() => validPassword('QwertyUIOP'), 'too common', 'common password check ignores case');
 says(fn() => recoveryHash('ZZZZ'), '0–9 and letters A–F', 'recovery code format message');
 $password = validPassword('  Sample meadow password 42!  ');
 check($password === '  Sample meadow password 42!  ', 'password spaces preserved');

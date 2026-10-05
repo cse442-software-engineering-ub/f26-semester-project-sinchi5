@@ -29,6 +29,15 @@ const EMOJI_PATTERN = '/[\x{1F000}-\x{1FAFF}\x{2600}-\x{27BF}\x{2300}-\x{23FF}\x
 const INVISIBLE_PATTERN = '/\p{C}/u';
 const PASSWORD_MIN = 8;
 const PASSWORD_MAX = 72;
+// Breached passwords people pick most often that still meet the length rule. Compared ignoring case.
+// ponytail: short list; check a full breached-password list if Notely leaves the class servers.
+const COMMON_PASSWORDS = ['password', 'password1', 'password12', 'password123', 'password1!', 'password123!',
+    'passw0rd', 'p@ssw0rd', 'p@ssword', '12345678', '123456789', '1234567890', '0987654321', '87654321',
+    '11111111', '00000000', '12341234', '11223344', 'qwertyui', 'qwertyuiop', 'qwerty12', 'qwerty123',
+    '1q2w3e4r', '1q2w3e4r5t', '1qaz2wsx', 'zaq12wsx', 'q1w2e3r4', 'asdfghjk', 'asdfghjkl', 'abcd1234',
+    'abc12345', 'abcdefgh', 'a1b2c3d4', 'aa123456', 'iloveyou', 'sunshine', 'princess', 'football',
+    'baseball', 'superman', 'starwars', 'trustno1', 'welcome1', 'welcome123', 'letmein1', 'changeme',
+    'admin123', 'whatever', 'computer', 'internet', 'notely123', 'notely2026'];
 
 function characterCount(string $value): int
 {
@@ -135,6 +144,9 @@ function validPassword(string $password): string
     }
     if ($length > PASSWORD_MAX) {
         throw new HttpError(422, 'Use at most ' . PASSWORD_MAX . " characters for your password. It currently has $length.");
+    }
+    if (in_array(strtolower($password), COMMON_PASSWORDS, true)) {
+        throw new HttpError(422, 'This password is too common and easy to guess. Try a short phrase instead.');
     }
     return $password;
 }
