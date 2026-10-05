@@ -213,7 +213,13 @@ export function createRepositories(
         return n;
       },
       async delete(noteId) {
-        get(noteId);
+        // The owner comes from the signed-in session, never from the caller.
+        if (!db.user) throw new Error("Sign in to continue.");
+        const note = get(noteId);
+        const email = db.user.email.trim().toLowerCase();
+        const collaborators = await repo.notes.collaborators(noteId);
+        if (note.ownerId !== db.user.id || collaborators.some((c) => c.email.toLowerCase() === email))
+          throw new Error("Only the note's owner can delete it.");
         db.notes = db.notes.filter((n) => n.id !== noteId);
         db.comments = db.comments.filter((c) => c.noteId !== noteId);
         db.versions = db.versions.filter((v) => v.noteId !== noteId);

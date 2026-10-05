@@ -60,6 +60,19 @@ function noteAction(PDO $db, array $session, string $route, array $input): array
         return ['note' => ['id' => (string) $note['id'], 'title' => $note['title'], 'body' => $note['body']]];
     }
 
+    if ($route === 'note-delete') {
+        // The caller comes from the session; owner IDs sent with the request are ignored.
+        $note = query($db, 'SELECT owner_user_id FROM notely_notes WHERE id = ? FOR UPDATE', [$id])->fetch();
+        if (!$note) throw new HttpError(404, 'This note could not be found.');
+        if ((string) $note['owner_user_id'] !== (string) $user['id']) {
+            throw new HttpError(403, "Only the note's owner can delete it.");
+        }
+        // Collaborator rows are removed by the ON DELETE CASCADE foreign key.
+        query($db, 'DELETE FROM notely_notes WHERE id = ?', [$id]);
+        $db->commit();
+        return ['note' => ['id' => $id]];
+    }
+
     $value = $route === 'note-content' ? noteBody($input) : noteTitle($input);
     $note = query($db, 'SELECT owner_user_id FROM notely_notes WHERE id = ? FOR UPDATE', [$id])->fetch();
     if (!$note) throw new HttpError(404, 'This note could not be found.');
