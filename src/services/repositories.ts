@@ -9,6 +9,7 @@ import type {
   Course,
   NoteQuery,
   Collaborator,
+  NoteRepository,
 } from "../domain";
 import { createMockCollaborators } from "./collaborators.mock";
 import { createMockComments } from "./comments.mock";
@@ -95,6 +96,8 @@ export function createRepositories(
   authenticatedUser?: User | null,
   // Sample content is for the demo; real accounts start with an empty workspace.
   sample = true,
+  // Signed-in accounts keep notes on the server; courses and events stay here.
+  serverNotes?: NoteRepository,
 ): Repositories {
   let db = initial(sample);
   try {
@@ -174,15 +177,14 @@ export function createRepositories(
         return c;
       },
       async folders(courseId) {
-        return db.notes
-          .filter((n) => n.courseId === courseId)
+        return (await repo.notes.list({ course: courseId }))
           .reduce<Record<string, Note[]>>((out, n) => {
             (out[n.lectureDate] ??= []).push(n);
             return out;
           }, {});
       },
     },
-    notes: {
+    notes: serverNotes ?? {
       ...createMockCollaborators(invitations),
       ...createMockComments(db, get, persist, (noteId) => repo.notes.collaborators(noteId)),
       async list(q) {
@@ -294,9 +296,7 @@ export function createRepositories(
         return e;
       },
       async lectureNotes(event) {
-        return db.notes.filter(
-          (n) => n.courseId === event.courseId && n.lectureDate === event.date,
-        );
+        return repo.notes.list({ course: event.courseId, from: event.date, to: event.date });
       },
     },
     imports: {
@@ -379,9 +379,11 @@ export function createRepositories(
       db = initial(sample);
       db.user = authenticatedUser ?? null;
       db.notes = db.notes.map((note) => ({ ...note, ownerId: authenticatedUser?.id ?? "student" }));
-      invitations = new Map();
-      Object.assign(repo.notes, createMockCollaborators(invitations));
-      Object.assign(repo.notes, createMockComments(db, get, persist, (noteId) => repo.notes.collaborators(noteId)));
+      if (!serverNotes) {
+        invitations = new Map();
+        Object.assign(repo.notes, createMockCollaborators(invitations));
+        Object.assign(repo.notes, createMockComments(db, get, persist, (noteId) => repo.notes.collaborators(noteId)));
+      }
       persist();
     },
   };

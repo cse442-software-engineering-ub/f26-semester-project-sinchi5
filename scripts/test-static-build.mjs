@@ -55,6 +55,8 @@ try {
         apiRequests++;
         const action = url.searchParams.get("route");
         if (action === "login") signedIn = true;
+        // Signed-in accounts load their notes from the server (task #120).
+        if (action === "notes") return route.fulfill({ json: { notes: [] } });
         await route.fulfill({ json: {
           user: signedIn ? { id: "42", name: "Route Tester", email: "routes@example.edu" } : null,
           onboarding: { completed: signedIn, step: signedIn ? 3 : 0 },
@@ -73,8 +75,9 @@ try {
       await page.getByRole("button", { name: "I already have an account" }).click();
       await page.getByLabel("Email address").fill("routes@example.edu");
       await page.getByLabel("Password", { exact: true }).fill("Routing fixture password 42!");
-      await page.getByRole("button", { name: "Sign in", exact: true }).click();
-      await expect(page.getByRole("heading", { name: /Good .*Route/ })).toBeVisible();
+      await page.getByRole("button", { name: "Log In", exact: true }).click();
+      // Returning users who finished onboarding land on their notes library.
+      await expect(page.getByRole("heading", { name: "Your notes", exact: true })).toBeVisible();
       assert.equal(new URL(page.url()).pathname, base);
 
       // A new tab exercises an actual document request; hash-only navigation does not.

@@ -52,10 +52,12 @@ says(fn() => validName('Jamie <script>'), '"<"', 'markup in name names the chara
 says(fn() => validName('Jamie@home'), '"@"', 'symbol in name names the character');
 says(fn() => validName('-Jamie'), 'start with a letter', 'leading punctuation');
 says(fn() => validName("Ja\u{0301}\u{0301}\u{0301}mie"), 'accent marks', 'stacked combining marks');
-says(fn() => validName("J\u{00E1}\u{0301}\u{0301}mie"), 'accent marks', 'marks stacked on a precomposed letter');
 check(validName('Nguyễn Thị Ngọc') !== '', 'Vietnamese double diacritics accepted');
 says(fn() => validName("Jamie\xFF"), 'could not read', 'invalid UTF-8 name');
+// Both checks need the intl extension's Normalizer, which aptitude's PHP doesn't have.
+// Without it, validName still rejects three separate marks but can't split a precomposed letter.
 if (class_exists('Normalizer')) {
+    says(fn() => validName("J\u{00E1}\u{0301}\u{0301}mie"), 'accent marks', 'marks stacked on a precomposed letter');
     check(validName("Zoe\u{0308}") === 'Zoë', 'decomposed accents normalized');
 }
 
@@ -76,6 +78,8 @@ says(fn() => validPassword("zero\u{200B}width pass"), 'hidden character', 'zero-
 rejects(fn() => validPassword("long password\0example"), 'null bytes');
 says(fn() => validPassword("bad\xFFbytes password"), 'could not read', 'invalid UTF-8 password');
 check(!str_contains(message(fn() => validPassword('pässwort sicher')), 'ä'), 'password characters never echoed');
+says(fn() => validPassword('password123'), 'too common', 'common password rejected');
+says(fn() => validPassword('QwertyUIOP'), 'too common', 'common password check ignores case');
 says(fn() => recoveryHash('ZZZZ'), '0–9 and letters A–F', 'recovery code format message');
 $password = validPassword('  Sample meadow password 42!  ');
 check($password === '  Sample meadow password 42!  ', 'password spaces preserved');

@@ -114,7 +114,9 @@ export function Settings() {
       {reset && (
         <Modal
           title="Start fresh?"
-          description={`This removes notes, ${isDemo ? "comments" : "courses"}, and events you created in this browser. It cannot be undone.`}
+          description={isDemo
+            ? "This removes notes, comments, and events you created in this browser. It cannot be undone."
+            : "This permanently deletes the notes you own, plus the courses and events saved in this browser. It cannot be undone."}
           onClose={() => setReset(false)}
         >
           {error && (

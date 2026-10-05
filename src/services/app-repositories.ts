@@ -1,8 +1,15 @@
-import type { AuthRepository, Repositories, User } from "../domain";
+import type { AuthRepository, Course, NoteRepository, Repositories, User } from "../domain";
 import { createAuthRepository } from "./auth";
+import { createHttpNotes } from "./notes-http";
 import { createRepositories } from "./repositories";
 
-export function createAppRepositories(storage: Storage, tabStorage: Storage, serverAuth = createAuthRepository()): Repositories {
+export function createAppRepositories(
+  storage: Storage,
+  tabStorage: Storage,
+  serverAuth = createAuthRepository(),
+  // Signed-in accounts keep notes on the server (task #120); tests pass a stand-in.
+  serverNotes: (user: User, courses: () => Promise<Course[]>) => NoteRepository = (_user, courses) => createHttpNotes(courses),
+): Repositories {
   let demo = tabStorage.getItem("notely-demo") === "true";
   let user: User | null = null;
   let activeId = "";
@@ -26,7 +33,9 @@ export function createAppRepositories(storage: Storage, tabStorage: Storage, ser
         storage.setItem(key, JSON.stringify(data));
       },
     } : undefined;
-    workspace = createRepositories(adapter, nextUser, demo);
+    const notes = nextUser && !demo ? serverNotes(nextUser, () => next.courses.list()) : undefined;
+    const next = createRepositories(adapter, nextUser, demo, notes);
+    workspace = next;
   }
   const demoUser: User = { id: "student", name: "Erin", email: "demo@example.edu" };
   const leaveDemo = () => { generation++; demo = false; tabStorage.removeItem("notely-demo"); select(null); };
@@ -80,6 +89,13 @@ export function createAppRepositories(storage: Storage, tabStorage: Storage, ser
   return {
     auth,
     courses: proxy("courses"), notes: proxy("notes"), schedule: proxy("schedule"), imports: proxy("imports"),
-    async reset() { await workspace.reset(); if (demo) leaveDemo(); },
+    async reset() {
+      // Clearing a signed-in workspace also deletes the notes this account owns on the server.
+      if (!demo && user) {
+        for (const note of await workspace.notes.list()) if (note.ownerId === user.id) await workspace.notes.delete(note.id);
+      }
+      await workspace.reset();
+      if (demo) leaveDemo();
+    },
   };
 }
