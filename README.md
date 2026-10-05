@@ -185,6 +185,7 @@ The API has a single entry point, `api/index.php?route=<name>`. Every response i
 | GET | `note&id=<id>` | none | yes (owner or collaborator) |
 | POST | `note-title` | `id`, `title` | yes (owner or editor) |
 | POST | `note-content` | `id`, `body` | yes (owner or editor) |
+| POST | `note-delete` | `id` | yes (owner only) |
 
 Every POST must include:
 - `Content-Type: application/json` (body at most 8 KB)
@@ -204,6 +205,8 @@ Successful responses have this shape:
 The note routes return `{ "note": { "id": "…", "title": "…" } }` instead. `note-create` returns 201. `note-title` returns 403 for a user without edit permission and 404 for a missing note. Note titles must contain 1–255 visible characters. These endpoints are the first server-side note contract; the current React workspace still stores its notes in the browser and does not call them yet.
 
 GET `note` additionally returns `body`. POST `note-content` returns `{ "note": { "id": "…", "body": "…" } }` and uses the same owner/edit-collaborator authorization and error statuses as `note-title`. Body text must be a UTF-8 string; empty bodies are allowed and whitespace is preserved exactly. The existing 8 KB JSON request limit applies. Title-only creation initializes an empty body. Apply migration 003 before deploying this backend, with note writes paused during the migration.
+
+POST `note-delete` returns `{ "note": { "id": "…" } }` and permanently removes the note and its collaborator rows. Only the owner, taken from the session, can delete; any owner ID sent with the request is ignored. Collaborators with `edit` or `view` permission get 403, signed-out users get 401, and a missing note gets 404.
 
 Errors return `{ "error": "<message>" }` with one of these statuses: 400 (bad JSON or plain HTTP in secure mode), 401 (not signed in, or wrong login), 403 (Origin or CSRF failure), 404 (unknown route), 405 (wrong method), 409 (email conflict), 413 (body too large), 415 (wrong content type), 422 (validation failure), 429 (rate limited, with `Retry-After`), 503 (service or configuration failure).
 
@@ -351,6 +354,8 @@ On the server:
 | `php backend/tests/note-titles.php` | Owner, editor, viewer, and missing-note title tests against a DEV/TEST database with migration 002 applied. Creates and deletes test accounts. |
 | `php backend/tests/note-content.php` | Body validation plus owner/editor/viewer, persistence, and title-preservation tests against a DEV/TEST database with all three migrations applied. |
 | `node backend/tests/note-content-http.mjs` | Task 110 HTTP persistence, access, CSRF/Origin, validation, and request-limit checks against a running DEV/TEST API. |
+| `php backend/tests/note-delete.php` | Task 116 owner-only deletion: owner delete, edit/view collaborator, signed-out, and forged-owner rejection, and collaborator cascade, against a DEV/TEST database with migrations 002 and 003 applied. |
+| `node backend/tests/note-delete-http.mjs` | Task 116 HTTP deletion, ownership, CSRF/Origin, and validation checks against a running DEV/TEST API. |
 
 The HTTP contract tests refuse any host except `localhost`, `127.0.0.1`, or aptitude. Point them with `NOTELY_TEST_URL` (and `NOTELY_TEST_ORIGIN` if needed). **Never run them against production.**
 
