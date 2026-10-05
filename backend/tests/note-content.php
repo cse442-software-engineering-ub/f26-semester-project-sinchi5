@@ -33,6 +33,11 @@ check(in_array(parse_url($config['origin'], PHP_URL_HOST), ['localhost', '127.0.
     'Run note content tests only on DEV or TEST.');
 $db = database($config);
 $users = [];
+// GET note returns the whole note since card 120; these checks cover its text.
+function text(array $note): array
+{
+    return array_intersect_key($note, ['id' => 0, 'title' => 0, 'body' => 0]);
+}
 function testUser(PDO $db, array $config, array &$users): array
 {
     query($db, 'INSERT INTO notely_users (name, email, password_hash, recovery_code_hash) VALUES (?, ?, ?, ?)',
@@ -53,7 +58,7 @@ try {
     $updated = " \tUpdated notes\r\n\u{1F600}\u{00E9} \n";
     check(noteAction($db, $owner, 'note-content', ['id' => $id, 'body' => $updated])['note']['body'] === $updated,
         'Owner update failed.');
-    check(noteAction($db, $owner, 'note', [])['note'] === ['id' => $id, 'title' => 'CSE 442 Notes', 'body' => $updated],
+    check(text(noteAction($db, $owner, 'note', [])['note']) === ['id' => $id, 'title' => 'CSE 442 Notes', 'body' => $updated],
         'Body did not persist exactly or title changed.');
     check(query($db, 'SELECT id, owner_user_id, title, created_at FROM notely_notes WHERE id = ?', [$id])->fetch() === $before,
         'Body update changed unrelated note fields.');
@@ -81,7 +86,7 @@ try {
     }
     expectStatus($db, fn () => noteAction($db, $owner, 'note-content', ['id' => '0', 'body' => 'Bad ID']), 422);
     noteAction($db, $owner, 'note-content', ['id' => $id, 'body' => '']);
-    check(noteAction($db, $owner, 'note', [])['note'] === ['id' => $id, 'title' => 'CSE 442 Notes', 'body' => ''], 'Empty body did not persist.');
+    check(text(noteAction($db, $owner, 'note', [])['note']) === ['id' => $id, 'title' => 'CSE 442 Notes', 'body' => ''], 'Empty body did not persist.');
     echo "PASS: body validation, empty content, exact whitespace/Unicode, invalid UTF-8\n";
     echo "PASS: owner/editor content updates, access control, missing notes, title preservation, validation\n";
 } finally {

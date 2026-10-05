@@ -225,8 +225,9 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
     if ($route === 'note-save') {
         $title = noteTitle($input);
         $body = noteBody($input);
-        $fields = noteFields($input);
         requireEditor($db, $id, $user);
+        // Fields left out of the request keep their current values.
+        $fields = noteFields($input + loadNote($db, $id));
         keepVersion($db, $id, $user, $title, $body);
         query($db, 'UPDATE notely_notes SET title = ?, body = ?, course_id = ?, lecture_date = ?, category = ?,
             visibility = ?, tags = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [$title, $body, ...$fields, $id]);

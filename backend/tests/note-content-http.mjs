@@ -49,7 +49,9 @@ try {
   const read = async () => {
     const result = await owner.call(`note&id=${id}`);
     assert.equal(result.status, 200);
-    return result.data.note;
+    // GET note returns the whole note since card 120; these checks cover its text.
+    const { id: noteId, title, body } = result.data.note;
+    return { id: noteId, title, body };
   };
   assert.deepEqual(await read(), { id, title: "CSE 442 Notes", body: "" });
   assert.equal((await owner.call("note-content", { id, body: "Original body" })).status, 200);
