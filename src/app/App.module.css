@@ -1241,8 +1241,43 @@
 .noteGrid .courseBadge {
   font-size: 0.65rem;
 }
+.noteItem {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+/* Leave room for the action in grid and list views; narrow cards wrap whole items. */
+.noteItem .noteCard .cardFooter {
+  padding-right: 76px;
+  flex-wrap: wrap;
+}
+.noteItem .cardFooter > span {
+  white-space: nowrap;
+}
+.cardAction {
+  position: absolute;
+  right: 8px;
+  bottom: 0;
+  min-height: 44px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 8px;
+  font-size: 0.63rem;
+  font-weight: 500;
+  color: #9b392e;
+}
+.cardAction:hover {
+  background: #fff0ed;
+}
 .noteList {
   grid-template-columns: 1fr;
+}
+.noteList .cardAction {
+  top: 50%;
+  bottom: auto;
+  translate: 0 -50%;
 }
 .noteList .noteCard {
   min-height: 0;
@@ -1615,13 +1650,15 @@
   background: #fff0ed;
 }
 :global([data-theme="dark"]) .dangerRow strong,
-:global([data-theme="dark"]) .dangerOutline {
+:global([data-theme="dark"]) .dangerOutline,
+:global([data-theme="dark"]) .cardAction {
   color: #ffb7a9;
 }
 :global([data-theme="dark"]) .dangerOutline {
   border-color: #80544a;
 }
-:global([data-theme="dark"]) .dangerOutline:hover {
+:global([data-theme="dark"]) .dangerOutline:hover,
+:global([data-theme="dark"]) .cardAction:hover {
   background: #3c2925;
 }
 .courseEmpty {
@@ -2101,6 +2138,11 @@
   }
   .noteList .cardFooter {
     grid-column: 2;
+  }
+  .noteList .cardAction {
+    top: auto;
+    bottom: 0;
+    translate: none;
   }
   .onboardingArt h1 {
     font-size: 2.2rem;
