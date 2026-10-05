@@ -232,6 +232,7 @@ The database never stores a plaintext password, recovery code, session token, em
 **Passwords**
 - Hashed with Argon2id (19 MiB, 2 iterations) when PHP supports it, otherwise bcrypt cost 12. Hashes are upgraded automatically on the next sign-in.
 - Length is 8–72 characters, printable ASCII only. Restricting to ASCII means bcrypt never silently truncates a password, and every password can be typed on any keyboard.
+- About 50 of the most common breached passwords, such as `password123` and `qwertyuiop`, are rejected, ignoring case.
 - Unknown emails still run a full hash, so response timing does not reveal whether an account exists. Login errors never say which field was wrong.
 
 **Recovery codes**
@@ -259,6 +260,7 @@ The database never stores a plaintext password, recovery code, session token, em
   | Sign-in | 60 per IP, 20 per email |
   | Recovery | 20 per IP, 10 per email |
   | Account actions | 90 per IP, 20 per user |
+  | Note changes | 1000 per user |
   | New anonymous sessions | 120 per IP |
 
   Client-supplied forwarding headers are ignored.
@@ -270,7 +272,7 @@ The database never stores a plaintext password, recovery code, session token, em
 - [src/services/validation.ts](src/services/validation.ts) mirrors [backend/lib/security.php](backend/lib/security.php) so people see the same message before submitting. **The server is the authority**, so keep the two files' wording in sync.
 
 **Files on the server**
-- Only `index.php` is meant to be requested. `lib/` contains `Require all denied`, and each library file also refuses to run unless loaded through `index.php`.
+- Only `index.php` is meant to be requested. `lib/` contains `Require all denied`, and each library file also refuses to run unless loaded through `index.php`. Aptitude ignores `.htaccess`, so `lib/index.php` returns 403 to keep the folder from being listed.
 - `.htaccess` blocks `config*`, `.sql`, and `.md` files and turns off directory listings.
 
 These controls follow the [OWASP authentication](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) and [session management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html) cheat sheets. They are not a formal security audit.
