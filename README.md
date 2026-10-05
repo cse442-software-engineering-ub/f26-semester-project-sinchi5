@@ -110,6 +110,7 @@ You need PHP 8 with `pdo_mysql`, and a local MySQL or MariaDB server (XAMPP work
    mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/001_accounts.sql
    mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/002_note_titles.sql
    mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/003_note_content.sql
+   mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/004_server_notes.sql
    ```
 
    You can also import the file through phpMyAdmin.
