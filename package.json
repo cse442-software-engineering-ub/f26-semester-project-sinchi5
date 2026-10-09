@@ -17,6 +17,7 @@
     "test:php": "php backend/tests/security.php && php backend/tests/configuration.php",
     "test:accounts": "node backend/tests/http.mjs",
     "test:note-titles": "node backend/tests/note-titles-http.mjs",
+    "test:note-categories": "node backend/tests/note-categories-http.mjs",
     "test:schema": "php backend/tests/schema.php"
   },
   "dependencies": {
