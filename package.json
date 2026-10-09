@@ -15,6 +15,7 @@
     "test:static-build": "node scripts/test-static-build.mjs",
     "dev:api": "php -S 127.0.0.1:8080 backend/dev-router.php",
     "test:php": "php backend/tests/security.php && php backend/tests/configuration.php",
+    "test:note-category-filter": "node backend/tests/note-category-filter-http.mjs",
     "test:accounts": "node backend/tests/http.mjs",
     "test:note-titles": "node backend/tests/note-titles-http.mjs",
     "test:schema": "php backend/tests/schema.php"

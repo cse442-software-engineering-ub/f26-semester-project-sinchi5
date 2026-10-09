@@ -31,6 +31,34 @@ it("lists server notes with the browser's search and sort", async () => {
   expect(api.calls).toEqual([{ route: "notes", method: "GET", csrf: undefined, body: undefined }]);
 });
 
+it("asks the server for one category and still applies the other filters in the browser", async () => {
+  const [first, second, third] = seedNotes();
+  const notes = [
+    { ...first, title: "Sprint plan", category: "Work", pinned: false },
+    { ...second, title: "Sprint retro", category: "Work", pinned: false },
+    { ...third, title: "Sprint notes", category: "School", pinned: false },
+  ];
+  // The fake server narrows by category the way the real notes list does.
+  const api = fakeApi((call) => {
+    const wanted = new URLSearchParams(call.route.split("&").slice(1).join("&")).get("category");
+    return { json: { notes: notes.filter((n) => !wanted || n.category === wanted) } };
+  });
+  const repo = createHttpNotes(courses, "/api/index.php", api.fetcher);
+  expect((await repo.list({ category: "Work" })).map((n) => n.title).sort()).toEqual(["Sprint plan", "Sprint retro"]);
+  expect((await repo.list({ category: "Work", q: "retro" })).map((n) => n.title)).toEqual(["Sprint retro"]);
+  expect(api.calls.map((call) => call.route)).toEqual(["notes&category=Work", "notes&category=Work"]);
+});
+
+it("sends no category for All categories or an unknown value, and shows nothing for the unknown one", async () => {
+  const [first] = seedNotes();
+  const api = fakeApi(() => ({ json: { notes: [{ ...first, category: "School", pinned: false }] } }));
+  const repo = createHttpNotes(courses, "/api/index.php", api.fetcher);
+  expect((await repo.list({ category: "" })).length).toBe(1);
+  expect((await repo.list({})).length).toBe(1);
+  expect(await repo.list({ category: "Vacation" })).toEqual([]);
+  expect(api.calls.map((call) => call.route)).toEqual(["notes", "notes", "notes"]);
+});
+
 it("sends the session's CSRF token and refreshes it once after a new sign-in", async () => {
   const tokens = ["old-token", "new-token"];
   const api = fakeApi((call) => {

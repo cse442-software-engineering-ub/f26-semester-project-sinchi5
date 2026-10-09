@@ -7,6 +7,7 @@ export class NoteServiceError extends Error {
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const NOTE_CATEGORIES = ["School", "Work", "Meetings", "Personal"];
 
 // Server-backed notes for signed-in accounts (task #120). The demo keeps notes in the browser.
 export function createHttpNotes(
@@ -46,7 +47,10 @@ export function createHttpNotes(
   });
   return {
     async list(q) {
-      const { notes } = await send<{ notes: Note[] }>("notes");
+      // Let the server narrow by category (card 41). The other filters and the sort stay in the
+      // browser, which also re-applies the category, so an unknown value just gives an empty list.
+      const category = NOTE_CATEGORIES.includes(q?.category ?? "") ? `&category=${encodeURIComponent(q!.category!)}` : "";
+      const { notes } = await send<{ notes: Note[] }>(`notes${category}`);
       return filterNotes(notes, q, await courses());
     },
     async get(noteId) {
