@@ -86,6 +86,69 @@ function noteFields(array $input): array
     return [$course, $date === '' ? null : $date, $category, $visibility, $tags];
 }
 
+// Optional narrowing for the notes list (card 41). Every filter is optional, an empty value
+// counts as absent, and filters combine with AND on top of "notes this user may view".
+// Returns [extra SQL starting with " AND ...", bound values].
+function noteListFilter(array $query): array
+{
+    $sql = '';
+    $values = [];
+    $text = static function (string $name) use ($query): ?string {
+        $value = $query[$name] ?? '';
+        if (is_array($value)) {
+            throw new HttpError(422, 'Use one value for each filter.');
+        }
+        return $value === '' ? null : (string) $value;
+    };
+    $category = $text('category');
+    if ($category !== null) {
+        if (!in_array($category, NOTE_CATEGORIES, true)) {
+            throw new HttpError(422, 'Choose a valid category.');
+        }
+        $sql .= ' AND n.category = ?';
+        $values[] = $category;
+    }
+    $keyword = $text('q');
+    if ($keyword !== null) {
+        if (!preg_match('//u', $keyword) || characterCount($keyword) > 100) {
+            throw new HttpError(422, 'Keep the search to 100 characters of plain text.');
+        }
+        // Escape LIKE wildcards so "50%" and "a_b" search for exactly what was typed.
+        $like = '%' . strtr($keyword, ['\\' => '\\\\', '%' => '\\%', '_' => '\\_']) . '%';
+        $sql .= ' AND (n.title LIKE ? OR n.body LIKE ? OR n.tags LIKE ?)';
+        array_push($values, $like, $like, $like);
+    }
+    $course = $text('course');
+    if ($course !== null) {
+        if (!preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $course)) {
+            throw new HttpError(422, 'Choose a valid course.');
+        }
+        $sql .= ' AND n.course_id = ?';
+        $values[] = $course;
+    }
+    $visibility = $text('visibility');
+    if ($visibility !== null) {
+        if (!in_array($visibility, ['private', 'shared'], true)) {
+            throw new HttpError(422, 'Choose who can see this note.');
+        }
+        $sql .= ' AND n.visibility = ?';
+        $values[] = $visibility;
+    }
+    foreach (['from' => '>=', 'to' => '<='] as $name => $operator) {
+        $date = $text($name);
+        if ($date === null) {
+            continue;
+        }
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/D', $date, $parts)
+            || !checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1])) {
+            throw new HttpError(422, 'Choose a valid lecture date.');
+        }
+        $sql .= " AND n.lecture_date $operator ?";
+        $values[] = $date;
+    }
+    return [$sql, $values];
+}
+
 function isoTime(string $value): string
 {
     // The connection uses UTC, so stored DATETIME values are UTC.
@@ -177,10 +240,11 @@ function noteAction(PDO $db, array $session, string $route, array $input, array 
 function noteRoute(PDO $db, array $user, string $route, array $input): array
 {
     if ($route === 'notes') {
+        [$filterSql, $filterValues] = noteListFilter($_GET);
         $rows = query($db, 'SELECT ' . NOTE_COLUMNS . ' FROM notely_notes n
             LEFT JOIN notely_note_editors e ON e.note_id = n.id AND e.user_id = ?
-            WHERE n.owner_user_id = ? OR e.user_id IS NOT NULL
-            ORDER BY n.updated_at DESC, n.id DESC', [$user['id'], $user['id']])->fetchAll();
+            WHERE (n.owner_user_id = ? OR e.user_id IS NOT NULL)' . $filterSql . '
+            ORDER BY n.updated_at DESC, n.id DESC', [$user['id'], $user['id'], ...$filterValues])->fetchAll();
         return ['notes' => array_map('noteJson', $rows)];
     }
     if ($route === 'note-create') {
