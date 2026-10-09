@@ -1219,6 +1219,17 @@
   font-size: 0.65rem;
   min-height: 32px;
 }
+/* Card 42: one section per category on the notes page. */
+.categoryGroup + .categoryGroup {
+  margin-top: 32px;
+}
+.categoryHeading {
+  margin: 0 0 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+}
 .noteGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

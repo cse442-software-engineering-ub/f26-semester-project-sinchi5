@@ -23,6 +23,7 @@ import {
 import { useApp } from "../app/context";
 import { PageHeading, NoteCard, Empty, Modal, EventRow, DeleteNoteDialog } from "../shared/ui";
 import { MAX_COMMENT_LENGTH } from "../domain";
+import { groupNotesByCategory, isNoteCategory, NOTE_CATEGORIES, type NoteCategory } from "../services/categories";
 import type {
   Note,
   NoteVersion,
@@ -43,6 +44,8 @@ export function Notes() {
   const [draftTitle, setDraftTitle] = useState("");
   const [draftBody, setDraftBody] = useState("");
   const [createStatus, setCreateStatus] = useState("All changes saved");
+  // Set when "New note" is chosen from an empty category, so the new note lands in that category.
+  const [draftCategory, setDraftCategory] = useState<NoteCategory>();
   const [noteToDelete, setNoteToDelete] = useState<Note>();
   const location = useLocation();
   const navigate = useNavigate();
@@ -55,6 +58,15 @@ export function Notes() {
     if (location.state?.noteDeleted)
       navigate({ pathname: location.pathname, search: location.search }, { replace: true });
   }, []);
+  // An empty result that comes only from a category filter gets its own message and a "New note"
+  // action for that category; any other empty result keeps the general "No notes found".
+  const selectedCategory = params.get("category");
+  const emptyCategory =
+    isNoteCategory(selectedCategory) &&
+    !params.get("q") &&
+    !["course", "visibility", "from", "to"].some((name) => params.get(name))
+      ? selectedCategory
+      : undefined;
   const key = params.toString();
   useEffect(() => {
     let active = true;
@@ -109,13 +121,15 @@ export function Notes() {
   function resetCreateNote() {
     setDraftTitle("");
     setDraftBody("");
+    setDraftCategory(undefined);
     setCreateStatus("All changes saved");
     setCreating(false);
   }
 
-  function openCreateNote() {
+  function openCreateNote(category?: NoteCategory) {
     setDraftTitle("");
     setDraftBody("");
+    setDraftCategory(category);
     setCreateStatus("All changes saved");
     setCreating(true);
   }
@@ -140,6 +154,7 @@ export function Notes() {
       await repo.notes.create({
         title: title || "Untitled note",
         body,
+        ...(draftCategory ? { category: draftCategory } : {}),
       });
       await refresh();
       setError("");
@@ -172,7 +187,7 @@ export function Notes() {
         actions={
           <button
             className={s.primary}
-            onClick={openCreateNote}
+            onClick={() => openCreateNote()}
           >
             <Plus size={18} /> Create Note
           </button>   
@@ -206,6 +221,10 @@ export function Notes() {
                 onChange={(e) => setDraftBody(e.target.value)}
               />
             </label>
+
+            {draftCategory && (
+              <p className={s.muted}>This note will be saved in {draftCategory}.</p>
+            )}
 
             <p role="status" className={s.muted}>
               {createStatus}
@@ -292,7 +311,7 @@ export function Notes() {
               onChange={(e) => set("category", e.target.value)}
             >
               <option value="">All categories</option>
-              {["School", "Work", "Meetings", "Personal"].map((c) => (
+              {NOTE_CATEGORIES.map((c) => (
                 <option key={c}>{c}</option>
               ))}
             </select>
@@ -356,24 +375,44 @@ export function Notes() {
       ) : loading ? (
         <p role="status">Gathering your notes…</p>
       ) : notes.length ? (
-        <div
-          className={`${s.noteGrid} ${params.get("view") === "list" ? s.noteList : ""}`}
-        >
-          {notes.map((n) => (
-            <NoteCard
-              key={n.id}
-              note={n}
-              onDelete={
-                n.ownerId === state.user?.id
-                  ? () => {
-                      setAnnouncement("");
-                      setNoteToDelete(n);
-                    }
-                  : undefined
-              }
-            />
-          ))}
-        </div>
+        // Card 42: notes sit under their category heading (with a count); a selected
+        // category filter leaves just that one group.
+        groupNotesByCategory(notes).map(({ category, notes: group }) => (
+          <section
+            key={category}
+            className={s.categoryGroup}
+            aria-labelledby={`category-heading-${category}`}
+          >
+            <h2 id={`category-heading-${category}`} className={s.categoryHeading}>
+              {category} ({group.length})
+            </h2>
+            <div
+              className={`${s.noteGrid} ${params.get("view") === "list" ? s.noteList : ""}`}
+            >
+              {group.map((n) => (
+                <NoteCard
+                  key={n.id}
+                  note={n}
+                  onDelete={
+                    n.ownerId === state.user?.id
+                      ? () => {
+                          setAnnouncement("");
+                          setNoteToDelete(n);
+                        }
+                      : undefined
+                  }
+                />
+              ))}
+            </div>
+          </section>
+        ))
+      ) : emptyCategory ? (
+        <Empty title={`No ${emptyCategory} notes yet`}>
+          Notes you put in {emptyCategory} will show up here.{" "}
+          <button className={s.primary} onClick={() => openCreateNote(emptyCategory)}>
+            <Plus size={18} /> New note
+          </button>
+        </Empty>
       ) : (
         <Empty title="No notes found">
           Try another keyword or clear a filter to find your way back.
