@@ -217,10 +217,38 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
     }
 
     if ($route === 'note-title' || $route === 'note-content') {
-        $value = $route === 'note-content' ? noteBody($input) : noteTitle($input);
+        $value = $route === 'note-content'
+            ? noteBody($input)
+            : noteTitle($input);
+
         requireEditor($db, $id, $user);
-        query($db, 'UPDATE notely_notes SET ' . ($route === 'note-content' ? 'body' : 'title') . ' = ? WHERE id = ?', [$value, $id]);
-        return ['note' => ['id' => $id, $route === 'note-content' ? 'body' : 'title' => $value]];
+
+        $current = loadNote($db, $id);
+
+        $title = $route === 'note-title'
+            ? $value
+            : $current['title'];
+
+        $body = $route === 'note-content'
+            ? $value
+            : $current['body'];
+
+        keepVersion($db, $id, $user, $title, $body);
+
+        query(
+            $db,
+            'UPDATE notely_notes SET '
+            . ($route === 'note-content' ? 'body' : 'title')
+            . ' = ? WHERE id = ?',
+            [$value, $id]
+        );
+
+        return [
+            'note' => [
+                'id' => $id,
+                $route === 'note-content' ? 'body' : 'title' => $value,
+            ],
+        ];
     }
     if ($route === 'note-save') {
         $title = noteTitle($input);
