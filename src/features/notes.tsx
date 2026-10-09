@@ -389,6 +389,16 @@ export function Notes() {
     </>
   );
 }
+// True when two copies of a note agree on every field the editor autosaves besides the text.
+function sameNoteFields(a: Note, b: Note) {
+  return (
+    a.courseId === b.courseId &&
+    a.lectureDate === b.lectureDate &&
+    a.category === b.category &&
+    a.visibility === b.visibility &&
+    JSON.stringify(a.tags) === JSON.stringify(b.tags)
+  );
+}
 export function NoteWorkspace() {
   const { id = "" } = useParams();
   // The quick-create editor still autosaves its first title; reopened notes use Save/Cancel.
@@ -424,6 +434,8 @@ export function NoteWorkspace() {
   const noteRef = useRef<Note>();
   const dirtyRef = useRef(false);
   const generation = useRef(0);
+  // The note as the server last confirmed it, so a failed category save can put the selector back.
+  const savedNote = useRef<Note>();
   useEffect(() => {
     let active = true;
     setNote(undefined);
@@ -446,6 +458,7 @@ export function NoteWorkspace() {
           setDraftBody(n.body);
           setTitleDraft(n.title);
           noteRef.current = n;
+          savedNote.current = n;
           setVersions(v);
           setCollaborators(collaborators);
         }
@@ -480,12 +493,28 @@ export function NoteWorkspace() {
         if (current === generation.current) {
           dirtyRef.current = false;
           setDirty(false);
+          savedNote.current = note;
+          // A saved change clears an earlier "could not be saved" alert.
+          setError("");
           setStatus("All changes saved");
           setVersions(await repo.notes.versions(id));
           await refresh();
         }
       } catch (e) {
-        setError((e as Error).message);
+        const lastSaved = savedNote.current;
+        if (lastSaved && note.category !== lastSaved.category) {
+          // The category did not save, so show the last saved one again and say why.
+          const reverted = { ...(noteRef.current ?? note), category: lastSaved.category };
+          noteRef.current = reverted;
+          setNote(reverted);
+          if (sameNoteFields(reverted, lastSaved)) {
+            dirtyRef.current = false;
+            setDirty(false);
+          }
+          setError(`The category could not be saved. ${(e as Error).message}`);
+        } else {
+          setError((e as Error).message);
+        }
         setStatus("Not saved");
       }
     }, 600);
@@ -542,6 +571,7 @@ export function NoteWorkspace() {
         body: draftBody,
       });
       noteRef.current = saved;
+      savedNote.current = saved;
       setNote(saved);
       setTitleDraft(saved.title);
       setDraftBody(saved.body);
@@ -975,6 +1005,7 @@ export function NoteWorkspace() {
                 setDraftBody(restored.body);
                 setTitleDraft(restored.title);
                 noteRef.current = restored;
+                savedNote.current = restored;
                 setVersions(await repo.notes.versions(id));
                 setPreview(undefined);
                 setStatus("Version restored");
