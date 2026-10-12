@@ -27,9 +27,11 @@ describe("repository contracts", () => {
     expect(
       filterNotes(notes, { q: "scrum", visibility: "private" }),
     ).toHaveLength(0);
-    expect(
-      filterNotes(notes, { q: "Algorithms" }).map((n) => n.courseId),
-    ).toEqual(["cse331"]);
+    expect(filterNotes(notes, { q: "recursion" }).map((n) => n.id)).toEqual(["note-2"]);
+    expect(filterNotes(notes, { q: "TRANSPARENCY" }).map((n) => n.id)).toEqual(["note-1"]);
+    expect(filterNotes(notes, { q: "teamwork" }).map((n) => n.id)).toEqual(["note-1"]);
+    expect(filterNotes(notes, { q: "CSE 442" })).toEqual([]);
+    expect(filterNotes(notes, { q: "Personal" })).toEqual([]);
   });
   it("sorts alphabetically and by creation date without mutating input", () => {
     const notes = seedNotes().map((n) => ({ ...n, pinned: false }));

@@ -27,7 +27,7 @@ it("lists server notes with the browser's search and sort", async () => {
   const [first, second] = seedNotes();
   const api = fakeApi(() => ({ json: { notes: [{ ...first, courseId: "other", pinned: false }, { ...second, courseId: "c1", pinned: false }] } }));
   const notes = createHttpNotes(courses, "/api/index.php", api.fetcher);
-  expect((await notes.list({ q: "software engineering" })).map((n) => n.id)).toEqual([second.id]);
+  expect((await notes.list({ q: "recursion" })).map((n) => n.id)).toEqual([second.id]);
   expect(api.calls).toEqual([{ route: "notes", method: "GET", csrf: undefined, body: undefined }]);
 });
 
