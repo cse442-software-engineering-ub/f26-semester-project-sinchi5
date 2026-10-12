@@ -18,6 +18,7 @@
     "test:note-category-filter": "node backend/tests/note-category-filter-http.mjs",
     "test:accounts": "node backend/tests/http.mjs",
     "test:note-titles": "node backend/tests/note-titles-http.mjs",
+    "test:note-sorting": "node backend/tests/note-sorting-http.mjs",
     "test:note-categories": "node backend/tests/note-categories-http.mjs",
     "test:schema": "php backend/tests/schema.php"
   },
