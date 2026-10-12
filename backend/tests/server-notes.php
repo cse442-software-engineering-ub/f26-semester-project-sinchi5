@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Card 120 server-side notes. Run only against DEV/TEST with migrations 002, 003, and 004 applied.
+// Server-side notes, including card 55 search. Run only against DEV/TEST with migrations 002, 003, and 004 applied.
 require_once __DIR__ . '/../lib/bootstrap.php';
 require_once __DIR__ . '/../lib/accounts.php';
 require_once __DIR__ . '/../lib/notes.php';
@@ -58,6 +58,41 @@ try {
         && $note['tags'] === ['exam'] && $note['pinned'] === false, 'Create did not store metadata.');
     $titles = fn (array $session) => array_column(noteAction($db, $session, 'notes', [])['notes'], 'title');
     check($titles($a) === ['Shared study guide'] && $titles($b) === [], 'List leaked or lost a note.');
+
+    // Card 55: keyword search covers title, body, and tags without treating wildcards as patterns.
+    $searchTitles = static function (array $session, string $keyword) use ($db): array {
+        $_GET['q'] = $keyword;
+        try {
+            return array_column(noteAction($db, $session, 'notes', [])['notes'], 'title');
+        } finally {
+            unset($_GET['q']);
+        }
+    };
+    $searchIds = [];
+    foreach ([
+        ['title' => 'Math Homework'],
+        ['title' => 'History Notes', 'tags' => ['mid!term']],
+        ['title' => 'Class Notes', 'body' => 'Binary search algorithm'],
+        ['title' => 'Score 50% done'],
+    ] as $input) {
+        $searchIds[] = noteAction($db, $a, 'note-create', $input)['note']['id'];
+    }
+    check($searchTitles($a, 'Math') === ['Math Homework'], 'Title search included unrelated notes.');
+    check($searchTitles($a, 'BINARY') === ['Class Notes'], 'Body search was not case-insensitive.');
+    check($searchTitles($a, 'mid!term') === ['History Notes'], 'Tag search or escape-character search failed.');
+    check($searchTitles($a, '50%') === ['Score 50% done'], 'Percent sign was treated as a wildcard.');
+    check($searchTitles($a, '_') === [], 'Underscore was treated as a wildcard.');
+    check($searchTitles($b, 'Math') === [], 'Search leaked another student’s note.');
+    check($searchTitles($a, str_repeat('a', 100)) === [], 'A 100-character search was rejected.');
+    try {
+        $searchTitles($a, str_repeat('a', 101));
+        throw new RuntimeException('A 101-character search was accepted.');
+    } catch (HttpError $error) {
+        check($error->status === 422 && $error->getMessage() === 'Keep the search to 100 characters of plain text.',
+            'A 101-character search did not return the expected error.');
+    }
+    foreach ($searchIds as $searchId) noteAction($db, $a, 'note-delete', ['id' => $searchId]);
+    echo "PASS: card 55 title, body, and tag search, literal wildcards, length limit, and access scope\n";
 
     // Save keeps the previous text as a version; pin keeps the edit date.
     $saved = noteAction($db, $a, 'note-save', ['id' => $id, 'title' => 'Shared study guide', 'body' => 'Chapter 2',

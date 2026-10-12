@@ -32,6 +32,13 @@ describe("repository contracts", () => {
     expect(filterNotes(notes, { q: "teamwork" }).map((n) => n.id)).toEqual(["note-1"]);
     expect(filterNotes(notes, { q: "CSE 442" })).toEqual([]);
     expect(filterNotes(notes, { q: "Personal" })).toEqual([]);
+    const specialNotes = [
+      { ...notes[0], title: "Score 50% done", body: "", tags: [] },
+      { ...notes[1], title: "History Notes", body: "", tags: ["mid!term"] },
+    ];
+    expect(filterNotes(specialNotes, { q: "50%" })).toEqual([specialNotes[0]]);
+    expect(filterNotes(specialNotes, { q: "_" })).toEqual([]);
+    expect(filterNotes(specialNotes, { q: "MID!TERM" })).toEqual([specialNotes[1]]);
   });
   it("sorts alphabetically and by creation date without mutating input", () => {
     const notes = seedNotes().map((n) => ({ ...n, pinned: false }));
