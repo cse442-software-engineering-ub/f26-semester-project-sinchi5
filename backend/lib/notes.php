@@ -86,7 +86,7 @@ function noteFields(array $input): array
     return [$course, $date === '' ? null : $date, $category, $visibility, $tags];
 }
 
-// Optional narrowing for the notes list (card 41). Every filter is optional, an empty value
+// Optional narrowing for the notes list (cards 41 and 55). Every filter is optional, an empty value
 // counts as absent, and filters combine with AND on top of "notes this user may view".
 // Returns [extra SQL starting with " AND ...", bound values].
 function noteListFilter(array $query): array
@@ -113,9 +113,10 @@ function noteListFilter(array $query): array
         if (!preg_match('//u', $keyword) || characterCount($keyword) > 100) {
             throw new HttpError(422, 'Keep the search to 100 characters of plain text.');
         }
-        // Escape LIKE wildcards so "50%" and "a_b" search for exactly what was typed.
-        $like = '%' . strtr($keyword, ['\\' => '\\\\', '%' => '\\%', '_' => '\\_']) . '%';
-        $sql .= ' AND (n.title LIKE ? OR n.body LIKE ? OR n.tags LIKE ?)';
+        // Use an explicit escape character so wildcard searches work with any SQL mode.
+        $like = '%' . strtr($keyword, ['!' => '!!', '%' => '!%', '_' => '!_']) . '%';
+        $sql .= " AND (n.title LIKE ? ESCAPE '!' OR n.body LIKE ? ESCAPE '!'
+            OR n.tags LIKE ? ESCAPE '!')";
         array_push($values, $like, $like, $like);
     }
     $course = $text('course');
