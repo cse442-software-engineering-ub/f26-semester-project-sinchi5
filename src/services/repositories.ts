@@ -58,21 +58,13 @@ const initial = (sample = true): Store => sample ? ({
 export function filterNotes(
   notes: Note[],
   query: NoteQuery = {},
-  allCourses: Course[] = courses,
 ) {
   const q = (query.q || "").toLowerCase();
   return notes
     .filter(
       (n) =>
         (!q ||
-          [
-            n.title,
-            n.body,
-            n.category,
-            ...n.tags,
-            allCourses.find((c) => c.id === n.courseId)?.name,
-            allCourses.find((c) => c.id === n.courseId)?.code,
-          ]
+          [n.title, n.body, ...n.tags]
             .join(" ")
             .toLowerCase()
             .includes(q)) &&
@@ -188,7 +180,7 @@ export function createRepositories(
       ...createMockCollaborators(invitations),
       ...createMockComments(db, get, persist, (noteId) => repo.notes.collaborators(noteId)),
       async list(q) {
-        return filterNotes(db.notes, q, db.courses);
+        return filterNotes(db.notes, q);
       },
       async get(noteId) {
         return { ...get(noteId) };

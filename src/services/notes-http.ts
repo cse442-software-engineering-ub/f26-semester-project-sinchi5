@@ -11,7 +11,7 @@ const NOTE_CATEGORIES = ["School", "Work", "Meetings", "Personal"];
 
 // Server-backed notes for signed-in accounts (task #120). The demo keeps notes in the browser.
 export function createHttpNotes(
-  courses: () => Promise<Course[]>,
+  _courses: () => Promise<Course[]>,
   endpoint = `${import.meta.env.BASE_URL}api/index.php`,
   fetcher: typeof fetch = fetch,
 ): NoteRepository {
@@ -51,7 +51,7 @@ export function createHttpNotes(
       // browser, which also re-applies the category, so an unknown value just gives an empty list.
       const category = NOTE_CATEGORIES.includes(q?.category ?? "") ? `&category=${encodeURIComponent(q!.category!)}` : "";
       const { notes } = await send<{ notes: Note[] }>(`notes${category}`);
-      return filterNotes(notes, q, await courses());
+      return filterNotes(notes, q);
     },
     async get(noteId) {
       return (await send<{ note: Note }>(query("note", noteId))).note;

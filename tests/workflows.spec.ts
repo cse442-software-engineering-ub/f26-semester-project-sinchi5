@@ -50,11 +50,23 @@ test("search, combined filters, clear and view persistence", async ({
   await demo(page);
   await page.goto("/notes");
   await page.getByLabel("Search notes").fill("scrum");
+  await expect(page).toHaveURL(/\bq=scrum\b/);
   await expect(
     page.getByRole("heading", {
       name: "Agile development & the Scrum framework",
     }),
   ).toBeVisible();
+  await expect(page.locator('a[href^="/notes/"] h3')).toHaveCount(1);
+  await page.getByLabel("Search notes").fill("transparency");
+  await expect(page.locator('a[href^="/notes/"] h3')).toHaveText(["Agile development & the Scrum framework"]);
+  await page.getByLabel("Search notes").fill("teamwork");
+  await expect(page.locator('a[href^="/notes/"] h3')).toHaveText(["Agile development & the Scrum framework"]);
+  await page.getByLabel("Search notes").fill("CSE 442");
+  await expect(page.getByRole("heading", { name: "No notes found" })).toBeVisible();
+  await page.getByLabel("Search notes").fill("scrum");
+  await page.reload();
+  await expect(page.getByLabel("Search notes")).toHaveValue("scrum");
+  await expect(page.locator('a[href^="/notes/"] h3')).toHaveText(["Agile development & the Scrum framework"]);
   await page.getByRole("button", { name: "Filters", exact: true }).click();
   await page
     .getByRole("combobox", { name: "Visibility", exact: true })
