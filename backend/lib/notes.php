@@ -149,6 +149,27 @@ function noteListFilter(array $query): array
     return [$sql, $values];
 }
 
+// Card 60: the notes list order. modified (default) and created are newest first, title is A to Z
+// ignoring capital letters, and the note ID breaks ties so the same request always returns the
+// same order. Only these fixed clauses are ever placed in the SQL.
+function noteListOrder(array $query): string
+{
+    $sort = $query['sort'] ?? '';
+    if (is_array($sort)) {
+        throw new HttpError(422, 'Choose a valid sort.');
+    }
+    $orders = [
+        'modified' => 'n.updated_at DESC, n.id DESC',
+        'created' => 'n.created_at DESC, n.id DESC',
+        'title' => 'LOWER(n.title) ASC, n.id ASC',
+    ];
+    $sort = (string) $sort === '' ? 'modified' : (string) $sort;
+    if (!array_key_exists($sort, $orders)) {
+        throw new HttpError(422, 'Choose a valid sort.');
+    }
+    return $orders[$sort];
+}
+
 function isoTime(string $value): string
 {
     // The connection uses UTC, so stored DATETIME values are UTC.
@@ -244,7 +265,7 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
         $rows = query($db, 'SELECT ' . NOTE_COLUMNS . ' FROM notely_notes n
             LEFT JOIN notely_note_editors e ON e.note_id = n.id AND e.user_id = ?
             WHERE (n.owner_user_id = ? OR e.user_id IS NOT NULL)' . $filterSql . '
-            ORDER BY n.updated_at DESC, n.id DESC', [$user['id'], $user['id'], ...$filterValues])->fetchAll();
+            ORDER BY ' . noteListOrder($_GET), [$user['id'], $user['id'], ...$filterValues])->fetchAll();
         return ['notes' => array_map('noteJson', $rows)];
     }
     if ($route === 'note-create') {
