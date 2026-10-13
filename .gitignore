@@ -5,3 +5,10 @@ playwright-report/
 devwork-ai/
 *.tsbuildinfo
 .DS_Store
+
+.env
+.env.*
+!.env.example
+backend/config.local.php
+backend/config-path.php
+.notely-config.*/

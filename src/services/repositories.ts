@@ -8,11 +8,16 @@ import type {
   User,
   Course,
   NoteQuery,
+  Collaborator,
+  NoteRepository,
 } from "../domain";
+import { createMockCollaborators } from "./collaborators.mock";
+import { createMockComments } from "./comments.mock";
 import {
   courses,
   seedNotes,
   seedEvents,
+  seedComments,
   dateKey,
   offsetDate,
 } from "./fixtures";
@@ -25,21 +30,22 @@ interface Store {
   comments: Comment[];
   versions: NoteVersion[];
 }
-const initial = (): Store => ({
+const empty = (): Store => ({
+  user: null,
+  completed: false,
+  courses: [],
+  notes: [],
+  events: [],
+  comments: [],
+  versions: [],
+});
+const initial = (sample = true): Store => sample ? ({
   user: null,
   completed: false,
   courses: [...courses],
   notes: seedNotes(),
   events: seedEvents(),
-  comments: [
-    {
-      id: "comment-1",
-      noteId: "note-1",
-      author: "Alex Morgan",
-      body: "The distinction between a sprint review and retrospective finally clicked. Thanks for sharing!",
-      createdAt: new Date().toISOString(),
-    },
-  ],
+  comments: seedComments(),
   versions: seedNotes().map((n) => ({
     id: `version-${n.id}`,
     noteId: n.id,
@@ -48,25 +54,17 @@ const initial = (): Store => ({
     author: "You",
     createdAt: n.createdAt,
   })),
-});
+}) : empty();
 export function filterNotes(
   notes: Note[],
   query: NoteQuery = {},
-  allCourses: Course[] = courses,
 ) {
   const q = (query.q || "").toLowerCase();
   return notes
     .filter(
       (n) =>
         (!q ||
-          [
-            n.title,
-            n.body,
-            n.category,
-            ...n.tags,
-            allCourses.find((c) => c.id === n.courseId)?.name,
-            allCourses.find((c) => c.id === n.courseId)?.code,
-          ]
+          [n.title, n.body, ...n.tags]
             .join(" ")
             .toLowerCase()
             .includes(q)) &&
@@ -87,8 +85,13 @@ export function filterNotes(
 }
 export function createRepositories(
   storage?: Pick<Storage, "getItem" | "setItem">,
+  authenticatedUser?: User | null,
+  // Sample content is for the demo; real accounts start with an empty workspace.
+  sample = true,
+  // Signed-in accounts keep notes on the server; courses and events stay here.
+  serverNotes?: NoteRepository,
 ): Repositories {
-  let db = initial();
+  let db = initial(sample);
   try {
     const saved = storage?.getItem("notely-data-v1");
     if (saved) {
@@ -99,13 +102,17 @@ export function createRepositories(
   } catch {
     /* Recover from unavailable or corrupted storage. */
   }
+  if (authenticatedUser !== undefined) db.user = authenticatedUser;
+  // Legacy prototype notes belong to the seeded student account.
+  db.notes = db.notes.map((note) => ({ ...note, ownerId: note.ownerId ?? authenticatedUser?.id ?? "student" }));
   let committed = structuredClone(db);
   const persist = () => {
     try {
       storage?.setItem("notely-data-v1", JSON.stringify(db));
       committed = structuredClone(db);
     } catch {
-      db = structuredClone(committed);
+      // Restore in place: the comment mock holds this same object.
+      Object.assign(db, structuredClone(committed));
       throw new Error(
         "Your browser storage is full or unavailable. Changes could not be saved.",
       );
@@ -118,16 +125,27 @@ export function createRepositories(
     if (!n) throw new Error("This note could not be found.");
     return n;
   };
+  let invitations = new Map<string, Collaborator[]>();
   const repo: Repositories = {
     auth: {
       async session() {
         return db.user;
       },
-      async signIn(email, name) {
+      async signIn() {
+        throw new Error("Use the PHP account service to sign in.");
+      },
+      async startDemo() {
+        const email = "erin@example.edu";
+        const name = "Erin";
         db.user = { id: "student", email, name: name || email.split("@")[0] };
         persist();
-        return db.user;
       },
+      async signUp() { throw new Error("Use the PHP account service to create accounts."); },
+      async updateProfile() { throw new Error("Demo accounts cannot be changed."); },
+      async changePassword() { throw new Error("Demo accounts cannot be changed."); },
+      async resetPassword() { throw new Error("Use the PHP account service for recovery."); },
+      async replaceRecoveryCode() { throw new Error("Demo accounts cannot be changed."); },
+      async deleteAccount() { throw new Error("Demo accounts cannot be changed."); },
       async signOut() {
         db.user = null;
         persist();
@@ -151,17 +169,18 @@ export function createRepositories(
         return c;
       },
       async folders(courseId) {
-        return db.notes
-          .filter((n) => n.courseId === courseId)
+        return (await repo.notes.list({ course: courseId }))
           .reduce<Record<string, Note[]>>((out, n) => {
             (out[n.lectureDate] ??= []).push(n);
             return out;
           }, {});
       },
     },
-    notes: {
+    notes: serverNotes ?? {
+      ...createMockCollaborators(invitations),
+      ...createMockComments(db, get, persist, (noteId) => repo.notes.collaborators(noteId)),
       async list(q) {
-        return filterNotes(db.notes, q, db.courses);
+        return filterNotes(db.notes, q);
       },
       async get(noteId) {
         return { ...get(noteId) };
@@ -180,13 +199,45 @@ export function createRepositories(
           createdAt: now(),
           updatedAt: now(),
           ...data,
+          ownerId: db.user?.id ?? "student",
+          ownerEmail: db.user?.email,
         };
         db.notes.unshift(n);
         persist();
         return n;
       },
+      async delete(noteId) {
+        // The owner comes from the signed-in session, never from the caller.
+        if (!db.user) throw new Error("Sign in to continue.");
+        const note = get(noteId);
+        const email = db.user.email.trim().toLowerCase();
+        const collaborators = await repo.notes.collaborators(noteId);
+        if (note.ownerId !== db.user.id || collaborators.some((c) => c.email.toLowerCase() === email))
+          throw new Error("Only the note's owner can delete it.");
+        db.notes = db.notes.filter((n) => n.id !== noteId);
+        db.comments = db.comments.filter((c) => c.noteId !== noteId);
+        db.versions = db.versions.filter((v) => v.noteId !== noteId);
+        // persist() restores every record if the write fails.
+        persist();
+        invitations.delete(noteId);
+      },
       async save(note) {
         const previous = get(note.id);
+
+        const currentEmail = db.user?.email.trim().toLowerCase();
+
+        if (currentEmail) {
+          const collaborators = await repo.notes.collaborators(note.id);
+
+          const collaborator = collaborators.find(
+            (entry) => entry.email.toLowerCase() === currentEmail,
+          );
+
+          if (collaborator && collaborator.permission !== "edit") {
+            throw new Error("You do not have permission to edit this note.");
+          }
+        }
+
         if (previous.title !== note.title || previous.body !== note.body)
           db.versions.unshift({
             id: id(),
@@ -196,6 +247,7 @@ export function createRepositories(
             author: db.user?.name || "You",
             createdAt: previous.updatedAt,
           });
+
         const saved = { ...note, updatedAt: now() };
         db.notes = db.notes.map((n) => (n.id === note.id ? saved : n));
         persist();
@@ -207,24 +259,6 @@ export function createRepositories(
         db.notes = db.notes.map((n) => (n.id === noteId ? saved : n));
         persist();
         return { ...saved };
-      },
-      async comments(noteId) {
-        return db.comments.filter((c) => c.noteId === noteId);
-      },
-      async comment(noteId, body) {
-        if (get(noteId).visibility !== "shared")
-          throw new Error("Share this note before adding comments.");
-        if (!body.trim()) throw new Error("Write a comment first.");
-        const c = {
-          id: id(),
-          noteId,
-          body: body.trim(),
-          author: db.user?.name || "You",
-          createdAt: now(),
-        };
-        db.comments.push(c);
-        persist();
-        return c;
       },
       async versions(noteId) {
         return db.versions.filter((v) => v.noteId === noteId);
@@ -254,9 +288,7 @@ export function createRepositories(
         return e;
       },
       async lectureNotes(event) {
-        return db.notes.filter(
-          (n) => n.courseId === event.courseId && n.lectureDate === event.date,
-        );
+        return repo.notes.list({ course: event.courseId, from: event.date, to: event.date });
       },
     },
     imports: {
@@ -336,7 +368,14 @@ export function createRepositories(
       },
     },
     async reset() {
-      db = initial();
+      db = initial(sample);
+      db.user = authenticatedUser ?? null;
+      db.notes = db.notes.map((note) => ({ ...note, ownerId: authenticatedUser?.id ?? "student" }));
+      if (!serverNotes) {
+        invitations = new Map();
+        Object.assign(repo.notes, createMockCollaborators(invitations));
+        Object.assign(repo.notes, createMockComments(db, get, persist, (noteId) => repo.notes.collaborators(noteId)));
+      }
       persist();
     },
   };
