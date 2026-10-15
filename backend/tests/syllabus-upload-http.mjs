@@ -66,7 +66,12 @@ try {
   const read = await owner.call(`import-job&id=${job.id}`);
   assert.equal(read.status, 200);
   assert.deepEqual(read.data.job, job);
-  pass(1, "a valid syllabus creates a queued job that its owner can read");
+  // A file of exactly 20 MB must be stored too; this fails if the server's PHP memory or MySQL
+  // max_allowed_packet is too small for the advertised limit.
+  const full = await upload(owner, "full-size.txt", Buffer.alloc(20 * 1024 * 1024, 97).toString("base64"));
+  assert.equal(full.status, 201, `a 20 MB upload failed: ${JSON.stringify(full.data)}`);
+  assert.equal(full.data.job.size, 20 * 1024 * 1024);
+  pass(1, "a valid syllabus, up to exactly 20 MB, creates a queued job that its owner can read");
 
   for (const [fileName, content, message] of [
     ["syllabus.exe", base64("x"), "Choose a PDF, DOCX, TXT, Markdown, or supported image file."],
@@ -80,7 +85,7 @@ try {
   // No other writers use the isolated database, so a skipped ID would mean a rejected upload was stored.
   const next = await upload(owner, "week-1.md", base64("Quiz 1 on September 8\n"));
   assert.equal(next.status, 201);
-  assert.equal(next.data.job.id, String(BigInt(job.id) + 1n));
+  assert.equal(next.data.job.id, String(BigInt(full.data.job.id) + 1n));
   pass(2, "unsupported, mismatched, empty, oversized, and course-less uploads are rejected and not stored");
 
   expectError(await other.call(`import-job&id=${job.id}`), 404, "This upload could not be found.");
