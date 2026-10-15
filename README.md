@@ -248,6 +248,8 @@ A syllabus can contain text written to trick the model (prompt injection), so th
 
 Each read is logged with its token counts only. A failed read leaves the job `failed`, and it can be retried.
 
+After adding a key, check it once with `NOTELY_AI_LIVE=1 NOTELY_GEMINI_API_KEY=<key> php backend/tests/gemini-smoke.php`. It sends a single small request (free on the free tier) and prints the events Gemini found; no other test or script calls the API.
+
 Errors return `{ "error": "<message>" }` with one of these statuses: 400 (bad JSON or plain HTTP in secure mode), 401 (not signed in, or wrong login), 403 (Origin or CSRF failure), 404 (unknown route), 405 (wrong method), 409 (email conflict), 413 (body too large), 415 (wrong content type), 422 (validation failure), 429 (rate limited, with `Retry-After`), 503 (service or configuration failure).
 
 The browser client is [src/services/auth.ts](src/services/auth.ts). It sends requests one at a time, refreshes the CSRF token after each response, and never caches recovery codes.
