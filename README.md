@@ -111,6 +111,7 @@ You need PHP 8 with `pdo_mysql`, and a local MySQL or MariaDB server (XAMPP work
    mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/002_note_titles.sql
    mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/003_note_content.sql
    mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/004_server_notes.sql
+   mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/005_import_jobs.sql
    ```
 
    You can also import the file through phpMyAdmin.
@@ -197,9 +198,11 @@ The API has a single entry point, `api/index.php?route=<name>`. Every response i
 | POST | `note-invite` | `id`, `email` | yes (owner only, rate limited) |
 | POST | `note-permission` | `id`, `userId`, `permission` (`view` or `edit`) | yes (owner only) |
 | POST | `note-delete` | `id` | yes (owner only) |
+| POST | `syllabus-upload` | `courseId`, `fileName`, `content` (the file as base64) | yes (rate limited) |
+| GET | `import-job&id=<id>` | none | yes (owner only) |
 
 Every POST must include:
-- `Content-Type: application/json` (body at most 8 KB)
+- `Content-Type: application/json` (body at most 8 KB, except `syllabus-upload`)
 - `Origin` matching the configured origin
 - `X-CSRF-Token` set to the `csrfToken` from the latest response
 
@@ -221,6 +224,8 @@ POST `note-delete` returns `{ "note": { "id": "…" } }` and permanently removes
 
 Since task 120, signed-in accounts use these routes for every note through [src/services/notes-http.ts](src/services/notes-http.ts). GET `note`, `notes`, `note-create`, `note-save`, `note-pin`, and `note-restore` return whole notes: `id`, `ownerId`, `title`, `body`, `courseId`, `lectureDate`, `category` (`School`, `Work`, `Meetings`, or `Personal`), `visibility` (`private` or `shared`), `tags` (at most 30 strings of up to 100 characters), `pinned`, `createdAt`, and `updatedAt` (ISO 8601, UTC). `note-save` keeps the current value of any field it doesn't receive, and saves the previous title and body as a version when either changes. Pinning doesn't change `updatedAt`. Notes the caller can't open return 404 from every read route, so their existence isn't revealed. Deleting a note also deletes its versions and comments. `note-invite` returns 404 for an unregistered email and is limited to 30 invitations per user every 15 minutes. Apply migration 004 before deploying this backend.
 
+Since card 43, POST `syllabus-upload` takes one syllabus (PDF, DOCX, TXT, Markdown, JPG, PNG, or WebP, at most 20 MB) and returns 201 with `{ "job": { "id", "kind": "syllabus", "courseId", "name", "type", "size", "state": "queued", "events": [], "createdAt" } }`. The file's first bytes must match its type. Wrong types, empty files, and files over 20 MB get 422 with the same messages the upload window shows (413 when the whole request is too large). Each account can upload 20 files every 15 minutes. GET `import-job` returns the same job to its owner and 404 to anyone else. The stored file is cleared by `prune.php` after a day. Apply migration 005 before deploying this backend.
+
 Errors return `{ "error": "<message>" }` with one of these statuses: 400 (bad JSON or plain HTTP in secure mode), 401 (not signed in, or wrong login), 403 (Origin or CSRF failure), 404 (unknown route), 405 (wrong method), 409 (email conflict), 413 (body too large), 415 (wrong content type), 422 (validation failure), 429 (rate limited, with `Retry-After`), 503 (service or configuration failure).
 
 The browser client is [src/services/auth.ts](src/services/auth.ts). It sends requests one at a time, refreshes the CSRF token after each response, and never caches recovery codes.
@@ -229,7 +234,7 @@ The browser client is [src/services/auth.ts](src/services/auth.ts). It sends req
 
 ## Database schema
 
-Defined in [backend/migrations/001_accounts.sql](backend/migrations/001_accounts.sql) and [backend/migrations/002_note_titles.sql](backend/migrations/002_note_titles.sql). Also apply [backend/migrations/003_note_content.sql](backend/migrations/003_note_content.sql), which backfills existing notes with an empty body, and [backend/migrations/004_server_notes.sql](backend/migrations/004_server_notes.sql), which adds note metadata, history, and comments. Apply all four in order, once each, separately to each environment. All timestamps are UTC.
+Defined in [backend/migrations/001_accounts.sql](backend/migrations/001_accounts.sql) and [backend/migrations/002_note_titles.sql](backend/migrations/002_note_titles.sql). Also apply [backend/migrations/003_note_content.sql](backend/migrations/003_note_content.sql), which backfills existing notes with an empty body, and [backend/migrations/004_server_notes.sql](backend/migrations/004_server_notes.sql), which adds note metadata, history, and comments. Then apply [backend/migrations/005_import_jobs.sql](backend/migrations/005_import_jobs.sql), which stores syllabus uploads. Apply them in order, once each, separately to each environment. All timestamps are UTC.
 
 | Table | Contents |
 | --- | --- |
@@ -238,6 +243,7 @@ Defined in [backend/migrations/001_accounts.sql](backend/migrations/001_accounts
 | `notely_rate_limits` | `bucket_hash` (HMAC of scope plus IP, email, or user), `window_start`, `attempts` |
 | `notely_notes` | Server-side note ID, owner, title, body (non-null TEXT), course ID, lecture date, category, visibility, tags (JSON text), pinned, timestamps |
 | `notely_note_editors` | Per-note user permission (`view` or `edit`) |
+| `notely_import_jobs` | A syllabus upload: owner (cascades on user delete), course ID, file name, type, size, SHA-256, the file itself until it is read, state, and proposed events (JSON text) |
 | `notely_note_versions` | Earlier title and body of a note, who saved over them, and when (cascades on note delete) |
 | `notely_note_comments` | Comment body, note, and author (cascades on note or author delete) |
 
