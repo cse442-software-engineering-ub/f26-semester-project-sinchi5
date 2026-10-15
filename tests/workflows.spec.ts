@@ -17,7 +17,8 @@ async function upload(page: Page, kind: string, name = "lecture.pdf") {
     buffer: Buffer.from("example file"),
   });
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await expect(page.getByLabel("Title", { exact: true })).toBeVisible();
+  // The review form ends with "Save to my notes", or "Add to schedule" for a syllabus (card 46).
+  await expect(page.getByRole("button", { name: /^(Save to my notes|Add to schedule)/ })).toBeVisible();
 }
 test("account and complete onboarding", async ({ page }) => {
   await page.goto("/");

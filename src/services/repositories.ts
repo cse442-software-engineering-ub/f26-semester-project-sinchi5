@@ -349,8 +349,9 @@ export function createRepositories(
         if (job.state !== "review" && job.state !== "partial")
           throw new Error("This upload is not ready to save.");
         if (job.kind === "syllabus") {
-          for (const e of job.events)
-            await repo.schedule.save({ ...e, courseId: job.metadata.courseId });
+          // Events the student left out are skipped, and review-only fields aren't saved (card 46).
+          for (const { include, needsReview: _needsReview, ...event } of job.events)
+            if (include !== false) await repo.schedule.save({ ...event, courseId: job.metadata.courseId });
         } else
           await repo.notes.create({
             ...job.metadata,

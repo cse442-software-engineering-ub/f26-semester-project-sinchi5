@@ -79,9 +79,11 @@ export interface DetectedMetadata {
   category: string;
 }
 export type UploadKind = "document" | "scan" | "syllabus";
-// An event proposed from a syllabus. needsReview means it has no clear date yet (card 44).
+// An event proposed from a syllabus. needsReview means it has no clear date yet (card 44);
+// include: false means the student left it out on the review screen (card 46).
 export interface DetectedEvent extends CourseEvent {
   needsReview?: boolean;
+  include?: boolean;
 }
 export interface UploadJob {
   id: string;

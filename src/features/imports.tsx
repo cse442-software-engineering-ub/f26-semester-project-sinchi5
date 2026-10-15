@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../app/context";
 import { Modal } from "../shared/ui";
-import type { UploadKind, UploadJob } from "../domain";
+import type { DetectedEvent, UploadKind, UploadJob } from "../domain";
 import s from "../app/App.module.css";
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export function ImportDialog({
@@ -230,20 +230,23 @@ export function ImportDialog({
               below.
             </p>
           )}
-          <label>
-            Title
-            <input
-              required
-              value={job.metadata.title}
-              onChange={(e) =>
-                setJob({
-                  ...job,
-                  metadata: { ...job.metadata, title: e.target.value },
-                })
-              }
-            />
-          </label>
-          <div className={s.formRow}>
+          {/* A syllabus only adds events, so the note's title, date, and category don't apply. */}
+          {kind !== "syllabus" && (
+            <label>
+              Title
+              <input
+                required
+                value={job.metadata.title}
+                onChange={(e) =>
+                  setJob({
+                    ...job,
+                    metadata: { ...job.metadata, title: e.target.value },
+                  })
+                }
+              />
+            </label>
+          )}
+          <div className={kind === "syllabus" ? undefined : s.formRow}>
             <label>
               Course
               <select
@@ -262,91 +265,107 @@ export function ImportDialog({
                 ))}
               </select>
             </label>
-            <label>
-              {kind === "syllabus" ? "Review date" : "Lecture date"}
-              <input
-                type="date"
-                required
-                value={job.metadata.lectureDate}
-                onChange={(e) =>
-                  setJob({
-                    ...job,
-                    metadata: { ...job.metadata, lectureDate: e.target.value },
-                  })
-                }
-              />
-            </label>
-          </div>
-          <label>
-            Category
-            <select
-              value={job.metadata.category}
-              onChange={(e) =>
-                setJob({
-                  ...job,
-                  metadata: { ...job.metadata, category: e.target.value },
-                })
-              }
-            >
-              {["School", "Work", "Meetings", "Personal"].map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-          </label>
-          {job.events.map((event, i) => (
-            <fieldset key={i}>
-              <legend>Detected {event.kind}</legend>
+            {kind !== "syllabus" && (
               <label>
-                Event title
+                Lecture date
                 <input
+                  type="date"
                   required
-                  value={event.title}
+                  value={job.metadata.lectureDate}
                   onChange={(e) =>
                     setJob({
                       ...job,
-                      events: job.events.map((v, j) =>
-                        j === i ? { ...v, title: e.target.value } : v,
-                      ),
+                      metadata: { ...job.metadata, lectureDate: e.target.value },
                     })
                   }
                 />
               </label>
-              <div className={s.formRow}>
-                <label>
-                  Due date
+            )}
+          </div>
+          {kind !== "syllabus" && (
+            <label>
+              Category
+              <select
+                value={job.metadata.category}
+                onChange={(e) =>
+                  setJob({
+                    ...job,
+                    metadata: { ...job.metadata, category: e.target.value },
+                  })
+                }
+              >
+                {["School", "Work", "Meetings", "Personal"].map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          {kind === "syllabus" && !job.events.length && (
+            <p className={s.notice}>
+              No dated events were found in this file. Try another copy of the
+              syllabus.
+            </p>
+          )}
+          {/* Card 46: each event can be corrected or left out. Included events need a title and a
+              date, so the browser asks for any that are missing before anything is added. */}
+          {job.events.map((event, i) => {
+            const included = event.include !== false;
+            const update = (change: Partial<DetectedEvent>) =>
+              setJob({ ...job, events: job.events.map((v, j) => (j === i ? { ...v, ...change } : v)) });
+            return (
+              <fieldset key={i}>
+                <legend>Detected {event.kind}</legend>
+                {event.needsReview && (
+                  <p className={s.notice}>
+                    Needs review: choose the date.
+                    {event.description && ` The syllabus says “${event.description}”.`}
+                  </p>
+                )}
+                <label className={s.checkLabel}>
                   <input
-                    type="date"
+                    type="checkbox"
+                    checked={included}
+                    onChange={(e) => update({ include: e.target.checked })}
+                  />
+                  Include
+                </label>
+                <label>
+                  Event title
+                  <input
                     required
-                    value={event.date}
-                    onChange={(e) =>
-                      setJob({
-                        ...job,
-                        events: job.events.map((v, j) =>
-                          j === i ? { ...v, date: e.target.value } : v,
-                        ),
-                      })
-                    }
+                    disabled={!included}
+                    value={event.title}
+                    onChange={(e) => update({ title: e.target.value })}
                   />
                 </label>
-                <label>
-                  Time
-                  <input
-                    type="time"
-                    value={event.time}
-                    onChange={(e) =>
-                      setJob({
-                        ...job,
-                        events: job.events.map((v, j) =>
-                          j === i ? { ...v, time: e.target.value } : v,
-                        ),
-                      })
-                    }
-                  />
-                </label>
-              </div>
-            </fieldset>
-          ))}
-          <button className={s.primary} disabled={busy}>
+                <div className={s.formRow}>
+                  <label>
+                    Due date
+                    <input
+                      type="date"
+                      required
+                      disabled={!included}
+                      value={event.date}
+                      onChange={(e) => update({ date: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Time
+                    <input
+                      type="time"
+                      disabled={!included}
+                      value={event.time}
+                      onChange={(e) => update({ time: e.target.value })}
+                    />
+                  </label>
+                </div>
+              </fieldset>
+            );
+          })}
+          <button
+            className={s.primary}
+            disabled={busy || (kind === "syllabus" && !job.events.some((e) => e.include !== false))}
+          >
             {busy
               ? "Saving…"
               : kind === "syllabus"

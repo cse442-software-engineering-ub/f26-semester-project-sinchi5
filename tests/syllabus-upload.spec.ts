@@ -2,39 +2,8 @@
 // support/account-fixture.ts. No server is needed and the Claude API is never called.
 import type { Page } from "@playwright/test";
 import { test, expect } from "./support/account-fixture";
+import { openUpload, signUpWithCourse, SYLLABUS, textFile as file } from "./support/syllabus";
 
-const SYLLABUS = [
-  "CSE 442 Software Engineering - Fall 2026 Syllabus",
-  "Homework 1 due September 28, 2026",
-  "Midterm exam October 14, 2026 at 10:00 AM",
-  "Final project due December 4, 2026",
-].join("\n");
-const file = (name: string, text: string) => ({ name, mimeType: "text/plain", buffer: Buffer.from(text) });
-
-async function signUpWithCourse(page: Page) {
-  await page.goto("/");
-  await page.getByRole("button", { name: "Create your workspace" }).click();
-  await page.getByLabel("Your name").fill("Task Tester");
-  await page.getByLabel("Email address").fill("notely-task45-442@example.edu");
-  await page.getByLabel("Password", { exact: true }).fill("Sample river password 42!");
-  await page.getByLabel("Confirm password", { exact: true }).fill("Sample river password 42!");
-  await page.getByRole("button", { name: "Create account", exact: true }).click();
-  await page.getByLabel("I saved my recovery code").check();
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "Add a course" }).click();
-  await page.getByLabel("Course code").fill("CSE 442");
-  await page.getByLabel("Term").fill("Fall 2026");
-  await page.getByLabel("Course name").fill("Software Engineering");
-  await page.getByRole("button", { name: "Add course" }).click();
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "I’ll do this later" }).click();
-  await page.getByRole("button", { name: "Let’s begin" }).click();
-}
-async function openUpload(page: Page) {
-  await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Upload syllabus", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Your semester, sorted" })).toBeVisible();
-}
 // Records which API routes the page calls, to prove which files reach the server reader.
 function apiRoutes(page: Page) {
   const routes: string[] = [];
