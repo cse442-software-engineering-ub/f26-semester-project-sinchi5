@@ -7,9 +7,10 @@ if (PHP_SAPI !== 'cli' && !defined('NOTELY_INTERNAL')) {
 
 // Card 43: a syllabus upload becomes an import job that only its owner can read.
 // Card 47: the student's reviewed events from a job are saved to their schedule.
+// import-extract reads PDF, DOCX, and image jobs with the Claude API (syllabus-ai.php).
 // Needs notes.php for recordId() and isoTime().
 const IMPORT_READ_ROUTES = ['import-job', 'events'];
-const IMPORT_ROUTES = [...IMPORT_READ_ROUTES, 'syllabus-upload', 'import-confirm'];
+const IMPORT_ROUTES = [...IMPORT_READ_ROUTES, 'syllabus-upload', 'import-confirm', 'import-extract'];
 const EVENT_KINDS = ['lecture', 'assignment', 'quiz', 'exam', 'deadline', 'other'];
 const MAX_IMPORTED_EVENTS = 200;
 const SYLLABUS_MAX_BYTES = 20 * 1024 * 1024;
@@ -151,6 +152,57 @@ function eventJson(array $row): array
     ];
 }
 
+// Proposes events for a PDF, DOCX, or image job. Every paid read is capped per student and for the
+// whole app each day, and $send replaces the live API in tests so they never spend credits.
+function extractImport(PDO $db, array $config, array $user, array $input, ?callable $send = null): array
+{
+    $id = recordId($input['id'] ?? null, 'Choose a valid upload.');
+    $year = $input['year'] ?? (int) gmdate('Y');
+    if (!is_int($year) || $year < 2000 || $year > 2100) {
+        throw new HttpError(422, 'Choose a valid course year.');
+    }
+    $job = ownedImport($db, $user, $id);
+    if (in_array($job['state'], ['review', 'completed'], true)) {
+        return ['job' => $job];
+    }
+    if (in_array($job['type'], ['txt', 'md'], true)) {
+        throw new HttpError(422, 'TXT and Markdown syllabi are read in your browser.');
+    }
+    // A class uploads the same syllabus many times, so a file that was read once is free after that.
+    $events = query($db, 'SELECT other.events FROM notely_import_jobs mine
+        JOIN notely_import_jobs other ON other.file_sha256 = mine.file_sha256 AND other.events IS NOT NULL
+        WHERE mine.id = ? LIMIT 1', [$id])->fetchColumn();
+    if ($events === false) {
+        // Claiming the job first means a double click can't pay for two reads of one file. A claim left
+        // by a request the server killed mid-read expires after 5 minutes.
+        $claim = query($db, "UPDATE notely_import_jobs SET state = 'processing' WHERE id = ? AND (state IN ('queued', 'failed')
+            OR (state = 'processing' AND updated_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 MINUTE)))", [$id]);
+        if ($claim->rowCount() !== 1) {
+            throw new HttpError(409, 'This file is already being read. Please wait a moment.');
+        }
+        try {
+            $send ??= liveAnthropic($config);
+            $perStudent = (int) ($config['ai_user_daily_limit'] ?? 5);
+            rateLimit($db, $config, 'syllabus-ai', (string) $user['id'], $perStudent, 86400,
+                "You can read $perStudent syllabi automatically each day. Try again tomorrow, or upload a TXT version.");
+            rateLimit($db, $config, 'syllabus-ai', 'everyone', (int) ($config['ai_daily_limit'] ?? 50), 86400,
+                'Automatic reading is busy today. Try again tomorrow, or upload a TXT version.');
+            $content = query($db, 'SELECT content FROM notely_import_jobs WHERE id = ?', [$id])->fetchColumn();
+            if (!is_string($content)) {
+                throw new HttpError(422, 'This upload expired. Please choose the file again.');
+            }
+            set_time_limit(180);
+            $events = json_encode(readSyllabusWithAi($config, $send, $job['type'], $content, $year),
+                JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        } catch (Throwable $error) {
+            query($db, "UPDATE notely_import_jobs SET state = 'failed' WHERE id = ?", [$id]);
+            throw $error;
+        }
+    }
+    query($db, "UPDATE notely_import_jobs SET state = 'review', events = ?, content = NULL WHERE id = ?", [$events, $id]);
+    return ['job' => ownedImport($db, $user, $id)];
+}
+
 function importAction(PDO $db, array $config, array $session, string $route, array $input): array
 {
     if ($route === 'import-confirm') {
@@ -174,6 +226,9 @@ function importAction(PDO $db, array $config, array $session, string $route, arr
         return ['created' => $created];
     }
     $user = requireUser($db, $session);
+    if ($route === 'import-extract') {
+        return extractImport($db, $config, $user, $input);
+    }
     if ($route === 'import-job') {
         return ['job' => ownedImport($db, $user, recordId($_GET['id'] ?? null, 'Choose a valid upload.'))];
     }

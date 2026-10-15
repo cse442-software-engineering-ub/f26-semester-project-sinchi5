@@ -74,18 +74,19 @@ function query(PDO $db, string $sql, array $parameters = []): PDOStatement
     return $statement;
 }
 
-function rateLimit(PDO $db, array $config, string $scope, string $value, int $limit): void
+function rateLimit(PDO $db, array $config, string $scope, string $value, int $limit, int $seconds = 900,
+    string $message = 'Too many attempts. Please try again in 15 minutes.'): void
 {
-    $window = intdiv(time(), 900) * 900;
+    $window = intdiv(time(), $seconds) * $seconds;
     $key = hash_hmac('sha256', $scope . ':' . $value, $config['app_key']);
-    // One atomic increment across requests/processes, with a bounded 15-minute window.
+    // One atomic increment across requests/processes, with a bounded window (15 minutes by default).
     query($db, 'INSERT INTO notely_rate_limits (bucket_hash, window_start, attempts) VALUES (?, ?, 1)
         ON DUPLICATE KEY UPDATE attempts = IF(window_start = VALUES(window_start), attempts + 1, 1),
         window_start = VALUES(window_start)', [$key, $window]);
     $attempts = query($db, 'SELECT attempts FROM notely_rate_limits WHERE bucket_hash = ?', [$key])->fetchColumn();
     if ((int) $attempts > $limit) {
-        header('Retry-After: ' . ($window + 900 - time()));
-        throw new HttpError(429, 'Too many attempts. Please try again in 15 minutes.');
+        header('Retry-After: ' . ($window + $seconds - time()));
+        throw new HttpError(429, $message);
     }
 }
 

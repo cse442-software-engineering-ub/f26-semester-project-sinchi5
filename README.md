@@ -163,6 +163,11 @@ The API looks for configuration in this order:
 | `origin` | `NOTELY_ORIGIN` | The exact scheme and host the frontend is served from. POST requests from any other `Origin` are rejected. |
 | `cookie_path` | `NOTELY_COOKIE_PATH` | Session cookie path, for example `/` locally or the class directory on the server. |
 | `secure_cookies` | `NOTELY_ALLOW_LOCAL_HTTP=1` disables it | HTTPS-only cookies. HTTP is accepted only for `localhost`, `127.0.0.1`, or `[::1]` origins. |
+| `anthropic_api_key` | `NOTELY_ANTHROPIC_API_KEY` | Optional. Turns on automatic reading of PDF, DOCX, and image syllabi with the Claude API. Without it, those uploads fail with a message to upload a TXT version. Local origins never call the API unless `NOTELY_AI_LIVE=1` is set for that run. |
+| `anthropic_model` | none | Model for syllabus reading. Default `claude-opus-5-5`; `claude-haiku-5-5` costs about 40 times less per token. |
+| `ai_user_daily_limit` | none | Automatic reads per student per UTC day. Default 5. |
+| `ai_daily_limit` | none | Automatic reads for all students per UTC day. Default 50. |
+| `ai_max_input_tokens` | none | Files over this many input tokens are refused before any paid request. Default 60000. |
 
 A missing or invalid configuration **fails closed**: the API returns HTTP 503 and logs only the exception class.
 
@@ -203,6 +208,7 @@ The API has a single entry point, `api/index.php?route=<name>`. Every response i
 | GET | `import-job&id=<id>` | none | yes (owner only) |
 | POST | `import-confirm` | `id`, `events` (each `title`, `date`, optional `kind`, `time`), optional `courseId` | yes (job owner only) |
 | GET | `events` or `events&courseId=<id>` | none | yes (the caller's own events) |
+| POST | `import-extract` | `id`, `year` (the course year, for dates without one) | yes (job owner only, daily limits) |
 
 Every POST must include:
 - `Content-Type: application/json` (body at most 8 KB, except `syllabus-upload`)
@@ -230,6 +236,15 @@ Since task 120, signed-in accounts use these routes for every note through [src/
 Since card 43, POST `syllabus-upload` takes one syllabus (PDF, DOCX, TXT, Markdown, JPG, PNG, or WebP, at most 20 MB) and returns 201 with `{ "job": { "id", "kind": "syllabus", "courseId", "name", "type", "size", "state": "queued", "events": [], "createdAt" } }`. The file's first bytes must match its type. Wrong types, empty files, and files over 20 MB get 422 with the same messages the upload window shows (413 when the whole request is too large). Each account can upload 20 files every 15 minutes. GET `import-job` returns the same job to its owner and 404 to anyone else. The stored file is cleared by `prune.php` after a day. Apply migration 005 before deploying this backend.
 
 Since card 47, POST `import-confirm` saves 1–200 reviewed events from the caller's own job to its course (or to `courseId`, when the student picked another course) and returns `{ "created": <count> }`. The job becomes `completed` and its file is dropped, so sending the same confirm again returns `{ "created": 0 }`. Every event needs a `title` (1–255 visible characters) and a real `date` (`YYYY-MM-DD`), otherwise 422 "Give every event a title and a date."; `kind` is one of `lecture`, `assignment`, `quiz`, `exam`, `deadline`, `other` (default), and `time` is empty or 24-hour `HH:MM`. GET `events` returns `{ "events": [{ "id", "courseId", "title", "kind", "date", "time", "location", "description", "source", "importJobId" }] }` ordered by date and time. Apply migration 006 before deploying this backend.
+
+POST `import-extract` proposes events for a PDF, DOCX, or image job with the Claude API ([backend/lib/syllabus-ai.php](backend/lib/syllabus-ai.php)) and returns the job in the `review` state with its `events`. TXT and Markdown jobs get 422, because the browser reads them for free ([src/services/syllabus.ts](src/services/syllabus.ts)). To keep API costs down:
+- A file whose identical copy was already read reuses those events, with no API call. A class uploading the same syllabus pays once.
+- The file is token-counted first (free), and anything over `ai_max_input_tokens` gets 422 before a paid request.
+- Each student gets `ai_user_daily_limit` reads per UTC day and the whole app `ai_daily_limit`; after that, 429.
+- A job being read can't be read again at the same time (409), so a double click pays once.
+- Without `anthropic_api_key`, or from a local origin without `NOTELY_AI_LIVE=1`, the route returns 503 and never contacts the API. Every automated test uses a fake API.
+
+Each read is logged with its input and output token counts only. A failed read leaves the job `failed`, and it can be retried.
 
 Errors return `{ "error": "<message>" }` with one of these statuses: 400 (bad JSON or plain HTTP in secure mode), 401 (not signed in, or wrong login), 403 (Origin or CSRF failure), 404 (unknown route), 405 (wrong method), 409 (email conflict), 413 (body too large), 415 (wrong content type), 422 (validation failure), 429 (rate limited, with `Retry-After`), 503 (service or configuration failure).
 

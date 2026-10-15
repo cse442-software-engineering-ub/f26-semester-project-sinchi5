@@ -13,6 +13,7 @@ require_once __DIR__ . '/lib/bootstrap.php';
 require_once __DIR__ . '/lib/accounts.php';
 require_once __DIR__ . '/lib/notes.php';
 require_once __DIR__ . '/lib/imports.php';
+require_once __DIR__ . '/lib/syllabus-ai.php';
 
 try {
     $config = configuration();
