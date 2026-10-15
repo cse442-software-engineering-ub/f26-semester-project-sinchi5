@@ -13,7 +13,8 @@ import type {
   DetectedEvent,
 } from "../domain";
 import type { SyllabusApi } from "./imports-http";
-import { extractEvents, normalizeEvents } from "./syllabus";
+import { checkDates, extractEvents, mergeEvents, normalizeEvents, rulesVerdict, type ProposedEvent } from "./syllabus";
+import { fileTypeProblem, syllabusText } from "./syllabus-text";
 import { createMockCollaborators } from "./collaborators.mock";
 import { createMockComments } from "./comments.mock";
 import {
@@ -130,6 +131,33 @@ export function createRepositories(
     if (!n) throw new Error("This note could not be found.");
     return n;
   };
+  // Card 45: the free rules read every syllabus first. The AI reader on the server is asked only when
+  // they can't stand alone (rulesVerdict), and its dates are checked against the file. When it can't
+  // help, the rules' events are still shown with the reason, and the student can fix or add events.
+  async function readSyllabus(jobId: string, file: File, year: number, onAutomaticReading?: () => void):
+    Promise<{ proposed: ProposedEvent[]; reader: NonNullable<UploadJob["reader"]>; notice?: string }> {
+    const text = await syllabusText(file);
+    const rules = extractEvents(text, year);
+    const verdict = rulesVerdict(text, rules);
+    const checkThem = "Check these events against your syllabus, and add any that are missing.";
+    if (!verdict) return { proposed: rules, reader: "rules" };
+    if (!serverSyllabus) {
+      // The demo has no server, so a file without text shows sample results.
+      if (verdict !== "no-text") return { proposed: rules, reader: "rules-only", notice: checkThem };
+      return { reader: "sample", notice: "This preview shows sample events. Sign in to read your own syllabus.", proposed: normalizeEvents([
+        { title: "Assignment 1", kind: "assignment", date: offsetDate(7), time: "23:59", source: "Detected from syllabus. Review before saving." },
+        { title: "Midterm exam", kind: "exam", date: offsetDate(21), time: "10:00", source: "Detected from syllabus." },
+      ]) };
+    }
+    onAutomaticReading?.();
+    try {
+      const ai = normalizeEvents((await serverSyllabus.extract(jobId, year)).events);
+      return { proposed: mergeEvents(checkDates(ai, text), rules), reader: "ai" };
+    } catch (error) {
+      // A daily limit, a busy service, or no key: what the rules found is still worth reviewing.
+      return { proposed: rules, reader: "rules-only", notice: `${(error as Error).message} ${checkThem}` };
+    }
+  }
   let invitations = new Map<string, Collaborator[]>();
   const repo: Repositories = {
     auth: {
@@ -321,34 +349,30 @@ export function createRepositories(
         const job = { kind, name: file.name, state: "queued" as const, events: [], metadata: {
           title: file.name.replace(/\.[^.]+$/, ""), courseId, lectureDate: dateKey(), category: "School",
         } };
+        // A renamed file is caught here with a message that says how to fix it; the server checks again.
+        const problem = kind === "syllabus" ? await fileTypeProblem(file) : null;
+        if (problem) throw new Error(problem);
         if (kind === "syllabus" && serverSyllabus) return { ...job, id: (await serverSyllabus.upload(file, courseId)).id };
         return { ...job, id: id() };
       },
-      async process(job, file, scenario = "success") {
+      async process(job, file, scenario = "success", onAutomaticReading) {
         // "Processing failed" in the prototype preview options shows the failure screen on purpose.
         if (scenario === "failure") return { ...job, state: "failed" };
         let events: DetectedEvent[] = [];
+        let read: Pick<UploadJob, "reader" | "notice"> = {};
         if (job.kind === "syllabus") {
           const { courseId } = job.metadata;
           const term = db.courses.find((c) => c.id === courseId)?.term ?? "";
           const year = Number(/\b(20\d\d)\b/.exec(term)?.[1]) || new Date().getFullYear();
-          // TXT and Markdown are read here for free; the server reads other files for signed-in students.
-          const proposed = /\.(txt|md)$/i.test(file.name)
-            ? extractEvents(await file.text(), year)
-            : serverSyllabus
-              ? normalizeEvents((await serverSyllabus.extract(job.id, year)).events)
-              : // The demo has no server, so other files show sample results.
-                normalizeEvents([
-                  { title: "Assignment 1", kind: "assignment", date: offsetDate(7), time: "23:59", source: "Detected from syllabus. Review before saving." },
-                  { title: "Midterm exam", kind: "exam", date: offsetDate(21), time: "10:00", source: "Detected from syllabus." },
-                ]);
-          events = proposed.map(({ source, time, needsReview, ...event }) => ({
+          const result = await readSyllabus(job.id, file, year, onAutomaticReading);
+          read = { reader: result.reader, ...(result.notice ? { notice: result.notice } : {}) };
+          events = result.proposed.map(({ source, time, needsReview, ...event }) => ({
             ...event, id: "", courseId, time: time ?? "", location: "", description: source, source: "imported",
             ...(needsReview ? { needsReview } : {}),
           }));
         }
         const partial = scenario === "partial" || events.some((e) => e.needsReview);
-        return { ...job, state: partial ? "partial" : "review", events };
+        return { ...job, state: partial ? "partial" : "review", events, ...read };
       },
       async confirm(job) {
         if (job.state !== "review" && job.state !== "partial")

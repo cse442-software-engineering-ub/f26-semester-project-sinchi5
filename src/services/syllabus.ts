@@ -73,7 +73,9 @@ function plainText(value: unknown, max: number) {
 }
 
 function cleanTitle(text: string) {
-  let title = text.replace(/\(\s*\)|\[\s*\]/g, " ").replace(/\s+/g, " ");
+  // A schedule table's week number sits in its own column, set off by a wide gap or a table bar.
+  let title = text.replace(/^\s*(?:week\s*)?\d{1,2}(?=\s{2,})/i, "");
+  title = title.replace(/\(\s*\)|\[\s*\]/g, " ").replace(/\s+/g, " ");
   title = title.replace(LEADING, "").replace(TRAILING, "");
   return plainText(title, 255);
 }
@@ -159,4 +161,44 @@ export function normalizeEvents(items: unknown): ProposedEvent[] {
     });
   }
   return events;
+}
+
+// Short lines that name a graded item, like a table cell or heading ("Midterm exam", "Project 2 due").
+const GRADED_ITEM = /\b(?:exams?|midterms?|finals?|quiz(?:zes)?|homework|hw\s*#?\d|assignments?|projects?|papers?|due|deadlines?)\b/i;
+
+// Why the rules' events can't be trusted on their own, or null when they're good enough to show as
+// they are. The browser asks the AI reader only for a reason, so most syllabi cost nothing.
+// ponytail: fixed thresholds; tune them against real syllabi from the team's courses.
+export type RulesVerdict = "no-text" | "no-events" | "unsure" | "missed" | null;
+export function rulesVerdict(text: string, events: ProposedEvent[]): RulesVerdict {
+  // A scan or photo has little or no text to read.
+  if (!events.length) return (text.match(/\p{L}/gu)?.length ?? 0) < 100 ? "no-text" : "no-events";
+  // "Next Friday" or "TBA" stumps any reader, so only lines with clashing or impossible dates count.
+  const relative = new RegExp(RELATIVE.source, "i");
+  if (events.filter((e) => e.needsReview && !relative.test(e.source)).length > events.length / 4) return "unsure";
+  // Many graded items without a date of their own suggest a table whose dates the rules couldn't pair up.
+  const missed = text.split(/\r\n|\r|\n/)
+    .filter((line) => line.trim().length <= 60 && GRADED_ITEM.test(line) && !parseLine(line, 2000)).length;
+  return missed >= 3 && missed > events.length / 2 ? "missed" : null;
+}
+
+// Flags each proposed date that appears nowhere in the file's text, so the student checks any date a
+// reader misread or made up. A photo has no text to compare, so its dates are left as they are.
+export function checkDates(events: ProposedEvent[], text: string): ProposedEvent[] {
+  if (!text.trim()) return events;
+  const days = new Set<string>();
+  for (const rule of DATE_RULES) {
+    for (const m of text.matchAll(rule.pattern)) {
+      const [, month, day] = rule.parts(m);
+      days.add(`${month}-${day}`);
+    }
+  }
+  return events.map((e) =>
+    !e.date || days.has(`${+e.date.slice(5, 7)}-${+e.date.slice(8)}`) ? e : { ...e, needsReview: true as const });
+}
+
+// The AI reader's events, plus each dated exam, quiz, assignment, or deadline the rules found on a day
+// the AI left empty, so neither reader's miss is lost.
+export function mergeEvents(ai: ProposedEvent[], rules: ProposedEvent[]): ProposedEvent[] {
+  return normalizeEvents([...ai, ...rules.filter((r) => r.date && r.kind !== "other" && !ai.some((a) => a.date === r.date))]);
 }

@@ -11,6 +11,8 @@ function memory() {
     },
   };
 }
+const PNG_1PX = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
 describe("repository contracts", () => {
   it("combines keyword, course, visibility, category and date filters", () => {
     const notes = seedNotes();
@@ -108,7 +110,7 @@ describe("repository contracts", () => {
     expect(queued.state).toBe("queued");
     const failed = await r.imports.process(queued, paper, "failure");
     await expect(r.imports.confirm(failed)).rejects.toThrow();
-    const syllabus = new File(["syllabus"], "syllabus.pdf");
+    const syllabus = new File(["syllabus"], "syllabus.txt");
     const job = await r.imports.process(await r.imports.start(syllabus, "syllabus"), syllabus, "partial");
     expect(job.state).toBe("partial");
     job.events[0].title = "Reviewed assignment";
@@ -136,6 +138,8 @@ describe("repository contracts", () => {
       ["Homework 1", "assignment", "2026-09-28", "cse442", "imported", false],
       ["Quiz", "quiz", "", "cse442", "imported", true],
     ]);
+    // The rules read it well enough ("next Friday" stumps any reader), so the AI reader isn't asked.
+    expect(job.reader).toBe("rules");
     expect(calls).toEqual(["upload cse442-syllabus.txt cse442"]);
   });
   it("asks the server to read other syllabus files and cleans what it returns (card 45)", async () => {
@@ -148,8 +152,10 @@ describe("repository contracts", () => {
       },
     } as never;
     const r = createRepositories(undefined, undefined, true, undefined, server);
-    const pdf = new File(["%PDF-1.7"], "syllabus.pdf");
+    // A photo has no text for the rules, so it goes straight to the AI reader.
+    const pdf = new File([Uint8Array.from(atob(PNG_1PX), (c) => c.charCodeAt(0))], "syllabus.png");
     const job = await r.imports.process(await r.imports.start(pdf, "syllabus", "success", "cse442"), pdf);
+    expect(job.reader).toBe("ai");
     expect(calls).toEqual([["8", 2026]]);
     expect([job.state, job.events]).toEqual(["review", [{
       id: "", courseId: "cse442", title: "Midterm exam", kind: "exam", date: "2026-10-14", time: "10:00",
@@ -178,6 +184,66 @@ describe("repository contracts", () => {
     // A local edit of an imported event replaces the server copy instead of showing both.
     await r.schedule.save({ ...midterm, title: "Midterm exam (room 101)" });
     expect((await r.schedule.list()).map((e) => e.title)).toEqual(["Midterm exam (room 101)"]);
+  });
+  it("checks the AI reader's dates against the file and keeps the rules' finds (card 45)", async () => {
+    let asked = 0;
+    const server = {
+      upload: async () => ({ id: "9" }),
+      extract: async () => {
+        asked++;
+        return { events: [
+          { title: "Midterm exam", kind: "exam", date: "2026-10-14", time: "", source: "" },
+          { title: "Quiz 3", kind: "quiz", date: "2026-11-05", time: "", source: "" },
+        ] };
+      },
+    } as never;
+    const r = createRepositories(undefined, undefined, true, undefined, server);
+    // A schedule table the rules couldn't pair up: names on one line, dates on another.
+    const text = "Homework 1 due September 28, 2026\nMidterm exam\nQuiz 3\nProject 2 due\nFinal exam\nOctober 14 November 13 December 1 December 10";
+    const file = new File([text], "syllabus.txt");
+    const job = await r.imports.process(await r.imports.start(file, "syllabus", "success", "cse442"), file);
+    expect([asked, job.reader]).toEqual([1, "ai"]);
+    // November 5 appears nowhere in the file, so the student is asked to check it.
+    expect(job.events.map((e) => [e.title, e.date, e.needsReview ?? false])).toEqual([
+      ["Midterm exam", "2026-10-14", false], ["Quiz 3", "2026-11-05", true], ["Homework 1", "2026-09-28", false],
+    ]);
+    expect(job.state).toBe("partial");
+  });
+  it("shows what the rules found, with the reason, when the AI reader can't help (card 45)", async () => {
+    const server = {
+      upload: async () => ({ id: "10" }),
+      extract: async () => { throw new Error("You can read 5 syllabi automatically each day. Try again tomorrow."); },
+    } as never;
+    const r = createRepositories(undefined, undefined, true, undefined, server);
+    const text = "Homework 1 due September 28, 2026\nQuizzes on October 2 and October 9\nLabs due 10/16, 10/23";
+    const file = new File([text], "syllabus.txt");
+    const job = await r.imports.process(await r.imports.start(file, "syllabus", "success", "cse442"), file);
+    expect(job.reader).toBe("rules-only");
+    expect(job.notice).toBe("You can read 5 syllabi automatically each day. Try again tomorrow. "
+      + "Check these events against your syllabus, and add any that are missing.");
+    // Lines with two dates come through for the student to choose, with the syllabus line beside them.
+    expect(job.events.map((e) => [e.title, e.date, e.needsReview ?? false])).toEqual([
+      ["Homework 1", "2026-09-28", false], ["Quizzes on and", "", true], ["Labs", "", true],
+    ]);
+  });
+  it("names what a renamed or damaged file really is, before uploading (card 45)", async () => {
+    let uploads = 0;
+    const server = { upload: async () => ({ id: String(++uploads) }) } as never;
+    const r = createRepositories(undefined, undefined, true, undefined, server);
+    const pdf = "%PDF-1.4\n1 0 obj <<>> endobj\ntrailer <<>>\n%%EOF\n";
+    for (const [name, content, message] of [
+      ["syllabus.docx", pdf, "This file is named .docx, but it is really a PDF. Rename it to end in .pdf, then choose it again."],
+      ["syllabus.pdf", pdf.slice(0, 20), "This PDF looks cut off. Download it again, then upload the new copy."],
+      ["syllabus.jpg", "\0\0\0\x18ftypheic", "This file is named .jpg, but it is really a HEIC photo. Notely can't read HEIC photos. Take a screenshot of it, or export it as a JPG."],
+      ["syllabus.pdf", "MZ\x90\0 program", "This doesn't look like a real PDF. Open it and save or export it again as a PDF, then upload that."],
+      ["syllabus.txt", "\xD0\xCF\x11\xE0\0\0", "This file is named .txt, but it is really an older Word file (.doc) or a locked document. Open it in Word or Google Docs, remove any password, and save it as .docx or PDF."],
+    ]) {
+      const file = new File([Uint8Array.from(content, (c) => c.charCodeAt(0))], name);
+      await expect(r.imports.start(file, "syllabus", "success", "cse442")).rejects.toThrow(message);
+    }
+    expect(uploads).toBe(0);
+    const good = new File([pdf], "syllabus.pdf");
+    expect((await r.imports.start(good, "syllabus", "success", "cse442")).id).toBe("1");
   });
   it("groups lecture folders and resolves exact lecture links", async () => {
     const r = createRepositories();
