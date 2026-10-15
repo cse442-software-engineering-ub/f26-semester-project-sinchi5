@@ -55,7 +55,7 @@ Accounts and signed-in users' notes (with their history, comments, and collabora
 
 **Imports**
 - Upload documents (PDF, DOCX, TXT, Markdown, images), scan photos, or upload a syllabus. Files are validated (type, empty file, 20 MB limit), then shown on a review screen before anything is saved.
-- Syllabus imports detect assignments and exams and add them to the calendar after review.
+- Syllabus imports detect assignments and exams and add them to the calendar after review. TXT, Markdown, PDF, and Word syllabi are read in the browser with free rules ([src/services/syllabus.ts](src/services/syllabus.ts), with PDF text from pdf.js), so most uploads never reach an API.
 - Extraction is simulated. A **Prototype preview options** control in the dialog exercises success, partial, and failure outcomes.
 
 **Settings**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractEvents, MAX_SYLLABUS_EVENTS, normalizeEvents, type ProposedEvent } from "./syllabus";
+import { checkDates, extractEvents, MAX_SYLLABUS_EVENTS, mergeEvents, normalizeEvents, rulesVerdict, type ProposedEvent } from "./syllabus";
 
 // The source line is checked separately so each expectation stays readable.
 const withoutSource = (events: ProposedEvent[]) => events.map(({ source: _source, ...event }) => event);
@@ -91,5 +91,50 @@ describe("normalizing proposed events (card 44)", () => {
     const many = Array.from({ length: MAX_SYLLABUS_EVENTS + 5 }, (_, i) => ({ title: `Quiz ${i}`, date: "2026-09-01" }));
     expect(normalizeEvents(many)).toHaveLength(MAX_SYLLABUS_EVENTS);
     expect(normalizeEvents([{ title: "x".repeat(300), date: "2026-09-01" }])[0].title).toHaveLength(255);
+  });
+});
+
+describe("rules first, AI only when needed (card 44)", () => {
+  const syllabus = [
+    "CSE 442 Software Engineering, Fall 2026. Read this whole syllabus before the first class meeting.",
+    "Homework 1 due September 28, 2026",
+    "Midterm exam October 14, 2026 at 10:00 AM",
+    "Final project due December 4, 2026",
+  ].join("\n");
+
+  it("keeps the rules' events when they read the syllabus cleanly", () => {
+    expect(rulesVerdict(syllabus, extractEvents(syllabus, 2026))).toBeNull();
+  });
+
+  it("asks for the AI reader when the rules find no text, no events, unsure dates, or undated items", () => {
+    expect(rulesVerdict("", [])).toBe("no-text");
+    const policies = "Attendance is expected at every lecture and lab section this semester. ".repeat(3);
+    expect(rulesVerdict(policies, extractEvents(policies, 2026))).toBe("no-events");
+    const relative = `${syllabus}\nQuiz 1 next Friday\nQuiz 2 next Friday\nProject proposal TBA`;
+    expect(rulesVerdict(relative, extractEvents(relative, 2026))).toBe("unsure");
+    // A table the rules couldn't pair up: names on one line, dates on another.
+    const split = `${syllabus}\nMidterm exam 2\nQuiz 3\nProject 2 due\nFinal exam\nOct 30 Nov 13 Dec 1 Dec 10`;
+    expect(rulesVerdict(split, extractEvents(split, 2026))).toBe("missed");
+  });
+
+  it("flags AI dates that the file never mentions, and keeps dates it does", () => {
+    const ai = [
+      { title: "Midterm exam", kind: "exam" as const, date: "2026-10-14", source: "" },
+      { title: "Quiz 9", kind: "quiz" as const, date: "2026-11-20", source: "" },
+      { title: "Lab 1", kind: "assignment" as const, date: "", source: "", needsReview: true as const },
+    ];
+    expect(checkDates(ai, `${syllabus}\nLab 1 week 3`).map((e) => [e.title, e.needsReview ?? false])).toEqual([
+      ["Midterm exam", false], ["Quiz 9", true], ["Lab 1", true],
+    ]);
+    expect(checkDates(ai.slice(0, 2), "10/14 midterm\n11-20")[1].needsReview).toBe(true);
+    expect(checkDates(ai.slice(0, 2), "")).toEqual(ai.slice(0, 2));
+  });
+
+  it("adds dated items the rules found on days the AI reader left empty", () => {
+    const rules = extractEvents(`${syllabus}\nOctober 1, 2026 Lecture: requirements`, 2026);
+    const ai = [{ title: "Midterm", kind: "exam" as const, date: "2026-10-14", source: "Midterm exam October 14" }];
+    expect(mergeEvents(ai, rules).map((e) => [e.title, e.date])).toEqual([
+      ["Midterm", "2026-10-14"], ["Homework 1", "2026-09-28"], ["Final project", "2026-12-04"],
+    ]);
   });
 });
