@@ -120,8 +120,8 @@ export const test = base.extend<{ accountApi: void }>({
       throw new ApiError(404, "This action was not found.");
     }
     // In-memory stand-in for the syllabus routes (cards 43 and 45), following the PHP rules.
-    // Its reader never calls the Claude API: PDFs "contain" SYLLABUS_PDF_EVENTS, and a file
-    // named limit.pdf hits the daily limit.
+    // Its reader never calls the Gemini API: every file it is asked about "contains"
+    // SYLLABUS_PDF_EVENTS, and a file named limit.<type> hits the daily limit.
     const jobs = new Map<string, { id: string; ownerId: string; courseId: string; name: string; type: string; state: string; events: unknown[] }>();
     function importRoute(action: string, query: URLSearchParams, body: Record<string, unknown>) {
       if (!user) throw new ApiError(401, "Sign in to continue.");
@@ -139,10 +139,9 @@ export const test = base.extend<{ accountApi: void }>({
       const job = jobs.get(String(query.get("id") ?? body.id));
       if (!job || job.ownerId !== user.id) throw new ApiError(404, "This upload could not be found.");
       if (action === "import-job") return { job };
-      if (["txt", "md"].includes(job.type)) throw new ApiError(422, "TXT and Markdown syllabi are read in your browser.");
-      if (job.name === "limit.pdf") {
+      if (job.name.startsWith("limit.")) {
         job.state = "failed";
-        throw new ApiError(429, "You can read 5 syllabi automatically each day. Try again tomorrow, or upload a TXT version.");
+        throw new ApiError(429, "You can read 5 syllabi automatically each day. Try again tomorrow.");
       }
       Object.assign(job, { state: "review", events: SYLLABUS_PDF_EVENTS });
       return { job };
