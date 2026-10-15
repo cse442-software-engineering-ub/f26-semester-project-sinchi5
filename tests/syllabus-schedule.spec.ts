@@ -1,5 +1,5 @@
 // Card 48: confirming imported events and finding them in the schedule, against the mocked API in
-// support/account-fixture.ts. No server is needed and the Claude API is never called.
+// support/account-fixture.ts. No server is needed and the Gemini API is never called.
 import { test, expect } from "./support/account-fixture";
 import { reviewSyllabus, signUpWithCourse } from "./support/syllabus";
 
@@ -11,6 +11,7 @@ test("Task tests 1 and 2: the confirmation links to imported events, labeled wit
   await dialog.getByRole("button", { name: "Add to schedule" }).click();
   await expect(dialog.getByRole("heading", { name: "A little more organized." })).toBeVisible();
   await expect(dialog.getByText("Your reviewed events are in your schedule.")).toBeVisible();
+  await expect(dialog.getByText("Added 3 events to CSE 442.")).toBeVisible();
   await dialog.getByRole("link", { name: "View schedule" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page).toHaveURL(/\/schedule\?date=2026-09-28$/);

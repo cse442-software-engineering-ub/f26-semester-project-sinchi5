@@ -554,6 +554,12 @@ export function ImportDialog({
               ? "Your reviewed events are in your schedule."
               : "Your note is waiting in your library."}
           </p>
+          {/* Card 48: exactly what was added and where, so the student knows what to look for. */}
+          {kind === "syllabus" && job && (() => {
+            const added = job.events.filter((e) => e.include !== false).length;
+            const course = state.courses.find((c) => c.id === job.metadata.courseId)?.code ?? "your course";
+            return <p>{`Added ${added} ${added === 1 ? "event" : "events"} to ${course}.`}</p>;
+          })()}
           {/* Card 48: open the schedule on the earliest added event, so it is in view. */}
           {kind === "syllabus" && (
             <Link
