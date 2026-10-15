@@ -237,7 +237,7 @@ Since card 43, POST `syllabus-upload` takes one syllabus (PDF, DOCX, TXT, Markdo
 
 Since card 47, POST `import-confirm` saves 1–200 reviewed events from the caller's own job to its course (or to `courseId`, when the student picked another course) and returns `{ "created": <count> }`. The job becomes `completed` and its file is dropped, so sending the same confirm again returns `{ "created": 0 }`. Every event needs a `title` (1–255 visible characters) and a real `date` (`YYYY-MM-DD`), otherwise 422 "Give every event a title and a date."; `kind` is one of `lecture`, `assignment`, `quiz`, `exam`, `deadline`, `other` (default), and `time` is empty or 24-hour `HH:MM`. GET `events` returns `{ "events": [{ "id", "courseId", "title", "kind", "date", "time", "location", "description", "source", "importJobId" }] }` ordered by date and time. Apply migration 006 before deploying this backend.
 
-POST `import-extract` proposes events for a job with the Gemini API ([backend/lib/syllabus-ai.php](backend/lib/syllabus-ai.php)) and returns the job in the `review` state with its `events`. The browser reads every syllabus with free rules first ([src/services/syllabus.ts](src/services/syllabus.ts)) and calls this route only when they find too little, such as for a scan or photo. To keep API use down:
+Since card 127, POST `import-extract` proposes events for a job with the Gemini API ([backend/lib/syllabus-ai.php](backend/lib/syllabus-ai.php)) and returns the job in the `review` state with its `events`. The browser reads every syllabus with free rules first ([src/services/syllabus.ts](src/services/syllabus.ts)) and calls this route only when they find too little, such as for a scan or photo. To keep API use down:
 - A file whose identical copy was read in the last 180 days reuses those events, with no API call. A class uploading the same syllabus reads it once.
 - The file is token-counted first (free), and anything over `ai_max_input_tokens` gets 422 before it is read.
 - Each student gets `ai_user_daily_limit` reads per UTC day and the whole app `ai_daily_limit`; after that, 429.
@@ -247,6 +247,8 @@ POST `import-extract` proposes events for a job with the Gemini API ([backend/li
 A syllabus can contain text written to trick the model (prompt injection), so the model is treated as untrusted too: it has no tools, its reply must match a fixed schema, and the server drops unknown fields, strips control and direction characters, shortens text, allows only known kinds, and clears any date that isn't a real day within a year of the course. The student then reviews every event, and saving goes through `import-confirm`'s checks and prepared statements. The API key is sent only in a request header, never to the browser or a log.
 
 Each read is logged with its token counts only. A failed read leaves the job `failed`, and it can be retried.
+
+Card 127's tests: `php backend/tests/syllabus-ai.php` (fake API, no database), `npm run test:import-extract` (fake API, against a DEV/TEST database with migrations 001–006; it cleans up after itself), and `NOTELY_TEST_ISOLATED=1 npm run test:import-extract-http` (local API, never calls Gemini). The aptitude steps use `backend/tests/data/cse442-syllabus-scan.png`, an image of the acceptance tests' syllabus.
 
 After adding a key, check it once with `NOTELY_AI_LIVE=1 NOTELY_GEMINI_API_KEY=<key> php backend/tests/gemini-smoke.php`. It sends a single small request (free on the free tier) and prints the events Gemini found; no other test or script calls the API.
 

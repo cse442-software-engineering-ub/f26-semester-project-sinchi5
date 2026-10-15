@@ -27,6 +27,7 @@
     "test:import-confirm": "php backend/tests/import-confirm.php",
     "test:import-confirm-http": "node backend/tests/import-confirm-http.mjs",
     "test:syllabus-ai": "php backend/tests/syllabus-ai.php",
+    "test:import-extract": "php backend/tests/import-extract.php",
     "test:import-extract-http": "node backend/tests/import-extract-http.mjs"
   },
   "dependencies": {
