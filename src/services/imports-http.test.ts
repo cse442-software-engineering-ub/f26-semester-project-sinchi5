@@ -50,3 +50,10 @@ it("asks the server to read a job for the course year and passes on its messages
   const offline = createHttpSyllabus("/api/index.php", (async () => { throw new TypeError("offline"); }) as unknown as typeof fetch);
   await expect(offline.extract("12", 2026)).rejects.toThrow("Could not reach Notely. Check your connection and try again.");
 });
+
+it("treats a non-JSON success reply as a failure instead of crashing", async () => {
+  // A server with display_errors on prints PHP's post_max_size warning before the JSON, with 200.
+  const warning = createHttpSyllabus("/api/index.php", (async () =>
+    new Response("<br />\n<b>Warning</b>: POST Content-Length exceeds the limit", { status: 200 })) as unknown as typeof fetch);
+  await expect(warning.extract("12", 2026)).rejects.toThrow("Uploads are unavailable right now. Please try again later.");
+});

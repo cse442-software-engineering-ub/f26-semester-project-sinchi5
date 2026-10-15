@@ -34,7 +34,8 @@ export function createApiClient(endpoint: string, fetcher: typeof fetch, offline
       csrf = "";
       return send(route, data, timeout, false);
     }
-    if (!response.ok) throw new NoteServiceError(body?.error || unavailable, response.status);
+    // A reply that isn't a JSON object (such as a PHP warning page sent with 200) is a failure too.
+    if (!response.ok || !body || typeof body !== "object") throw new NoteServiceError(body?.error || unavailable, response.status);
     return body as T;
   };
 }
