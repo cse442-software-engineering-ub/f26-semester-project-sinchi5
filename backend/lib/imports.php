@@ -6,9 +6,12 @@ if (PHP_SAPI !== 'cli' && !defined('NOTELY_INTERNAL')) {
 }
 
 // Card 43: a syllabus upload becomes an import job that only its owner can read.
+// Card 47: the student's reviewed events from a job are saved to their schedule.
 // Needs notes.php for recordId() and isoTime().
-const IMPORT_READ_ROUTES = ['import-job'];
-const IMPORT_ROUTES = [...IMPORT_READ_ROUTES, 'syllabus-upload'];
+const IMPORT_READ_ROUTES = ['import-job', 'events'];
+const IMPORT_ROUTES = [...IMPORT_READ_ROUTES, 'syllabus-upload', 'import-confirm'];
+const EVENT_KINDS = ['lecture', 'assignment', 'quiz', 'exam', 'deadline', 'other'];
+const MAX_IMPORTED_EVENTS = 200;
 const SYLLABUS_MAX_BYTES = 20 * 1024 * 1024;
 // A 20 MB file is 27962028 characters of base64, plus room for the JSON fields around it.
 const SYLLABUS_MAX_BASE64 = 27962028;
@@ -91,18 +94,100 @@ function ownedImport(PDO $db, array $user, string $id, bool $lock = false): arra
     return importJson($row);
 }
 
+// Courses live in the browser, so the server only checks the ID's shape; events are always the caller's own.
+function courseId(mixed $value, string $message): string
+{
+    if (!is_string($value) || !preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $value)) {
+        throw new HttpError(422, $message);
+    }
+    return $value;
+}
+
+// Returns [title, kind, date, time or null] for each reviewed event, or throws the message to show.
+function reviewedEvents(mixed $events): array
+{
+    if (!is_array($events) || !array_is_list($events) || count($events) < 1 || count($events) > MAX_IMPORTED_EVENTS) {
+        throw new HttpError(422, 'Choose 1 to 200 events to add.');
+    }
+    return array_map(static function (mixed $event): array {
+        $event = $event instanceof stdClass ? (array) $event : (is_array($event) ? $event : []);
+        $title = is_string($event['title'] ?? null) && preg_match('//u', $event['title']) ? trimEdges($event['title']) : '';
+        $date = is_string($event['date'] ?? null) ? $event['date'] : '';
+        if ($title === '' || $date === '') {
+            throw new HttpError(422, 'Give every event a title and a date.');
+        }
+        if (characterCount($title) > 255 || preg_match(INVISIBLE_PATTERN, $title)) {
+            throw new HttpError(422, 'Keep each event title to 255 visible characters.');
+        }
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/D', $date, $parts) || (int) $parts[1] < 2000 || (int) $parts[1] > 2100
+            || !checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1])) {
+            throw new HttpError(422, 'Choose a real date for every event.');
+        }
+        $kind = $event['kind'] ?? 'other';
+        if (!in_array($kind, EVENT_KINDS, true)) {
+            throw new HttpError(422, 'Choose a valid event type.');
+        }
+        $time = $event['time'] ?? '';
+        if (!is_string($time) || ($time !== '' && !preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/D', $time))) {
+            throw new HttpError(422, 'Use a 24-hour time like 10:00.');
+        }
+        return [$title, $kind, $date, $time === '' ? null : $time . ':00'];
+    }, $events);
+}
+
+function eventJson(array $row): array
+{
+    return [
+        'id' => (string) $row['id'],
+        'courseId' => $row['course_id'],
+        'title' => $row['title'],
+        'kind' => $row['kind'],
+        'date' => $row['event_date'],
+        'time' => $row['event_time'] === null ? '' : substr($row['event_time'], 0, 5),
+        'location' => '',
+        'description' => '',
+        'source' => $row['source'],
+        'importJobId' => $row['import_job_id'] === null ? null : (string) $row['import_job_id'],
+    ];
+}
+
 function importAction(PDO $db, array $config, array $session, string $route, array $input): array
 {
+    if ($route === 'import-confirm') {
+        $events = reviewedEvents($input['events'] ?? null);
+        // Locking the account and the job makes a repeated or concurrent confirm add nothing twice.
+        $db->beginTransaction();
+        $user = requireUser($db, $session, true);
+        $job = ownedImport($db, $user, recordId($input['id'] ?? null, 'Choose a valid upload.'), true);
+        $course = courseId($input['courseId'] ?? $job['courseId'], 'Choose a course for this syllabus.');
+        $created = 0;
+        if ($job['state'] !== 'completed') {
+            foreach ($events as $event) {
+                query($db, "INSERT INTO notely_events (owner_user_id, course_id, title, kind, event_date, event_time, source, import_job_id)
+                    VALUES (?, ?, ?, ?, ?, ?, 'imported', ?)", [$user['id'], $course, ...$event, $job['id']]);
+            }
+            $created = count($events);
+            // The file is no longer needed once its events are in the schedule.
+            query($db, "UPDATE notely_import_jobs SET state = 'completed', content = NULL WHERE id = ?", [$job['id']]);
+        }
+        $db->commit();
+        return ['created' => $created];
+    }
     $user = requireUser($db, $session);
     if ($route === 'import-job') {
         return ['job' => ownedImport($db, $user, recordId($_GET['id'] ?? null, 'Choose a valid upload.'))];
     }
+    if ($route === 'events') {
+        $course = $_GET['courseId'] ?? '';
+        $filter = $course === '' ? '' : ' AND course_id = ?';
+        $values = $course === '' ? [$user['id']] : [$user['id'], courseId($course, 'Choose a valid course.')];
+        $rows = query($db, 'SELECT id, course_id, title, kind, event_date, event_time, source, import_job_id FROM notely_events
+            WHERE owner_user_id = ?' . $filter . ' ORDER BY event_date, event_time, id', $values)->fetchAll();
+        return ['events' => array_map('eventJson', $rows)];
+    }
     // Each upload can store up to 20 MB, so one account can't fill the shared database.
     rateLimit($db, $config, 'syllabus-upload', (string) $user['id'], 20);
-    $course = $input['courseId'] ?? null;
-    if (!is_string($course) || !preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $course)) {
-        throw new HttpError(422, 'Choose a course for this syllabus.');
-    }
+    $course = courseId($input['courseId'] ?? null, 'Choose a course for this syllabus.');
     [$name, $type, $bytes] = syllabusFile($input);
     $insert = $db->prepare('INSERT INTO notely_import_jobs
         (owner_user_id, course_id, file_name, file_type, file_size, file_sha256, content) VALUES (?, ?, ?, ?, ?, ?, ?)');

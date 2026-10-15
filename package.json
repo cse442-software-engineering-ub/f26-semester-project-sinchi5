@@ -23,7 +23,9 @@
     "test:note-categories": "node backend/tests/note-categories-http.mjs",
     "test:schema": "php backend/tests/schema.php",
     "test:syllabus-upload": "php backend/tests/syllabus-upload.php",
-    "test:syllabus-upload-http": "node backend/tests/syllabus-upload-http.mjs"
+    "test:syllabus-upload-http": "node backend/tests/syllabus-upload-http.mjs",
+    "test:import-confirm": "php backend/tests/import-confirm.php",
+    "test:import-confirm-http": "node backend/tests/import-confirm-http.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.0.0",
