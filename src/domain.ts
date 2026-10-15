@@ -91,6 +91,10 @@ export interface UploadJob {
     "queued" | "processing" | "review" | "completed" | "partial" | "failed";
   metadata: DetectedMetadata;
   events: DetectedEvent[];
+  // How a syllabus was read (card 45): by the free rules, by the AI reader after the rules found too
+  // little, by the rules alone because the AI reader couldn't help (notice says why), or a demo sample.
+  reader?: "rules" | "ai" | "rules-only" | "sample";
+  notice?: string;
 }
 export interface NoteQuery {
   q?: string;
@@ -153,7 +157,8 @@ export interface ImportRepository {
   // Registers the file as a queued job; a signed-in student's syllabus goes to the server (card 43).
   start(file: File, kind: UploadKind, scenario?: string, courseId?: string): Promise<UploadJob>;
   // Reads a queued job's file and proposes note details or schedule events (cards 44 and 45).
-  process(job: UploadJob, file: File, scenario?: string): Promise<UploadJob>;
+  // onAutomaticReading is called when the AI reader is asked, which can take up to a minute.
+  process(job: UploadJob, file: File, scenario?: string, onAutomaticReading?: () => void): Promise<UploadJob>;
   confirm(job: UploadJob): Promise<void>;
 }
 export interface Repositories {
