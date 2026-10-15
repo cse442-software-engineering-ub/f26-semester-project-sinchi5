@@ -158,6 +158,27 @@ describe("repository contracts", () => {
     expect((await r.imports.process(job, pdf, "failure")).state).toBe("failed");
     expect(calls).toHaveLength(1);
   });
+  it("saves a signed-in student's included events on the server and lists them (card 48)", async () => {
+    const confirmed: unknown[] = [];
+    const midterm = { id: "41", courseId: "cse442", title: "Midterm exam", kind: "exam" as const, date: "2026-10-14",
+      time: "10:00", location: "", description: "", source: "imported" as const };
+    const server = {
+      upload: async () => ({ id: "9" }),
+      extract: async () => ({ events: [] }),
+      confirm: async (...args: unknown[]) => { confirmed.push(args); return 1; },
+      events: async () => [midterm],
+    } as never;
+    const r = createRepositories(undefined, undefined, false, undefined, server);
+    const file = new File(["Homework 1 due Sep 28, 2026\nFinal project due Dec 4, 2026"], "cse442-syllabus.txt");
+    const job = await r.imports.process(await r.imports.start(file, "syllabus", "success", "cse442"), file);
+    job.events[1].include = false;
+    await r.imports.confirm(job);
+    expect(confirmed).toEqual([["9", "cse442", [{ title: "Homework 1", kind: "assignment", date: "2026-09-28", time: "" }]]]);
+    expect(await r.schedule.list("2026-10-01", "2026-10-31")).toEqual([midterm]);
+    // A local edit of an imported event replaces the server copy instead of showing both.
+    await r.schedule.save({ ...midterm, title: "Midterm exam (room 101)" });
+    expect((await r.schedule.list()).map((e) => e.title)).toEqual(["Midterm exam (room 101)"]);
+  });
   it("groups lecture folders and resolves exact lecture links", async () => {
     const r = createRepositories();
     const event = {

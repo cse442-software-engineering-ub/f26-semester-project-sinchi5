@@ -282,7 +282,12 @@ export function createRepositories(
     },
     schedule: {
       async list(from, to) {
-        return db.events
+        // A signed-in student's imported events are on the server (card 48). Editing one saves a
+        // copy with the same ID in this browser, which then takes the server copy's place.
+        // ponytail: edits to imported events stay in this browser; add an event update route if
+        // they must follow the student to other devices.
+        const imported = serverSyllabus ? await serverSyllabus.events() : [];
+        return [...db.events, ...imported.filter((e) => !db.events.some((local) => local.id === e.id))]
           .filter((e) => (!from || e.date >= from) && (!to || e.date <= to))
           .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
       },
@@ -350,8 +355,14 @@ export function createRepositories(
           throw new Error("This upload is not ready to save.");
         if (job.kind === "syllabus") {
           // Events the student left out are skipped, and review-only fields aren't saved (card 46).
-          for (const { include, needsReview: _needsReview, ...event } of job.events)
-            if (include !== false) await repo.schedule.save({ ...event, courseId: job.metadata.courseId });
+          const included = job.events.filter((e) => e.include !== false);
+          const { courseId } = job.metadata;
+          // A signed-in student's events are saved on the server with the job (cards 47 and 48).
+          if (serverSyllabus)
+            await serverSyllabus.confirm(job.id, courseId, included.map(({ title, kind, date, time }) => ({ title, kind, date, time })));
+          else
+            for (const { include: _include, needsReview: _needsReview, ...event } of included)
+              await repo.schedule.save({ ...event, courseId });
         } else
           await repo.notes.create({
             ...job.metadata,

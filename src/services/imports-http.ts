@@ -1,3 +1,4 @@
+import type { CourseEvent } from "../domain";
 import { createApiClient } from "./notes-http";
 
 // A syllabus import job as the PHP API returns it (card 43).
@@ -26,6 +27,14 @@ export function createHttpSyllabus(endpoint = `${import.meta.env.BASE_URL}api/in
     // Reads a PDF, DOCX, or image job on the server, which can take a couple of minutes.
     async extract(id: string, year: number) {
       return (await send<{ job: SyllabusJob }>("import-extract", { id, year }, 180000)).job;
+    },
+    // Saves the reviewed events to the course (card 47). Sending it again adds nothing.
+    async confirm(id: string, courseId: string, events: Pick<CourseEvent, "title" | "kind" | "date" | "time">[]) {
+      return (await send<{ created: number }>("import-confirm", { id, courseId, events })).created;
+    },
+    // The student's imported events, for the schedule (card 48).
+    async events() {
+      return (await send<{ events: CourseEvent[] }>("events")).events;
     },
   };
 }

@@ -7,7 +7,7 @@ type Note = {
   visibility: string; tags: string[]; pinned: boolean; createdAt: string; updatedAt: string;
 };
 class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
-const IMPORT_ROUTES = ["syllabus-upload", "import-job", "import-extract"];
+const IMPORT_ROUTES = ["syllabus-upload", "import-job", "import-extract", "import-confirm", "events"];
 // What the fake server reader "finds" in any uploaded PDF.
 export const SYLLABUS_PDF_EVENTS = [
   { title: "Reading response 1", kind: "assignment", date: "2026-09-21", time: "23:59", source: "Reading response 1 due Sept. 21" },
@@ -123,6 +123,7 @@ export const test = base.extend<{ accountApi: void }>({
     // Its reader never calls the Claude API: PDFs "contain" SYLLABUS_PDF_EVENTS, and a file
     // named limit.pdf hits the daily limit.
     const jobs = new Map<string, { id: string; ownerId: string; courseId: string; name: string; type: string; state: string; events: unknown[] }>();
+    let savedEvents: Record<string, string>[] = [];
     function importRoute(action: string, query: URLSearchParams, body: Record<string, unknown>) {
       if (!user) throw new ApiError(401, "Sign in to continue.");
       if (action === "syllabus-upload") {
@@ -136,9 +137,26 @@ export const test = base.extend<{ accountApi: void }>({
         jobs.set(job.id, job);
         return { job };
       }
+      if (action === "events") {
+        return { events: savedEvents.filter((e) => e.ownerId === user!.id).map(({ ownerId: _owner, ...e }) => e) };
+      }
       const job = jobs.get(String(query.get("id") ?? body.id));
       if (!job || job.ownerId !== user.id) throw new ApiError(404, "This upload could not be found.");
       if (action === "import-job") return { job };
+      if (action === "import-confirm") {
+        const reviewed = (Array.isArray(body.events) ? body.events : []) as Record<string, string>[];
+        if (!reviewed.length || reviewed.length > 200) throw new ApiError(422, "Choose 1 to 200 events to add.");
+        if (reviewed.some((e) => !String(e.title ?? "").trim() || !e.date)) throw new ApiError(422, "Give every event a title and a date.");
+        // Like the PHP route, a completed job adds nothing the second time.
+        if (job.state === "completed") return { created: 0 };
+        for (const e of reviewed) {
+          savedEvents.push({ id: String(nextId++), ownerId: user.id, courseId: String(body.courseId ?? job.courseId),
+            title: e.title.trim(), kind: e.kind ?? "other", date: e.date, time: e.time ?? "", location: "", description: "",
+            source: "imported", importJobId: job.id });
+        }
+        job.state = "completed";
+        return { created: reviewed.length };
+      }
       if (["txt", "md"].includes(job.type)) throw new ApiError(422, "TXT and Markdown syllabi are read in your browser.");
       if (job.name === "limit.pdf") {
         job.state = "failed";
@@ -187,6 +205,7 @@ export const test = base.extend<{ accountApi: void }>({
         else if (action === "password") user.password = body.password;
         else if (action === "delete") {
           for (const note of [...notes.values()]) if (note.ownerId === user.id) removeNote(note.id);
+          savedEvents = savedEvents.filter((e) => e.ownerId !== user!.id);
           for (const list of editors.values()) list.delete(user.id);
           accounts.delete(user.email); user = null;
         } else { user.code = "BEEF-5678-BEEF-5678-BEEF-5678-BEEF-5678"; recoveryCode = user.code; }

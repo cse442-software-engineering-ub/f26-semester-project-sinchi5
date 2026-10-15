@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   UploadCloud,
   Camera,
@@ -6,6 +7,7 @@ import {
   Check,
   AlertCircle,
   LoaderCircle,
+  ArrowUpRight,
 } from "lucide-react";
 import { useApp } from "../app/context";
 import { Modal } from "../shared/ui";
@@ -386,6 +388,16 @@ export function ImportDialog({
               ? "Your reviewed events are in your schedule."
               : "Your note is waiting in your library."}
           </p>
+          {/* Card 48: open the schedule on the earliest added event, so it is in view. */}
+          {kind === "syllabus" && (
+            <Link
+              className={s.textLink}
+              to={`/schedule?date=${job?.events.filter((e) => e.include !== false).map((e) => e.date).sort()[0] ?? ""}`}
+              onClick={onClose}
+            >
+              View schedule <ArrowUpRight size={16} />
+            </Link>
+          )}
           <button className={s.primary} onClick={onClose}>
             All done
           </button>
