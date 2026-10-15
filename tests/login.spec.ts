@@ -16,6 +16,11 @@ async function mockLogin(page: Page, options: { fail?: boolean; completed?: bool
       await route.fulfill({ json: { notes: [] } });
       return;
     }
+    // ...and their imported schedule events (card 48).
+    if (action === "events") {
+      await route.fulfill({ json: { events: [] } });
+      return;
+    }
     if (action === "login") {
       expect(route.request().method()).toBe("POST");
       credentials.push(route.request().postDataJSON());

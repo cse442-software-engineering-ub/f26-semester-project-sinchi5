@@ -1,6 +1,7 @@
 import type { AuthRepository, Course, NoteRepository, Repositories, User } from "../domain";
 import { createAuthRepository } from "./auth";
 import { createHttpNotes } from "./notes-http";
+import { createHttpSyllabus, type SyllabusApi } from "./imports-http";
 import { createRepositories } from "./repositories";
 
 export function createAppRepositories(
@@ -9,6 +10,8 @@ export function createAppRepositories(
   serverAuth = createAuthRepository(),
   // Signed-in accounts keep notes on the server (task #120); tests pass a stand-in.
   serverNotes: (user: User, courses: () => Promise<Course[]>) => NoteRepository = (_user, courses) => createHttpNotes(courses),
+  // Signed-in accounts upload syllabi to the server (card 45); tests pass a stand-in.
+  serverSyllabus: () => SyllabusApi = () => createHttpSyllabus(),
 ): Repositories {
   let demo = tabStorage.getItem("notely-demo") === "true";
   let user: User | null = null;
@@ -34,7 +37,7 @@ export function createAppRepositories(
       },
     } : undefined;
     const notes = nextUser && !demo ? serverNotes(nextUser, () => next.courses.list()) : undefined;
-    const next = createRepositories(adapter, nextUser, demo, notes);
+    const next = createRepositories(adapter, nextUser, demo, notes, nextUser && !demo ? serverSyllabus() : undefined);
     workspace = next;
   }
   const demoUser: User = { id: "student", name: "Erin", email: "demo@example.edu" };

@@ -7,6 +7,12 @@ type Note = {
   visibility: string; tags: string[]; pinned: boolean; createdAt: string; updatedAt: string;
 };
 class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
+const IMPORT_ROUTES = ["syllabus-upload", "import-job", "import-extract", "import-confirm", "events"];
+// What the fake server reader "finds" in any uploaded PDF.
+export const SYLLABUS_PDF_EVENTS = [
+  { title: "Reading response 1", kind: "assignment", date: "2026-09-21", time: "23:59", source: "Reading response 1 due Sept. 21" },
+  { title: "Lab practical", kind: "exam", date: "", time: "", source: "Lab practical: date TBA" },
+];
 
 export const test = base.extend<{ accountApi: void }>({
   accountApi: [async ({ context }, use) => {
@@ -113,6 +119,51 @@ export const test = base.extend<{ accountApi: void }>({
       }
       throw new ApiError(404, "This action was not found.");
     }
+    // In-memory stand-in for the syllabus routes (cards 43 and 45), following the PHP rules.
+    // Its reader never calls the Gemini API: every file it is asked about "contains"
+    // SYLLABUS_PDF_EVENTS, and a file named limit.<type> hits the daily limit.
+    const jobs = new Map<string, { id: string; ownerId: string; courseId: string; name: string; type: string; state: string; events: unknown[] }>();
+    let savedEvents: Record<string, string>[] = [];
+    function importRoute(action: string, query: URLSearchParams, body: Record<string, unknown>) {
+      if (!user) throw new ApiError(401, "Sign in to continue.");
+      if (action === "syllabus-upload") {
+        const name = String(body.fileName ?? "");
+        const type = name.split(".").pop()!.toLowerCase().replace("jpeg", "jpg");
+        if (!["pdf", "docx", "txt", "md", "jpg", "png", "webp"].includes(type)) {
+          throw new ApiError(422, "Choose a PDF, DOCX, TXT, Markdown, or supported image file.");
+        }
+        if (!body.content) throw new ApiError(422, "This file is empty. Please choose another.");
+        const job = { id: String(nextId++), ownerId: user.id, courseId: String(body.courseId), name, type, state: "queued", events: [] };
+        jobs.set(job.id, job);
+        return { job };
+      }
+      if (action === "events") {
+        return { events: savedEvents.filter((e) => e.ownerId === user!.id).map(({ ownerId: _owner, ...e }) => e) };
+      }
+      const job = jobs.get(String(query.get("id") ?? body.id));
+      if (!job || job.ownerId !== user.id) throw new ApiError(404, "This upload could not be found.");
+      if (action === "import-job") return { job };
+      if (action === "import-confirm") {
+        const reviewed = (Array.isArray(body.events) ? body.events : []) as Record<string, string>[];
+        if (!reviewed.length || reviewed.length > 200) throw new ApiError(422, "Choose 1 to 200 events to add.");
+        if (reviewed.some((e) => !String(e.title ?? "").trim() || !e.date)) throw new ApiError(422, "Give every event a title and a date.");
+        // Like the PHP route, a completed job adds nothing the second time.
+        if (job.state === "completed") return { created: 0 };
+        for (const e of reviewed) {
+          savedEvents.push({ id: String(nextId++), ownerId: user.id, courseId: String(body.courseId ?? job.courseId),
+            title: e.title.trim(), kind: e.kind ?? "other", date: e.date, time: e.time ?? "", location: "", description: "",
+            source: "imported", importJobId: job.id });
+        }
+        job.state = "completed";
+        return { created: reviewed.length };
+      }
+      if (job.name.startsWith("limit.")) {
+        job.state = "failed";
+        throw new ApiError(429, "You can read 5 syllabi automatically each day. Try again tomorrow.");
+      }
+      Object.assign(job, { state: "review", events: SYLLABUS_PDF_EVENTS });
+      return { job };
+    }
     await context.route("**/api/index.php?route=*", async route => {
       const query = new URL(route.request().url()).searchParams;
       const action = query.get("route")!;
@@ -120,6 +171,14 @@ export const test = base.extend<{ accountApi: void }>({
       if (action.startsWith("note")) {
         try {
           await route.fulfill({ status: action === "note-create" ? 201 : 200, json: noteRoute(action, query, body) });
+        } catch (e) {
+          await route.fulfill({ status: (e as ApiError).status ?? 500, json: { error: (e as Error).message } });
+        }
+        return;
+      }
+      if (IMPORT_ROUTES.includes(action)) {
+        try {
+          await route.fulfill({ status: action === "syllabus-upload" ? 201 : 200, json: importRoute(action, query, body) });
         } catch (e) {
           await route.fulfill({ status: (e as ApiError).status ?? 500, json: { error: (e as Error).message } });
         }
@@ -145,6 +204,7 @@ export const test = base.extend<{ accountApi: void }>({
         else if (action === "password") user.password = body.password;
         else if (action === "delete") {
           for (const note of [...notes.values()]) if (note.ownerId === user.id) removeNote(note.id);
+          savedEvents = savedEvents.filter((e) => e.ownerId !== user!.id);
           for (const list of editors.values()) list.delete(user.id);
           accounts.delete(user.email); user = null;
         } else { user.code = "BEEF-5678-BEEF-5678-BEEF-5678-BEEF-5678"; recoveryCode = user.code; }
