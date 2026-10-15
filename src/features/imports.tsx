@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   UploadCloud,
   Camera,
@@ -11,6 +11,7 @@ import { useApp } from "../app/context";
 import { Modal } from "../shared/ui";
 import type { UploadKind, UploadJob } from "../domain";
 import s from "../app/App.module.css";
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export function ImportDialog({
   kind,
   onClose,
@@ -25,43 +26,54 @@ export function ImportDialog({
   const [error, setError] = useState("");
   const [scenario, setScenario] = useState("success");
   const [busy, setBusy] = useState(false);
+  const [courseId, setCourseId] = useState(state.courses[0]?.id || "");
+  // A slow upload must not update the window after it closes. Setting it on every mount matters:
+  // React's development mode mounts, unmounts, and mounts again.
+  const open = useRef(true);
   useEffect(() => {
-    if (phase !== "queued") return;
-    const a = setTimeout(() => setPhase("processing"), 250);
-    return () => clearTimeout(a);
-  }, [phase]);
-  useEffect(() => {
-    if (phase !== "processing" || !file) return;
-    let active = true;
-    const timer = setTimeout(() => {
-      repo.imports
-        .start(file, kind, scenario)
-        .then((j) => {
-          if (active) {
-            setJob(j);
-            setPhase(j.state === "failed" ? "failed" : "review");
-          }
-        })
-        .catch((e) => {
-          if (active) {
-            setError(e.message);
-            setPhase("pick");
-          }
-        });
-    }, 900);
+    open.current = true;
     return () => {
-      active = false;
-      clearTimeout(timer);
+      open.current = false;
     };
-  }, [phase, file, kind, scenario, repo]);
+  }, []);
+  // Card 45: queued while the file is registered, processing while it is read, then review or failed.
+  async function run(result = scenario) {
+    if (!file) return;
+    setError("");
+    setPhase("queued");
+    let queued: UploadJob;
+    try {
+      // The short waits keep each step on screen long enough to read.
+      [queued] = await Promise.all([repo.imports.start(file, kind, result, courseId), wait(250)]);
+    } catch (e) {
+      if (open.current) {
+        setError((e as Error).message);
+        setPhase("pick");
+      }
+      return;
+    }
+    if (!open.current) return;
+    setPhase("processing");
+    try {
+      const [done] = await Promise.all([repo.imports.process(queued, file, result), wait(900)]);
+      if (!open.current) return;
+      setJob(done);
+      setPhase(done.state === "failed" ? "failed" : "review");
+    } catch (e) {
+      // The file was uploaded but couldn't be read (a daily limit, for example), so offer another try.
+      if (open.current) {
+        setError((e as Error).message);
+        setPhase("failed");
+      }
+    }
+  }
   function pick(f?: File) {
     if (!f) return;
     const invalid = repo.imports.validate(f, kind);
     setError(invalid || "");
-    if (!invalid) {
-      setFile(f);
-      setJob(undefined);
-    }
+    // An invalid choice replaces the earlier file, so Continue can't send the wrong one.
+    setFile(invalid ? undefined : f);
+    setJob(undefined);
   }
   async function confirm() {
     if (!job) return;
@@ -99,6 +111,23 @@ export function ImportDialog({
       )}
       {phase === "pick" && (
         <>
+          {kind === "syllabus" &&
+            (state.courses.length ? (
+              <div className={s.form}>
+                <label>
+                  Course
+                  <select value={courseId} onChange={(e) => setCourseId(e.target.value)}>
+                    {state.courses.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.code}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : (
+              <p className={s.notice}>Add a course in Settings before uploading its syllabus.</p>
+            ))}
           <label
             className={s.dropzone}
             onDragOver={(e) => e.preventDefault()}
@@ -136,7 +165,8 @@ export function ImportDialog({
           <details className={s.demoDetails}>
             <summary>Prototype preview options</summary>
             <p>
-              Extraction uses sample results. Your file stays on this device.
+              Preview how Notely handles results that need review, or a file
+              it can’t read.
             </p>
             <label>
               Processing result
@@ -152,8 +182,8 @@ export function ImportDialog({
           </details>
           <button
             className={s.primary}
-            disabled={!file}
-            onClick={() => setPhase("queued")}
+            disabled={!file || (kind === "syllabus" && !courseId)}
+            onClick={() => void run()}
           >
             Continue <FileText size={16} />
           </button>
@@ -179,7 +209,7 @@ export function ImportDialog({
             className={s.primary}
             onClick={() => {
               setScenario("success");
-              setPhase("queued");
+              void run("success");
             }}
           >
             Try again

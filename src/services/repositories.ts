@@ -10,7 +10,10 @@ import type {
   NoteQuery,
   Collaborator,
   NoteRepository,
+  DetectedEvent,
 } from "../domain";
+import type { SyllabusApi } from "./imports-http";
+import { extractEvents, normalizeEvents } from "./syllabus";
 import { createMockCollaborators } from "./collaborators.mock";
 import { createMockComments } from "./comments.mock";
 import {
@@ -90,6 +93,8 @@ export function createRepositories(
   sample = true,
   // Signed-in accounts keep notes on the server; courses and events stay here.
   serverNotes?: NoteRepository,
+  // Signed-in accounts upload syllabi to the server (cards 43 and 45).
+  serverSyllabus?: SyllabusApi,
 ): Repositories {
   let db = initial(sample);
   try {
@@ -305,54 +310,40 @@ export function createRepositories(
         if (!file.size) return "This file is empty. Please choose another.";
         return null;
       },
-      async start(file, kind, scenario = "success") {
+      async start(file, kind, _scenario, courseId = db.courses[0]?.id || "") {
         const error = repo.imports.validate(file, kind);
         if (error) throw new Error(error);
-        return {
-          id: id(),
-          kind,
-          name: file.name,
-          state:
-            scenario === "failure"
-              ? "failed"
-              : scenario === "partial"
-                ? "partial"
-                : "review",
-          metadata: {
-            title: file.name.replace(/\.[^.]+$/, ""),
-            courseId: db.courses[0]?.id || "",
-            lectureDate: dateKey(),
-            category: "School",
-          },
-          events:
-            kind === "syllabus"
-              ? [
-                  {
-                    id: "",
-                    courseId: db.courses[0]?.id || "",
-                    title: "Assignment 1",
-                    date: offsetDate(7),
-                    time: "23:59",
-                    kind: "assignment",
-                    location: "",
-                    description:
-                      "Detected from syllabus. Review before saving.",
-                    source: "imported",
-                  },
-                  {
-                    id: "",
-                    courseId: db.courses[0]?.id || "",
-                    title: "Midterm exam",
-                    date: offsetDate(21),
-                    time: "10:00",
-                    kind: "exam",
-                    location: "",
-                    description: "Detected from syllabus.",
-                    source: "imported",
-                  },
-                ]
-              : [],
-        };
+        const job = { kind, name: file.name, state: "queued" as const, events: [], metadata: {
+          title: file.name.replace(/\.[^.]+$/, ""), courseId, lectureDate: dateKey(), category: "School",
+        } };
+        if (kind === "syllabus" && serverSyllabus) return { ...job, id: (await serverSyllabus.upload(file, courseId)).id };
+        return { ...job, id: id() };
+      },
+      async process(job, file, scenario = "success") {
+        // "Processing failed" in the prototype preview options shows the failure screen on purpose.
+        if (scenario === "failure") return { ...job, state: "failed" };
+        let events: DetectedEvent[] = [];
+        if (job.kind === "syllabus") {
+          const { courseId } = job.metadata;
+          const term = db.courses.find((c) => c.id === courseId)?.term ?? "";
+          const year = Number(/\b(20\d\d)\b/.exec(term)?.[1]) || new Date().getFullYear();
+          // TXT and Markdown are read here for free; the server reads other files for signed-in students.
+          const proposed = /\.(txt|md)$/i.test(file.name)
+            ? extractEvents(await file.text(), year)
+            : serverSyllabus
+              ? normalizeEvents((await serverSyllabus.extract(job.id, year)).events)
+              : // The demo has no server, so other files show sample results.
+                normalizeEvents([
+                  { title: "Assignment 1", kind: "assignment", date: offsetDate(7), time: "23:59", source: "Detected from syllabus. Review before saving." },
+                  { title: "Midterm exam", kind: "exam", date: offsetDate(21), time: "10:00", source: "Detected from syllabus." },
+                ]);
+          events = proposed.map(({ source, time, needsReview, ...event }) => ({
+            ...event, id: "", courseId, time: time ?? "", location: "", description: source, source: "imported",
+            ...(needsReview ? { needsReview } : {}),
+          }));
+        }
+        const partial = scenario === "partial" || events.some((e) => e.needsReview);
+        return { ...job, state: partial ? "partial" : "review", events };
       },
       async confirm(job) {
         if (job.state !== "review" && job.state !== "partial")
