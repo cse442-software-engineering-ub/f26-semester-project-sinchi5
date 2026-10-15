@@ -52,9 +52,9 @@ export async function openUpload(page: Page) {
 }
 
 // Uploads a text syllabus and waits for the review screen.
-export async function reviewSyllabus(page: Page, text = SYLLABUS) {
+export async function reviewSyllabus(page: Page, text = SYLLABUS, name = "cse442-syllabus.txt") {
   const dialog = await openUpload(page);
-  await dialog.getByLabel("Choose upload file").setInputFiles(textFile("cse442-syllabus.txt", text));
+  await dialog.getByLabel("Choose upload file").setInputFiles(textFile(name, text));
   await dialog.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(dialog.getByRole("button", { name: "Add to schedule" })).toBeVisible();
   return dialog;
