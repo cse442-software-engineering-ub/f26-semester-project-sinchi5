@@ -7,6 +7,12 @@ type Note = {
   visibility: string; tags: string[]; pinned: boolean; createdAt: string; updatedAt: string;
 };
 class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
+const IMPORT_ROUTES = ["syllabus-upload", "import-job", "import-extract"];
+// What the fake server reader "finds" in any uploaded PDF.
+export const SYLLABUS_PDF_EVENTS = [
+  { title: "Reading response 1", kind: "assignment", date: "2026-09-21", time: "23:59", source: "Reading response 1 due Sept. 21" },
+  { title: "Lab practical", kind: "exam", date: "", time: "", source: "Lab practical: date TBA" },
+];
 
 export const test = base.extend<{ accountApi: void }>({
   accountApi: [async ({ context }, use) => {
@@ -113,6 +119,34 @@ export const test = base.extend<{ accountApi: void }>({
       }
       throw new ApiError(404, "This action was not found.");
     }
+    // In-memory stand-in for the syllabus routes (cards 43 and 45), following the PHP rules.
+    // Its reader never calls the Claude API: PDFs "contain" SYLLABUS_PDF_EVENTS, and a file
+    // named limit.pdf hits the daily limit.
+    const jobs = new Map<string, { id: string; ownerId: string; courseId: string; name: string; type: string; state: string; events: unknown[] }>();
+    function importRoute(action: string, query: URLSearchParams, body: Record<string, unknown>) {
+      if (!user) throw new ApiError(401, "Sign in to continue.");
+      if (action === "syllabus-upload") {
+        const name = String(body.fileName ?? "");
+        const type = name.split(".").pop()!.toLowerCase().replace("jpeg", "jpg");
+        if (!["pdf", "docx", "txt", "md", "jpg", "png", "webp"].includes(type)) {
+          throw new ApiError(422, "Choose a PDF, DOCX, TXT, Markdown, or supported image file.");
+        }
+        if (!body.content) throw new ApiError(422, "This file is empty. Please choose another.");
+        const job = { id: String(nextId++), ownerId: user.id, courseId: String(body.courseId), name, type, state: "queued", events: [] };
+        jobs.set(job.id, job);
+        return { job };
+      }
+      const job = jobs.get(String(query.get("id") ?? body.id));
+      if (!job || job.ownerId !== user.id) throw new ApiError(404, "This upload could not be found.");
+      if (action === "import-job") return { job };
+      if (["txt", "md"].includes(job.type)) throw new ApiError(422, "TXT and Markdown syllabi are read in your browser.");
+      if (job.name === "limit.pdf") {
+        job.state = "failed";
+        throw new ApiError(429, "You can read 5 syllabi automatically each day. Try again tomorrow, or upload a TXT version.");
+      }
+      Object.assign(job, { state: "review", events: SYLLABUS_PDF_EVENTS });
+      return { job };
+    }
     await context.route("**/api/index.php?route=*", async route => {
       const query = new URL(route.request().url()).searchParams;
       const action = query.get("route")!;
@@ -120,6 +154,14 @@ export const test = base.extend<{ accountApi: void }>({
       if (action.startsWith("note")) {
         try {
           await route.fulfill({ status: action === "note-create" ? 201 : 200, json: noteRoute(action, query, body) });
+        } catch (e) {
+          await route.fulfill({ status: (e as ApiError).status ?? 500, json: { error: (e as Error).message } });
+        }
+        return;
+      }
+      if (IMPORT_ROUTES.includes(action)) {
+        try {
+          await route.fulfill({ status: action === "syllabus-upload" ? 201 : 200, json: importRoute(action, query, body) });
         } catch (e) {
           await route.fulfill({ status: (e as ApiError).status ?? 500, json: { error: (e as Error).message } });
         }

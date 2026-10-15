@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   UploadCloud,
   Camera,
@@ -9,8 +9,9 @@ import {
 } from "lucide-react";
 import { useApp } from "../app/context";
 import { Modal } from "../shared/ui";
-import type { UploadKind, UploadJob } from "../domain";
+import type { DetectedEvent, UploadKind, UploadJob } from "../domain";
 import s from "../app/App.module.css";
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export function ImportDialog({
   kind,
   onClose,
@@ -25,43 +26,54 @@ export function ImportDialog({
   const [error, setError] = useState("");
   const [scenario, setScenario] = useState("success");
   const [busy, setBusy] = useState(false);
+  const [courseId, setCourseId] = useState(state.courses[0]?.id || "");
+  // A slow upload must not update the window after it closes. Setting it on every mount matters:
+  // React's development mode mounts, unmounts, and mounts again.
+  const open = useRef(true);
   useEffect(() => {
-    if (phase !== "queued") return;
-    const a = setTimeout(() => setPhase("processing"), 250);
-    return () => clearTimeout(a);
-  }, [phase]);
-  useEffect(() => {
-    if (phase !== "processing" || !file) return;
-    let active = true;
-    const timer = setTimeout(() => {
-      repo.imports
-        .start(file, kind, scenario)
-        .then((j) => {
-          if (active) {
-            setJob(j);
-            setPhase(j.state === "failed" ? "failed" : "review");
-          }
-        })
-        .catch((e) => {
-          if (active) {
-            setError(e.message);
-            setPhase("pick");
-          }
-        });
-    }, 900);
+    open.current = true;
     return () => {
-      active = false;
-      clearTimeout(timer);
+      open.current = false;
     };
-  }, [phase, file, kind, scenario, repo]);
+  }, []);
+  // Card 45: queued while the file is registered, processing while it is read, then review or failed.
+  async function run(result = scenario) {
+    if (!file) return;
+    setError("");
+    setPhase("queued");
+    let queued: UploadJob;
+    try {
+      // The short waits keep each step on screen long enough to read.
+      [queued] = await Promise.all([repo.imports.start(file, kind, result, courseId), wait(250)]);
+    } catch (e) {
+      if (open.current) {
+        setError((e as Error).message);
+        setPhase("pick");
+      }
+      return;
+    }
+    if (!open.current) return;
+    setPhase("processing");
+    try {
+      const [done] = await Promise.all([repo.imports.process(queued, file, result), wait(900)]);
+      if (!open.current) return;
+      setJob(done);
+      setPhase(done.state === "failed" ? "failed" : "review");
+    } catch (e) {
+      // The file was uploaded but couldn't be read (a daily limit, for example), so offer another try.
+      if (open.current) {
+        setError((e as Error).message);
+        setPhase("failed");
+      }
+    }
+  }
   function pick(f?: File) {
     if (!f) return;
     const invalid = repo.imports.validate(f, kind);
     setError(invalid || "");
-    if (!invalid) {
-      setFile(f);
-      setJob(undefined);
-    }
+    // An invalid choice replaces the earlier file, so Continue can't send the wrong one.
+    setFile(invalid ? undefined : f);
+    setJob(undefined);
   }
   async function confirm() {
     if (!job) return;
@@ -99,6 +111,23 @@ export function ImportDialog({
       )}
       {phase === "pick" && (
         <>
+          {kind === "syllabus" &&
+            (state.courses.length ? (
+              <div className={s.form}>
+                <label>
+                  Course
+                  <select value={courseId} onChange={(e) => setCourseId(e.target.value)}>
+                    {state.courses.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.code}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : (
+              <p className={s.notice}>Add a course in Settings before uploading its syllabus.</p>
+            ))}
           <label
             className={s.dropzone}
             onDragOver={(e) => e.preventDefault()}
@@ -136,7 +165,8 @@ export function ImportDialog({
           <details className={s.demoDetails}>
             <summary>Prototype preview options</summary>
             <p>
-              Extraction uses sample results. Your file stays on this device.
+              Preview how Notely handles results that need review, or a file
+              it can’t read.
             </p>
             <label>
               Processing result
@@ -152,8 +182,8 @@ export function ImportDialog({
           </details>
           <button
             className={s.primary}
-            disabled={!file}
-            onClick={() => setPhase("queued")}
+            disabled={!file || (kind === "syllabus" && !courseId)}
+            onClick={() => void run()}
           >
             Continue <FileText size={16} />
           </button>
@@ -179,7 +209,7 @@ export function ImportDialog({
             className={s.primary}
             onClick={() => {
               setScenario("success");
-              setPhase("queued");
+              void run("success");
             }}
           >
             Try again
@@ -200,20 +230,23 @@ export function ImportDialog({
               below.
             </p>
           )}
-          <label>
-            Title
-            <input
-              required
-              value={job.metadata.title}
-              onChange={(e) =>
-                setJob({
-                  ...job,
-                  metadata: { ...job.metadata, title: e.target.value },
-                })
-              }
-            />
-          </label>
-          <div className={s.formRow}>
+          {/* A syllabus only adds events, so the note's title, date, and category don't apply. */}
+          {kind !== "syllabus" && (
+            <label>
+              Title
+              <input
+                required
+                value={job.metadata.title}
+                onChange={(e) =>
+                  setJob({
+                    ...job,
+                    metadata: { ...job.metadata, title: e.target.value },
+                  })
+                }
+              />
+            </label>
+          )}
+          <div className={kind === "syllabus" ? undefined : s.formRow}>
             <label>
               Course
               <select
@@ -232,91 +265,107 @@ export function ImportDialog({
                 ))}
               </select>
             </label>
-            <label>
-              {kind === "syllabus" ? "Review date" : "Lecture date"}
-              <input
-                type="date"
-                required
-                value={job.metadata.lectureDate}
-                onChange={(e) =>
-                  setJob({
-                    ...job,
-                    metadata: { ...job.metadata, lectureDate: e.target.value },
-                  })
-                }
-              />
-            </label>
-          </div>
-          <label>
-            Category
-            <select
-              value={job.metadata.category}
-              onChange={(e) =>
-                setJob({
-                  ...job,
-                  metadata: { ...job.metadata, category: e.target.value },
-                })
-              }
-            >
-              {["School", "Work", "Meetings", "Personal"].map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-          </label>
-          {job.events.map((event, i) => (
-            <fieldset key={i}>
-              <legend>Detected {event.kind}</legend>
+            {kind !== "syllabus" && (
               <label>
-                Event title
+                Lecture date
                 <input
+                  type="date"
                   required
-                  value={event.title}
+                  value={job.metadata.lectureDate}
                   onChange={(e) =>
                     setJob({
                       ...job,
-                      events: job.events.map((v, j) =>
-                        j === i ? { ...v, title: e.target.value } : v,
-                      ),
+                      metadata: { ...job.metadata, lectureDate: e.target.value },
                     })
                   }
                 />
               </label>
-              <div className={s.formRow}>
-                <label>
-                  Due date
+            )}
+          </div>
+          {kind !== "syllabus" && (
+            <label>
+              Category
+              <select
+                value={job.metadata.category}
+                onChange={(e) =>
+                  setJob({
+                    ...job,
+                    metadata: { ...job.metadata, category: e.target.value },
+                  })
+                }
+              >
+                {["School", "Work", "Meetings", "Personal"].map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          {kind === "syllabus" && !job.events.length && (
+            <p className={s.notice}>
+              No dated events were found in this file. Try another copy of the
+              syllabus.
+            </p>
+          )}
+          {/* Card 46: each event can be corrected or left out. Included events need a title and a
+              date, so the browser asks for any that are missing before anything is added. */}
+          {job.events.map((event, i) => {
+            const included = event.include !== false;
+            const update = (change: Partial<DetectedEvent>) =>
+              setJob({ ...job, events: job.events.map((v, j) => (j === i ? { ...v, ...change } : v)) });
+            return (
+              <fieldset key={i}>
+                <legend>Detected {event.kind}</legend>
+                {event.needsReview && (
+                  <p className={s.notice}>
+                    Needs review: choose the date.
+                    {event.description && ` The syllabus says “${event.description}”.`}
+                  </p>
+                )}
+                <label className={s.checkLabel}>
                   <input
-                    type="date"
+                    type="checkbox"
+                    checked={included}
+                    onChange={(e) => update({ include: e.target.checked })}
+                  />
+                  Include
+                </label>
+                <label>
+                  Event title
+                  <input
                     required
-                    value={event.date}
-                    onChange={(e) =>
-                      setJob({
-                        ...job,
-                        events: job.events.map((v, j) =>
-                          j === i ? { ...v, date: e.target.value } : v,
-                        ),
-                      })
-                    }
+                    disabled={!included}
+                    value={event.title}
+                    onChange={(e) => update({ title: e.target.value })}
                   />
                 </label>
-                <label>
-                  Time
-                  <input
-                    type="time"
-                    value={event.time}
-                    onChange={(e) =>
-                      setJob({
-                        ...job,
-                        events: job.events.map((v, j) =>
-                          j === i ? { ...v, time: e.target.value } : v,
-                        ),
-                      })
-                    }
-                  />
-                </label>
-              </div>
-            </fieldset>
-          ))}
-          <button className={s.primary} disabled={busy}>
+                <div className={s.formRow}>
+                  <label>
+                    Due date
+                    <input
+                      type="date"
+                      required
+                      disabled={!included}
+                      value={event.date}
+                      onChange={(e) => update({ date: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Time
+                    <input
+                      type="time"
+                      disabled={!included}
+                      value={event.time}
+                      onChange={(e) => update({ time: e.target.value })}
+                    />
+                  </label>
+                </div>
+              </fieldset>
+            );
+          })}
+          <button
+            className={s.primary}
+            disabled={busy || (kind === "syllabus" && !job.events.some((e) => e.include !== false))}
+          >
             {busy
               ? "Saving…"
               : kind === "syllabus"
