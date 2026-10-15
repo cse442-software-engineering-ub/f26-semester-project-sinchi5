@@ -203,8 +203,9 @@ function extractImport(PDO $db, array $config, array $user, array $input, ?calla
         WHERE mine.id = ? LIMIT 1', [$id])->fetchColumn();
     if ($events === false) {
         // Claiming the job first means a double click can't pay for two reads of one file. A claim left
-        // by a request the server killed mid-read expires after 5 minutes.
-        $claim = query($db, "UPDATE notely_import_jobs SET state = 'processing' WHERE id = ? AND (state IN ('queued', 'failed')
+        // by a request the server killed mid-read expires after 5 minutes; the new time makes taking it
+        // over count as a change, since the state stays 'processing'.
+        $claim = query($db, "UPDATE notely_import_jobs SET state = 'processing', updated_at = UTC_TIMESTAMP() WHERE id = ? AND (state IN ('queued', 'failed')
             OR (state = 'processing' AND updated_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 MINUTE)))", [$id]);
         if ($claim->rowCount() !== 1) {
             throw new HttpError(409, 'This file is already being read. Please wait a moment.');
