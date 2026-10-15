@@ -20,9 +20,10 @@ export async function syllabusText(file: Blob & { name: string }): Promise<strin
 }
 
 async function pdfText(data: Uint8Array) {
-  // pdf.js is large, so it downloads only when a student picks a PDF.
-  const [pdfjs, worker] = await Promise.all([import("pdfjs-dist"), import("pdfjs-dist/build/pdf.worker.min.mjs?url")]);
-  pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+  // pdf.js is large, so it downloads only when a student picks a PDF. Its worker is built as a plain
+  // .js file, since a shared host may not send .mjs files with a JavaScript type.
+  const [pdfjs, { default: PdfWorker }] = await Promise.all([import("pdfjs-dist"), import("pdfjs-dist/build/pdf.worker.min.mjs?worker")]);
+  pdfjs.GlobalWorkerOptions.workerPort ??= new PdfWorker();
   // Only text is read: no scripts, forms, or rendering.
   const task = pdfjs.getDocument({ data, enableXfa: false });
   let pdf;
