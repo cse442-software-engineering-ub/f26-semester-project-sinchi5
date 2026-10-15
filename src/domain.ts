@@ -79,6 +79,10 @@ export interface DetectedMetadata {
   category: string;
 }
 export type UploadKind = "document" | "scan" | "syllabus";
+// An event proposed from a syllabus. needsReview means it has no clear date yet (card 44).
+export interface DetectedEvent extends CourseEvent {
+  needsReview?: boolean;
+}
 export interface UploadJob {
   id: string;
   kind: UploadKind;
@@ -86,7 +90,7 @@ export interface UploadJob {
   state:
     "queued" | "processing" | "review" | "completed" | "partial" | "failed";
   metadata: DetectedMetadata;
-  events: CourseEvent[];
+  events: DetectedEvent[];
 }
 export interface NoteQuery {
   q?: string;
@@ -146,11 +150,10 @@ export interface ScheduleRepository {
 }
 export interface ImportRepository {
   validate(file: Pick<File, "name" | "size">, kind: UploadKind): string | null;
-  start(
-    file: Pick<File, "name" | "size">,
-    kind: UploadKind,
-    scenario?: string,
-  ): Promise<UploadJob>;
+  // Registers the file as a queued job; a signed-in student's syllabus goes to the server (card 43).
+  start(file: File, kind: UploadKind, scenario?: string, courseId?: string): Promise<UploadJob>;
+  // Reads a queued job's file and proposes note details or schedule events (cards 44 and 45).
+  process(job: UploadJob, file: File, scenario?: string): Promise<UploadJob>;
   confirm(job: UploadJob): Promise<void>;
 }
 export interface Repositories {
