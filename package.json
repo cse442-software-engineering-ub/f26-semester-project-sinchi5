@@ -21,7 +21,9 @@
     "test:note-titles": "node backend/tests/note-titles-http.mjs",
     "test:note-sorting": "node backend/tests/note-sorting-http.mjs",
     "test:note-categories": "node backend/tests/note-categories-http.mjs",
-    "test:schema": "php backend/tests/schema.php"
+    "test:schema": "php backend/tests/schema.php",
+    "test:syllabus-upload": "php backend/tests/syllabus-upload.php",
+    "test:syllabus-upload-http": "node backend/tests/syllabus-upload-http.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.0.0",
