@@ -172,9 +172,10 @@ const GRADED_ITEM = /\b(?:exams?|midterms?|finals?|quiz(?:zes)?|homework|hw\s*#?
 export type RulesVerdict = "no-text" | "no-events" | "unsure" | "missed" | null;
 export function rulesVerdict(text: string, events: ProposedEvent[]): RulesVerdict {
   // A scan or photo has little or no text to read.
-  if ((text.match(/\p{L}/gu)?.length ?? 0) < 100) return "no-text";
-  if (!events.length) return "no-events";
-  if (events.filter((e) => e.needsReview).length > events.length / 4) return "unsure";
+  if (!events.length) return (text.match(/\p{L}/gu)?.length ?? 0) < 100 ? "no-text" : "no-events";
+  // "Next Friday" or "TBA" stumps any reader, so only lines with clashing or impossible dates count.
+  const relative = new RegExp(RELATIVE.source, "i");
+  if (events.filter((e) => e.needsReview && !relative.test(e.source)).length > events.length / 4) return "unsure";
   // Many graded items without a date of their own suggest a table whose dates the rules couldn't pair up.
   const missed = text.split(/\r\n|\r|\n/)
     .filter((line) => line.trim().length <= 60 && GRADED_ITEM.test(line) && !parseLine(line, 2000)).length;
