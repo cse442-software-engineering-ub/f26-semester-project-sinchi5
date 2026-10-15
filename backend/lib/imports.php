@@ -19,8 +19,9 @@ const SYLLABUS_SIZE_ERROR = 'Choose a file smaller than 20 MB.';
 const IMPORT_COLUMNS = 'id, kind, course_id, file_name, file_type, file_size, state, events, created_at';
 
 // Returns [file name, type, bytes], or throws the message the upload window shows. The order and
-// wording match the browser's check (imports.validate in src/services/repositories.ts); the first
-// bytes are checked too, because a file named .pdf may not be a PDF.
+// wording match the browser's check (src/services/repositories.ts). The contents are checked against
+// the name, because a file named .pdf may be anything. The file is only ever stored as data, read as
+// text, or sent to the AI reader; it is never run, written to disk, or served back to a browser.
 function syllabusFile(array $input): array
 {
     $name = $input['fileName'] ?? null;
@@ -50,12 +51,18 @@ function syllabusFile(array $input): array
     if ($bytes === '') {
         throw new HttpError(422, 'This file is empty. Please choose another.');
     }
+    $zip = $type === 'docx' ? zipDirectory($bytes) : null;
+    $image = in_array($type, ['jpg', 'png', 'webp'], true) ? @getimagesizefromstring($bytes) : false;
     $matches = match ($type) {
-        'pdf' => str_contains(substr($bytes, 0, 1024), '%PDF-'),
-        'docx' => str_starts_with($bytes, "PK\x03\x04"),
-        'jpg' => str_starts_with($bytes, "\xFF\xD8\xFF"),
-        'png' => str_starts_with($bytes, "\x89PNG\r\n\x1A\n"),
-        'webp' => str_starts_with($bytes, 'RIFF') && substr($bytes, 8, 4) === 'WEBP',
+        // A PDF starts with its header and ends with the end-of-file marker.
+        'pdf' => str_contains(substr($bytes, 0, 1024), '%PDF-') && str_contains(substr($bytes, -2048), '%%EOF'),
+        // A Word document is a zip that holds the document itself; one with macros is refused.
+        'docx' => isset($zip['[Content_Types].xml'], $zip['word/document.xml']) && !isset($zip['word/vbaProject.bin'])
+            && !($zip['word/document.xml']['flags'] & 1),
+        // The image header must parse as the named format, not just start like it.
+        'jpg' => ($image[2] ?? 0) === IMAGETYPE_JPEG,
+        'png' => ($image[2] ?? 0) === IMAGETYPE_PNG,
+        'webp' => ($image[2] ?? 0) === IMAGETYPE_WEBP,
         // Text in any encoding is fine; a NUL byte means it is really a binary file.
         default => !str_contains($bytes, "\0"),
     };
@@ -63,6 +70,29 @@ function syllabusFile(array $input): array
         throw new HttpError(422, SYLLABUS_TYPE_ERROR);
     }
     return [trimEdges($name), $type, $bytes];
+}
+
+// Lists a zip's files from its central directory as name => [flags, method, compressed, local], or
+// returns null when the bytes aren't a readable zip. The class servers may lack the zip extension.
+function zipDirectory(string $bytes): ?array
+{
+    $end = strrpos($bytes, "PK\x05\x06");
+    $directory = $end === false || strlen($bytes) < $end + 22 ? false : unpack('vcount/x4/Voffset', $bytes, $end + 10);
+    // A real Word document has a few dozen files; thousands means something else.
+    if (!$directory || $directory['count'] > 5000) {
+        return null;
+    }
+    $entries = [];
+    $at = $directory['offset'];
+    for ($i = 0; $i < $directory['count']; $i++) {
+        if (substr($bytes, $at, 4) !== "PK\x01\x02" || strlen($bytes) < $at + 46) {
+            return null;
+        }
+        $entry = unpack('vflags/vmethod/x8/Vcompressed/x4/vname/vextra/vcomment/x8/Vlocal', $bytes, $at + 8);
+        $entries[substr($bytes, $at + 46, $entry['name'])] = $entry;
+        $at += 46 + $entry['name'] + $entry['extra'] + $entry['comment'];
+    }
+    return $entries;
 }
 
 function importJson(array $row): array
