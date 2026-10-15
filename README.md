@@ -112,6 +112,7 @@ You need PHP 8 with `pdo_mysql`, and a local MySQL or MariaDB server (XAMPP work
    mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/003_note_content.sql
    mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/004_server_notes.sql
    mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/005_import_jobs.sql
+   mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/006_events.sql
    ```
 
    You can also import the file through phpMyAdmin.
@@ -200,6 +201,8 @@ The API has a single entry point, `api/index.php?route=<name>`. Every response i
 | POST | `note-delete` | `id` | yes (owner only) |
 | POST | `syllabus-upload` | `courseId`, `fileName`, `content` (the file as base64) | yes (rate limited) |
 | GET | `import-job&id=<id>` | none | yes (owner only) |
+| POST | `import-confirm` | `id`, `events` (each `title`, `date`, optional `kind`, `time`), optional `courseId` | yes (job owner only) |
+| GET | `events` or `events&courseId=<id>` | none | yes (the caller's own events) |
 
 Every POST must include:
 - `Content-Type: application/json` (body at most 8 KB, except `syllabus-upload`)
@@ -226,6 +229,8 @@ Since task 120, signed-in accounts use these routes for every note through [src/
 
 Since card 43, POST `syllabus-upload` takes one syllabus (PDF, DOCX, TXT, Markdown, JPG, PNG, or WebP, at most 20 MB) and returns 201 with `{ "job": { "id", "kind": "syllabus", "courseId", "name", "type", "size", "state": "queued", "events": [], "createdAt" } }`. The file's first bytes must match its type. Wrong types, empty files, and files over 20 MB get 422 with the same messages the upload window shows (413 when the whole request is too large). Each account can upload 20 files every 15 minutes. GET `import-job` returns the same job to its owner and 404 to anyone else. The stored file is cleared by `prune.php` after a day. Apply migration 005 before deploying this backend.
 
+Since card 47, POST `import-confirm` saves 1–200 reviewed events from the caller's own job to its course (or to `courseId`, when the student picked another course) and returns `{ "created": <count> }`. The job becomes `completed` and its file is dropped, so sending the same confirm again returns `{ "created": 0 }`. Every event needs a `title` (1–255 visible characters) and a real `date` (`YYYY-MM-DD`), otherwise 422 "Give every event a title and a date."; `kind` is one of `lecture`, `assignment`, `quiz`, `exam`, `deadline`, `other` (default), and `time` is empty or 24-hour `HH:MM`. GET `events` returns `{ "events": [{ "id", "courseId", "title", "kind", "date", "time", "location", "description", "source", "importJobId" }] }` ordered by date and time. Apply migration 006 before deploying this backend.
+
 Errors return `{ "error": "<message>" }` with one of these statuses: 400 (bad JSON or plain HTTP in secure mode), 401 (not signed in, or wrong login), 403 (Origin or CSRF failure), 404 (unknown route), 405 (wrong method), 409 (email conflict), 413 (body too large), 415 (wrong content type), 422 (validation failure), 429 (rate limited, with `Retry-After`), 503 (service or configuration failure).
 
 The browser client is [src/services/auth.ts](src/services/auth.ts). It sends requests one at a time, refreshes the CSRF token after each response, and never caches recovery codes.
@@ -234,7 +239,7 @@ The browser client is [src/services/auth.ts](src/services/auth.ts). It sends req
 
 ## Database schema
 
-Defined in [backend/migrations/001_accounts.sql](backend/migrations/001_accounts.sql) and [backend/migrations/002_note_titles.sql](backend/migrations/002_note_titles.sql). Also apply [backend/migrations/003_note_content.sql](backend/migrations/003_note_content.sql), which backfills existing notes with an empty body, and [backend/migrations/004_server_notes.sql](backend/migrations/004_server_notes.sql), which adds note metadata, history, and comments. Then apply [backend/migrations/005_import_jobs.sql](backend/migrations/005_import_jobs.sql), which stores syllabus uploads. Apply them in order, once each, separately to each environment. All timestamps are UTC.
+Defined in [backend/migrations/001_accounts.sql](backend/migrations/001_accounts.sql) and [backend/migrations/002_note_titles.sql](backend/migrations/002_note_titles.sql). Also apply [backend/migrations/003_note_content.sql](backend/migrations/003_note_content.sql), which backfills existing notes with an empty body, and [backend/migrations/004_server_notes.sql](backend/migrations/004_server_notes.sql), which adds note metadata, history, and comments. Then apply [backend/migrations/005_import_jobs.sql](backend/migrations/005_import_jobs.sql), which stores syllabus uploads, and [backend/migrations/006_events.sql](backend/migrations/006_events.sql), which stores imported schedule events. Apply them in order, once each, separately to each environment. All timestamps are UTC.
 
 | Table | Contents |
 | --- | --- |
@@ -244,6 +249,7 @@ Defined in [backend/migrations/001_accounts.sql](backend/migrations/001_accounts
 | `notely_notes` | Server-side note ID, owner, title, body (non-null TEXT), course ID, lecture date, category, visibility, tags (JSON text), pinned, timestamps |
 | `notely_note_editors` | Per-note user permission (`view` or `edit`) |
 | `notely_import_jobs` | A syllabus upload: owner (cascades on user delete), course ID, file name, type, size, SHA-256, the file itself until it is read, state, and proposed events (JSON text) |
+| `notely_events` | A schedule event: owner (cascades on user delete), course ID, title, kind, date, optional time, source (`manual` or `imported`), and the import job it came from (set to null if the job is deleted) |
 | `notely_note_versions` | Earlier title and body of a note, who saved over them, and when (cascades on note delete) |
 | `notely_note_comments` | Comment body, note, and author (cascades on note or author delete) |
 
