@@ -101,8 +101,20 @@ try {
   assert.equal((await events(owner, "")).length, 3);
   expectError(await owner.call("events&courseId=../x"), 422, "Choose a valid course.");
   pass(4, "jobs and events stay private, and the reviewed course is used");
+
+  // Text from a syllabus is only ever data: SQL in a file name or an event title is stored as typed.
+  const sneaky = await owner.call("syllabus-upload", { courseId: "cse442", fileName: "x'); DROP TABLE notely_events; --.txt",
+    content: Buffer.from("Quiz 1 on September 8").toString("base64") });
+  assert.equal(sneaky.status, 201);
+  assert.equal(sneaky.data.job.name, "x'); DROP TABLE notely_events; --.txt");
+  const titles = ["Robert'); DROP TABLE notely_events; --", "Quiz\" OR 1=1 --", "<img src=x onerror=alert(1)>"];
+  const added = await owner.call("import-confirm", { id: sneaky.data.job.id, events: titles.map((title) => ({ title, date: "2026-11-02" })) });
+  assert.deepEqual([added.status, added.data], [200, { created: 3 }]);
+  assert.deepEqual((await events(owner)).filter((e) => e.date === "2026-11-02").map((e) => e.title).sort(), [...titles].sort());
+  assert.equal((await events(owner, "")).length, 6);
+  pass(5, "SQL and HTML in file names and titles are saved as plain text");
 } catch (error) {
-  console.error(`FAIL: ${passed}/4 task tests passed; remaining tests did not complete.`);
+  console.error(`FAIL: ${passed}/5 task tests passed; remaining tests did not complete.`);
   throw error;
 } finally {
   // Deleting each account also deletes its import jobs and events (ON DELETE CASCADE).
