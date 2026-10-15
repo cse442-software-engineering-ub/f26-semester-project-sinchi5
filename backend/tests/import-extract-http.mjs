@@ -1,4 +1,4 @@
-// Real HTTP tests for import-extract without spending API credits: the local API has no key, or
+// Real HTTP tests for import-extract without using the Gemini API: the local API has no key, or
 // blocks live calls because its origin is local. Requires PHP/PDO MySQL, a disposable local database
 // with migrations 001-006, and backend/dev-router.php on port 8080.
 // Only after confirming that the API uses an isolated DEV/TEST database:
@@ -10,7 +10,7 @@ const url = new URL(process.env.NOTELY_TEST_URL || "http://127.0.0.1:8080/api/in
 assert(["localhost", "127.0.0.1", "[::1]"].includes(url.hostname), "Use a local disposable DEV/TEST API only.");
 assert.equal(process.env.NOTELY_TEST_ISOLATED, "1",
   "Confirm the local API uses an approved isolated DEV/TEST database, then set NOTELY_TEST_ISOLATED=1. No requests sent.");
-assert.notEqual(process.env.NOTELY_AI_LIVE, "1", "Unset NOTELY_AI_LIVE: these tests must never call the Claude API.");
+assert.notEqual(process.env.NOTELY_AI_LIVE, "1", "Unset NOTELY_AI_LIVE: these tests must never call the Gemini API.");
 const origin = process.env.NOTELY_TEST_ORIGIN || url.origin;
 const password = `Extract meadow ${randomUUID()}!`;
 
@@ -58,19 +58,19 @@ try {
   }
   assert.equal((await anonymous.call("session")).status, 200);
 
+  // The browser asks only when its free rules couldn't read a file, whatever the type.
   const text = await upload("cse442-syllabus.txt", "Homework 1 due September 28, 2026");
-  expectError(await owner.call("import-extract", { id: text.id, year: 2026 }), 422, "TXT and Markdown syllabi are read in your browser.");
-  assert.equal((await owner.call(`import-job&id=${text.id}`)).data.job.state, "queued");
-  pass(1, "text syllabi are never sent for automatic reading");
-
-  const pdf = await upload("syllabus.pdf", "%PDF-1.7\nHomework 1 due September 28, 2026");
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const result = await owner.call("import-extract", { id: pdf.id, year: 2026 });
-    assert.equal(result.status, 503);
-    assert.match(result.data.error, /^Automatic reading (isn't set up yet|is off in local development)\./);
-    const job = (await owner.call(`import-job&id=${pdf.id}`)).data.job;
-    assert.deepEqual([job.state, job.events], ["failed", []]);
+  const pdf = await upload("syllabus.pdf", "%PDF-1.7\nHomework 1 due September 28, 2026\n%%EOF\n");
+  for (const job of [text, pdf]) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const result = await owner.call("import-extract", { id: job.id, year: 2026 });
+      assert.equal(result.status, 503);
+      assert.match(result.data.error, /^Automatic reading (isn't set up yet|is off in local development)\./);
+      const saved = (await owner.call(`import-job&id=${job.id}`)).data.job;
+      assert.deepEqual([saved.state, saved.events], ["failed", []]);
+    }
   }
+  pass(1, "text and PDF syllabi take the same path to the API");
   pass(2, "without a key, or from a local origin, the read is blocked, the job fails, and it can be retried");
 
   expectError(await other.call("import-extract", { id: pdf.id, year: 2026 }), 404, "This upload could not be found.");

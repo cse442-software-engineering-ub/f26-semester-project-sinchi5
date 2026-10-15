@@ -7,7 +7,7 @@ if (PHP_SAPI !== 'cli' && !defined('NOTELY_INTERNAL')) {
 
 // Card 43: a syllabus upload becomes an import job that only its owner can read.
 // Card 47: the student's reviewed events from a job are saved to their schedule.
-// import-extract reads PDF, DOCX, and image jobs with the Claude API (syllabus-ai.php).
+// import-extract reads a job with the Gemini API (syllabus-ai.php) when the browser's free rules can't.
 // Needs notes.php for recordId() and isoTime().
 const IMPORT_READ_ROUTES = ['import-job', 'events'];
 const IMPORT_ROUTES = [...IMPORT_READ_ROUTES, 'syllabus-upload', 'import-confirm', 'import-extract'];
@@ -182,8 +182,8 @@ function eventJson(array $row): array
     ];
 }
 
-// Proposes events for a PDF, DOCX, or image job. Every paid read is capped per student and for the
-// whole app each day, and $send replaces the live API in tests so they never spend credits.
+// Proposes events for a job the browser's free rules couldn't read well. Every API read is capped per
+// student and for the whole app each day, and $send replaces the live API in tests so they never use it.
 function extractImport(PDO $db, array $config, array $user, array $input, ?callable $send = null): array
 {
     $id = recordId($input['id'] ?? null, 'Choose a valid upload.');
@@ -195,12 +195,11 @@ function extractImport(PDO $db, array $config, array $user, array $input, ?calla
     if (in_array($job['state'], ['review', 'completed'], true)) {
         return ['job' => $job];
     }
-    if (in_array($job['type'], ['txt', 'md'], true)) {
-        throw new HttpError(422, 'TXT and Markdown syllabi are read in your browser.');
-    }
     // A class uploads the same syllabus many times, so a file that was read once is free after that.
+    // Only this term's reads are reused: a syllabus without years reused next year needs new dates.
     $events = query($db, 'SELECT other.events FROM notely_import_jobs mine
         JOIN notely_import_jobs other ON other.file_sha256 = mine.file_sha256 AND other.events IS NOT NULL
+            AND other.updated_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 180 DAY)
         WHERE mine.id = ? LIMIT 1', [$id])->fetchColumn();
     if ($events === false) {
         // Claiming the job first means a double click can't pay for two reads of one file. A claim left
@@ -211,12 +210,12 @@ function extractImport(PDO $db, array $config, array $user, array $input, ?calla
             throw new HttpError(409, 'This file is already being read. Please wait a moment.');
         }
         try {
-            $send ??= liveAnthropic($config);
+            $send ??= liveGemini($config);
             $perStudent = (int) ($config['ai_user_daily_limit'] ?? 5);
             rateLimit($db, $config, 'syllabus-ai', (string) $user['id'], $perStudent, 86400,
-                "You can read $perStudent syllabi automatically each day. Try again tomorrow, or upload a TXT version.");
+                "You can read $perStudent syllabi automatically each day. Try again tomorrow.");
             rateLimit($db, $config, 'syllabus-ai', 'everyone', (int) ($config['ai_daily_limit'] ?? 50), 86400,
-                'Automatic reading is busy today. Try again tomorrow, or upload a TXT version.');
+                'Automatic reading has reached its limit for today. Try again tomorrow.');
             $content = query($db, 'SELECT content FROM notely_import_jobs WHERE id = ?', [$id])->fetchColumn();
             if (!is_string($content)) {
                 throw new HttpError(422, 'This upload expired. Please choose the file again.');

@@ -11,12 +11,13 @@ return [
     'origin' => 'https://aptitude.cse.buffalo.edu',
     'cookie_path' => '/CSE442/2026-Fall/cse-442c/',
     'secure_cookies' => true,
-    // Optional: read PDF, DOCX, and image syllabi with the Claude API. TXT and Markdown never use it.
-    // Leave the key out to keep automatic reading off. Local origins never call the API unless
-    // NOTELY_AI_LIVE=1 is set for that run.
-    // 'anthropic_api_key' => 'YOUR_ANTHROPIC_API_KEY',
-    // 'anthropic_model' => 'claude-opus-5-5',  // 'claude-haiku-5-5' costs about 40 times less per token
-    // 'ai_user_daily_limit' => 5,               // automatic reads per student per day
-    // 'ai_daily_limit' => 50,                   // automatic reads for all students per day
-    // 'ai_max_input_tokens' => 60000,           // longer files are refused before they cost anything
+    // Optional: read syllabi the browser's free rules can't (scans, photos, unusual layouts) with
+    // Google's Gemini API. Get a key at https://aistudio.google.com/apikey and paste it here, in the
+    // private copy only. Leave it out to keep automatic reading off. Local origins never call the API
+    // unless NOTELY_AI_LIVE=1 is set for that run.
+    // 'gemini_api_key' => 'YOUR_GOOGLE_AI_STUDIO_KEY',
+    // 'gemini_model' => 'gemini-3.5-flash-lite',  // cheapest; 'gemini-3.8-flash' is stronger
+    // 'ai_user_daily_limit' => 5,                 // automatic reads per student per day
+    // 'ai_daily_limit' => 50,                     // automatic reads for all students per day
+    // 'ai_max_input_tokens' => 60000,             // longer files are refused before they are read
 ];
