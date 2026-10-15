@@ -102,16 +102,21 @@ describe("rules first, AI only when needed (card 44)", () => {
     "Final project due December 4, 2026",
   ].join("\n");
 
-  it("keeps the rules' events when they read the syllabus cleanly", () => {
+  it("keeps the rules' events when they read the syllabus cleanly, even a short one", () => {
     expect(rulesVerdict(syllabus, extractEvents(syllabus, 2026))).toBeNull();
+    const short = "Homework 1 due September 28, 2026\nMidterm exam October 14, 2026";
+    expect(rulesVerdict(short, extractEvents(short, 2026))).toBeNull();
+    // No reader can turn "next Friday" into a date, so it is left for the student, not sent to the AI.
+    const relative = `${short}\nQuiz 1 next Friday\nProject proposal TBA`;
+    expect(rulesVerdict(relative, extractEvents(relative, 2026))).toBeNull();
   });
 
   it("asks for the AI reader when the rules find no text, no events, unsure dates, or undated items", () => {
     expect(rulesVerdict("", [])).toBe("no-text");
     const policies = "Attendance is expected at every lecture and lab section this semester. ".repeat(3);
     expect(rulesVerdict(policies, extractEvents(policies, 2026))).toBe("no-events");
-    const relative = `${syllabus}\nQuiz 1 next Friday\nQuiz 2 next Friday\nProject proposal TBA`;
-    expect(rulesVerdict(relative, extractEvents(relative, 2026))).toBe("unsure");
+    const clashing = `${syllabus}\nQuizzes on October 2 and October 9\nLabs due 10/16, 10/23\nDemos December 1 or December 3`;
+    expect(rulesVerdict(clashing, extractEvents(clashing, 2026))).toBe("unsure");
     // A table the rules couldn't pair up: names on one line, dates on another.
     const split = `${syllabus}\nMidterm exam 2\nQuiz 3\nProject 2 due\nFinal exam\nOct 30 Nov 13 Dec 1 Dec 10`;
     expect(rulesVerdict(split, extractEvents(split, 2026))).toBe("missed");
