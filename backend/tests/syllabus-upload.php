@@ -5,6 +5,7 @@ ini_set('memory_limit', '512M');
 require_once __DIR__ . '/../lib/bootstrap.php';
 require_once __DIR__ . '/../lib/notes.php';
 require_once __DIR__ . '/../lib/imports.php';
+require_once __DIR__ . '/fixtures.php';
 
 function check(bool $condition, string $message): void
 {
@@ -23,15 +24,15 @@ function rejects(array $input, int $status, string $message): void
 }
 $file = fn (string $name, string $bytes) => ['fileName' => $name, 'content' => base64_encode($bytes)];
 
-// Task test 1: each supported type is accepted when its first bytes match its name.
+// Task test 1: each supported type is accepted when its contents match its name.
 foreach ([
     ['cse442-syllabus.txt', "CSE 442 Software Engineering - Fall 2026 Syllabus\nHomework 1 due September 28, 2026\n", 'txt'],
     ['week-1.md', "# Week 1\nQuiz 1 on September 8\n", 'md'],
-    ['syllabus.pdf', "%PDF-1.7\n%\xE2\xE3\xCF\xD3\n", 'pdf'],
-    ['syllabus.docx', "PK\x03\x04\x14\x00", 'docx'],
-    ['scan.JPEG', "\xFF\xD8\xFF\xE0\x00\x10JFIF", 'jpg'],
-    ['scan.png', "\x89PNG\r\n\x1A\n\x00\x00\x00\x0DIHDR", 'png'],
-    ['scan.webp', "RIFF\x24\x00\x00\x00WEBPVP8 ", 'webp'],
+    ['syllabus.pdf', pdfOf('Homework 1 due September 28, 2026'), 'pdf'],
+    ['syllabus.docx', docxOf('Homework 1 due September 28, 2026'), 'docx'],
+    ['scan.JPEG', base64_decode(JPG_1PX), 'jpg'],
+    ['scan.png', base64_decode(PNG_1PX), 'png'],
+    ['scan.webp', base64_decode(WEBP_1PX), 'webp'],
     ['Exposé – plan.txt', "Draft due December 1, 2026", 'txt'],
 ] as [$name, $bytes, $type]) {
     check(syllabusFile($file($name, $bytes)) === [$name, $type, $bytes], "$name was not accepted as $type.");
@@ -59,3 +60,23 @@ foreach ([null, 7, '', '   ', str_repeat('a', 252) . '.txt', "bell\u{0007}.txt",
     rejects(['fileName' => $name, 'content' => 'eA=='], 422, 'Choose a file with a name of 1 to 255 characters.');
 }
 echo "PASS 3: mismatched first bytes, binary text, bad base64, and bad names are rejected\n";
+
+// Disguised files: a name only says what a file claims to be, so each is checked inside too.
+$pdf = pdfOf('Quiz 1 on September 8');
+$png = base64_decode(PNG_1PX);
+foreach ([
+    'cut-off.pdf' => substr($pdf, 0, 200),
+    'page.pdf' => "<html><script>alert(1)</script></html>\n%PDF-",
+    'renamed-pdf.docx' => $pdf,
+    'spreadsheet.docx' => zipOf(['[Content_Types].xml' => '<Types/>', 'xl/workbook.xml' => '<workbook/>']),
+    'macros.docx' => docxOf('Quiz 1 on September 8', ['word/vbaProject.bin' => 'macro code']),
+    'header-only.jpg' => "\xFF\xD8\xFF\xE0\x00\x10JFIF",
+    'header-only.png' => "\x89PNG\r\n\x1A\n\x00\x00\x00\x0DIHDR",
+    'header-only.webp' => "RIFF\x24\x00\x00\x00WEBPVP8 ",
+    'png-named.jpg' => $png,
+    'script.png' => "<?php system(\$_GET['c']); ?>",
+    'page.webp' => '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>',
+] as $name => $bytes) {
+    rejects($file($name, $bytes), 422, SYLLABUS_TYPE_ERROR);
+}
+echo "PASS 4: cut-off PDFs, renamed files, spreadsheets, macro documents, and fake image headers are rejected\n";
