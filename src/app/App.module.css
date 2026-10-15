@@ -2792,6 +2792,11 @@
   width: 18px;
   height: 18px;
   flex: 0 0 18px;
+  /* Text fields are at least 44px tall; a checkbox isn't, or it sits below its words. The whole
+     label stays the click target. */
+  min-height: 0;
+  padding: 0;
+  margin: 2px 0 0;
 }
 
 .accountText {
