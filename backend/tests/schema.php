@@ -36,6 +36,13 @@ $tables = [
         'id' => ['bigint unsigned', 'NO'], 'note_id' => ['bigint unsigned', 'NO'], 'author_user_id' => ['bigint unsigned', 'NO'],
         'body' => ['text', 'NO'], 'created_at' => ['datetime', 'NO'],
     ],
+    'notely_import_jobs' => [
+        'id' => ['bigint unsigned', 'NO'], 'owner_user_id' => ['bigint unsigned', 'NO'], 'kind' => ["enum('syllabus')", 'NO'],
+        'course_id' => ['varchar(64)', 'NO'], 'file_name' => ['varchar(255)', 'NO'], 'file_type' => ['varchar(4)', 'NO'],
+        'file_size' => ['int unsigned', 'NO'], 'file_sha256' => ['char(64)', 'NO'], 'content' => ['longblob', 'YES'],
+        'state' => ["enum('queued','processing','review','failed','completed')", 'NO'], 'events' => ['mediumtext', 'YES'],
+        'created_at' => ['datetime', 'NO'], 'updated_at' => ['datetime', 'NO'],
+    ],
 ];
 foreach ($tables as $table => $columns) {
     $rows = query($db, 'SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION', [$table])->fetchAll();
@@ -55,7 +62,8 @@ if ((int) $index !== 1) { throw new RuntimeException('Missing unique email index
 $fk = query($db, "SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'notely_sessions_user_fk'")->fetchColumn();
 if ($fk !== 'CASCADE') { throw new RuntimeException('Missing session cascade'); }
 foreach (['notely_notes_owner_fk', 'notely_note_editors_note_fk', 'notely_note_editors_user_fk',
-    'notely_note_versions_note_fk', 'notely_note_comments_note_fk', 'notely_note_comments_author_fk'] as $constraint) {
+    'notely_note_versions_note_fk', 'notely_note_comments_note_fk', 'notely_note_comments_author_fk',
+    'notely_import_jobs_owner_fk'] as $constraint) {
     $rule = query($db, 'SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS
         WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = ?', [$constraint])->fetchColumn();
     if ($rule !== 'CASCADE') { throw new RuntimeException('Missing note cascade: ' . $constraint); }
