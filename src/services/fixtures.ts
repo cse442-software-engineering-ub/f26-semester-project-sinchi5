@@ -1,4 +1,4 @@
-import type { Course, Note, CourseEvent } from "../domain";
+import type { Course, Note, CourseEvent, Comment } from "../domain";
 export function dateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
@@ -83,6 +83,26 @@ export function seedNotes(): Note[] {
     updatedAt: `${offsetDate(-i)}T14:30:00`,
     pinned: i < 2,
   }));
+}
+export function seedComments(): Comment[] {
+  return [
+    {
+      id: "comment-1",
+      noteId: "note-1",
+      author: "Jamie",
+      authorId: "classmate-jamie",
+      body: "This explanation helped me.",
+      createdAt: `${offsetDate(-2)}T09:15:00`,
+    },
+    {
+      id: "comment-2",
+      noteId: "note-1",
+      author: "Alex Morgan",
+      authorId: "classmate-alex",
+      body: "The distinction between a sprint review and retrospective finally clicked. Thanks for sharing!",
+      createdAt: `${offsetDate(-1)}T16:40:00`,
+    },
+  ];
 }
 export function seedEvents(): CourseEvent[] {
   return [

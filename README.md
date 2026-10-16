@@ -1,91 +1,497 @@
 # Notely
 
-A responsive student workspace for notes, courses, and schedules. Built with React, TypeScript, Vite, CSS Modules, Base UI, and self-hosted Inter. The interface includes a complete first-run journey, a populated demo workspace, note editing and history, shared-note comments, combined library filters, a calendar, and reviewed document/photo/syllabus imports.
+Notely is a responsive study workspace for university students. It brings course notes, lecture folders, a class schedule, and syllabus/document imports into one place, with a calm interface that works on phones, tablets, and desktops.
 
-## Run locally
+The project has two halves:
 
-Use **Node 22.12 or newer** (`nvm use` reads `.nvmrc`).
+- **Frontend**: a React + TypeScript single-page app built with Vite. It runs entirely in the browser and ships with a populated demo workspace.
+- **PHP service**: a PHP + MySQL API for real accounts and the initial server-side note title endpoints.
+
+Accounts and signed-in users' notes (with their history, comments, and collaborators) are server-backed. Courses, events, imports, and the demo workspace are still a **browser prototype** stored in `localStorage` (see [Where data lives](#where-data-lives)).
+
+---
+
+## Contents
+
+- [Features](#features)
+- [Tech stack](#tech-stack)
+- [Quick start (frontend only)](#quick-start-frontend-only)
+- [Running the PHP service locally](#running-the-php-service-locally)
+- [Configuration reference](#configuration-reference)
+- [API](#api)
+- [Database schema](#database-schema)
+- [Security model](#security-model)
+- [Where data lives](#where-data-lives)
+- [Deployment](#deployment)
+- [Testing](#testing)
+- [Project structure](#project-structure)
+- [URL parameters](#url-parameters)
+- [Design and accessibility](#design-and-accessibility)
+- [Known limitations and next steps](#known-limitations-and-next-steps)
+
+---
+
+## Features
+
+**Getting started**
+- Welcome screen with two paths: **Take a look around first** (demo workspace, no account needed) or **Create your workspace** (real account).
+- Sign up, **Log In**, and **Recover your account** with a one-time recovery code.
+- Returning users who already finished onboarding land on their **Notes** library after logging in. Users who stopped partway through onboarding resume where they left off.
+- Three-step onboarding: name your space, add courses, optionally upload a syllabus. Progress is stored on the server, so onboarding resumes on any device.
+
+**Today (dashboard)**
+- Time-of-day greeting, recently edited notes, your courses, upcoming events ("On the horizon"), and deadline reminders.
+
+**Notes**
+- Library with full-text search, combined filters (course, category, visibility, lecture-date range), sorting (modified, created, title), and grid/list views. Filter state is kept in the URL.
+- Note editor with autosave (it also saves when you leave the page), version history with restore, and comments on shared notes.
+- **Pinning**: pinned notes stay at the top of every sort without changing their edit date.
+- **Collaborators**: the note owner can invite a registered classmate by email and set **view** or **edit** permission. Viewers cannot save edits. This currently uses a frontend mock (see [limitations](#known-limitations-and-next-steps)).
+
+**Courses and schedule**
+- Course pages group notes into dated lecture folders and list upcoming course events.
+- Calendar with agenda and month views. Add lectures, assignments, quizzes, exams, and deadlines manually.
+- Lecture events link straight to that day's lecture folder.
+
+**Imports**
+- Upload documents (PDF, DOCX, TXT, Markdown, images), scan photos, or upload a syllabus. Files are validated (type, empty file, 20 MB limit), then shown on a review screen before anything is saved.
+- Syllabus imports detect assignments and exams and add them to the calendar after review. TXT, Markdown, PDF, and Word syllabi are read in the browser with free rules ([src/services/syllabus.ts](src/services/syllabus.ts), with PDF text from pdf.js), so most uploads never reach an API.
+- Uploaded notes are sorted into course and lecture folders (card 35): the course code and lecture date are read from TXT/Markdown text or the file name by local rules in [src/services/noteMetadata.ts](src/services/noteMetadata.ts) (`Course:` and `Lecture date:` headers win; deadlines in prose are ignored). Anything not found shows **Not detected** and can be filled in on the review screen, and TXT/Markdown text becomes the note body. Try it with [tests/fixtures/cse442-lecture.txt](tests/fixtures/cse442-lecture.txt).
+- Document extraction for PDF, DOCX, and images is simulated. A **Prototype preview options** control in the dialog exercises success, partial, and failure outcomes.
+
+**Settings**
+- **Account**: edit name and email, change password, replace the recovery code, delete the account. Each sensitive action asks for the current password.
+- **Appearance**: light, dark, or system theme.
+- **Courses**: add courses with a code, name, colour, and term.
+- **Workspace data**: **Reset sample data** (demo) or **Clear workspace** (account) resets prototype content without touching the server account.
+- **Log out** is available in the sidebar and in the mobile navigation bar.
+
+---
+
+## Tech stack
+
+| Layer | Technology |
+| --- | --- |
+| UI | React 18, TypeScript 5, CSS Modules, [Base UI](https://base-ui.com) (dialogs, menus), [lucide-react](https://lucide.dev) icons, self-hosted Inter |
+| Routing | React Router 7 (browser history or hash routing) |
+| Build | Vite 7 |
+| Account API | PHP 8 (PDO, `password_hash`), MySQL 5.7+/8 or MariaDB 10.2+ |
+| Unit tests | Vitest |
+| Browser tests | Playwright (Chromium, mobile Chromium, Firefox, WebKit) with axe-core accessibility checks |
+
+---
+
+## Quick start (frontend only)
+
+You need **Node 22.12 or newer**. If you use nvm, `nvm use` reads `.nvmrc`.
 
 ```sh
 npm install
 npm run dev
 ```
 
-Open the URL printed by Vite. Choose **Take a look around first** for the populated workspace, or **Create your workspace** to walk through onboarding. Passwords are validated as form input only and are never persisted. Use sample credentials.
+Open the URL Vite prints and choose **Take a look around first**. The demo workspace works without PHP or MySQL. Creating a real account requires the account service below; without it, sign-up and sign-in show "Could not reach the account service".
+
+Other commands:
 
 ```sh
-npm run build
-npm run preview
-npm test
-npm run test:e2e
+npm run build      # Typecheck, build to dist/, and copy the public PHP API into dist/api
+npm run preview    # Serve the production build locally
 ```
 
-Install the matching browsers once with `npx playwright install chromium firefox webkit`. The browser tests use Chromium for desktop and mobile workflow coverage, plus Firefox and WebKit for cross-engine screen, theme, and dialog checks. Mobile emulation does not replace testing on physical iOS/Android devices.
+---
 
-## Structure and data
+## Running the PHP service locally
 
-- `src/domain.ts`: domain types and asynchronous repository contracts; `BRAND` is the visible product-name setting.
-- `src/services/`: realistic seeded courses/notes/events, search and filtering, and repositories. `createRepositories()` accepts a storage adapter for isolated testing.
-- `src/app/`: session/theme reducer context, route shell, CSS Modules, global tokens, and accessibility preferences.
-- `src/features/`: dashboard, onboarding, notes/course folders, calendar, import review, and settings.
-- `src/shared/`: reusable accessible dialogs, note cards, event rows, headings, and empty states.
-- `tests/`: browser workflows, responsive checks, and axe accessibility tests.
+You need PHP 8 with `pdo_mysql`, and a local MySQL or MariaDB server (XAMPP works; see [Notes/XAMPP.md](Notes/XAMPP.md)).
 
-All product data access goes through the typed repository interfaces. Prototype records live under `notely-data-v1` in browser localStorage; appearance lives under `notely-theme`. Use Settings → Reset sample data to remove prototype changes and return to onboarding. Seed dates are relative to the day the workspace is first created so its initial dashboard is useful. Resetting creates a fresh set of relative dates.
+1. **Create a database and user** for development, then apply the schema:
 
-Library query parameters are `q`, `course`, `category`, `visibility`, `from`, `to`, `sort` (`modified`, `created`, `title`), and `view` (`grid`, `list`). Calendar parameters are `date` (`YYYY-MM-DD`) and `view` (`agenda`, `month`). Course lecture links use `/courses/:id?lecture=YYYY-MM-DD`.
+   ```sh
+   mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/001_accounts.sql
+   mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/002_note_titles.sql
+   mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/003_note_content.sql
+   mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/004_server_notes.sql
+   mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/005_import_jobs.sql
+   mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/006_events.sql
+   ```
 
-## PHP / XAMPP handoff
+   You can also import the file through phpMyAdmin.
 
-The prototype does not perform server authentication, OCR, binary document parsing, file storage, or real-time collaboration. Original upload files remain local and are not persisted. TXT/Markdown note contents and detected metadata are saved in browser localStorage after review. PDF, DOCX, and image notes use filename metadata only; syllabus event extraction still uses deterministic sample results. The upload dialog’s **Prototype preview options** can exercise successful, partial, and failed processing. The 20 MB limit and supported extensions are enforced by the import repository.
+2. **Create a private config file outside the repository.** Copy [backend/config.example.php](backend/config.example.php) somewhere like `~/.config/notely/notely.php` and fill it in:
 
-### Sprint 1: automatic note organization (User Story #4)
+   ```php
+   return [
+       'db_name' => 'YOUR_DEV_DATABASE',
+       'db_user' => 'YOUR_DEV_USER',
+       'db_password' => 'YOUR_DEV_PASSWORD',
+       'app_key' => '<64 hex characters>',  // php -r 'echo bin2hex(random_bytes(32)), PHP_EOL;'
+       'origin' => 'http://127.0.0.1:5173',
+       'cookie_path' => '/',
+       'secure_cookies' => false,           // local HTTP only
+   ];
+   ```
 
-Note uploads use a small local parser in `src/services/noteMetadata.ts`, with no new dependencies or AI service. It matches existing workspace course codes case-insensitively, accepting spaces, hyphens, underscores, or joined codes (for example, `CSE 442`, `CSE-442`, and `cse442`). It stores the existing course ID so the review form, note editor, and course folders display the canonical code **CSE 442**. A `Course:` or `Course code:` header takes precedence over course references in the body. Courses that are not in the workspace are left undetected.
+   Restrict it to your user (`chmod 600`). **Never commit this file or put its values in a `VITE_*` variable.** Vite exposes `VITE_*` variables to the browser.
 
-Lecture dates are read first from `Lecture date:`/`Lecture:` headers, then `Date:` headers, then standalone date lines. Markdown heading/emphasis markers are supported. Accepted dates include `2026-09-14`, `2026/9/14`, US `9/14/2026`, `September 14, 2026`, and `14 September 2026`. A four-digit year is required; invalid calendar dates and conflicting candidates are left empty. Assignment/deadline dates in prose are not treated as lecture dates. Each field can fall back to the filename when its content metadata is absent. Stored dates use `YYYY-MM-DD`, independent of timezone; native date inputs display them according to the browser locale.
+3. **Start the API and the frontend** in two terminals:
 
-Missing fields stay empty and display **Not detected**. They do not default to the first course or today's date. Students can save a partially detected note or correct either field in the existing review form/editor. Undated course notes have a **Lecture date: Not detected** folder and are excluded from date-range searches. Metadata fields stack vertically on mobile.
+   ```sh
+   NOTELY_CONFIG=~/.config/notely/notely.php npm run dev:api   # PHP on 127.0.0.1:8080
+   npm run dev                                                  # Vite on 127.0.0.1:5173
+   ```
 
-No test note was supplied with the story; `tests/fixtures/cse442-lecture.txt` provides a reproducible example with course **CSE 442**, lecture date **September 14, 2026**, and a different assignment deadline. To try it, start the app, choose **Take a look around first**, then **Create → Upload document**, upload that fixture, review, and choose **Save to my notes**. Open `cse442-lecture` in All notes. Both fields and the note text survive a reload. For PDF/DOCX/images, a filename such as `CSE442_2026-09-14.pdf` is supported; reading those formats' contents requires a later parser/OCR implementation.
+   Vite proxies `/api` to the PHP server, so the app talks to `api/index.php` on the same origin. `backend/dev-router.php` exposes only `/api/index.php` and returns 404 for everything else.
 
-Run these commands from the repository root with Node 22.12 or newer:
+4. **Optional housekeeping:** `php backend/prune.php` deletes expired sessions and old rate-limit rows. Run it from a cron job on servers. It refuses to run over HTTP.
+
+---
+
+## Configuration reference
+
+The API looks for configuration in this order:
+
+1. The `NOTELY_CONFIG` environment variable, holding an absolute path to a private PHP config file.
+2. `config-path.php` next to `index.php`. This optional file returns **only a path**, for shared hosts that ignore `SetEnv`. Start from [backend/config-path.example.php](backend/config-path.example.php). It is git-ignored.
+3. Individual environment variables. These also fill any key the file leaves out.
+
+| Key | Environment variable | Purpose |
+| --- | --- | --- |
+| `db_name` | `NOTELY_DB_NAME` | Database name. Letters, digits, and `_` only. The host is always `localhost`. |
+| `db_user` | `NOTELY_DB_USER` | Database user (required) |
+| `db_password` | `NOTELY_DB_PASSWORD` | Database password (required) |
+| `app_key` | `NOTELY_APP_KEY` | 64 hex characters. Signs CSRF tokens and keys the rate-limit hashes. Use a different key in every environment. |
+| `origin` | `NOTELY_ORIGIN` | The exact scheme and host the frontend is served from. POST requests from any other `Origin` are rejected. |
+| `cookie_path` | `NOTELY_COOKIE_PATH` | Session cookie path, for example `/` locally or the class directory on the server. |
+| `secure_cookies` | `NOTELY_ALLOW_LOCAL_HTTP=1` disables it | HTTPS-only cookies. HTTP is accepted only for `localhost`, `127.0.0.1`, or `[::1]` origins. |
+| `gemini_api_key` | `NOTELY_GEMINI_API_KEY` | Optional. A Google AI Studio key (aistudio.google.com/apikey) that turns on automatic reading for syllabi the browser's free rules can't read, such as scans and photos. Without it, students review what the rules found and add the rest by hand. Local origins never call the API unless `NOTELY_AI_LIVE=1` is set for that run. Keep the key only in the private config, never in the repository or the frontend. |
+| `gemini_model` | none | Model for syllabus reading. Default `gemini-3.5-flash-lite`, the cheapest; `gemini-3.8-flash` is stronger. Both have a free tier, where Google may use the uploads to improve its products. |
+| `ai_user_daily_limit` | none | Automatic reads per student per UTC day. Default 5. |
+| `ai_daily_limit` | none | Automatic reads for all students per UTC day. Default 50. |
+| `ai_max_input_tokens` | none | Files over this many input tokens are refused before any read. Default 60000. |
+
+A missing or invalid configuration **fails closed**: the API returns HTTP 503 and logs only the exception class.
+
+---
+
+## API
+
+The API has a single entry point, `api/index.php?route=<name>`. Every response is JSON with `Cache-Control: no-store`.
+
+| Method | Route | Body | Signed in? |
+| --- | --- | --- | --- |
+| GET | `session` | none | no (starts an anonymous session if needed) |
+| POST | `register` | `name`, `email`, `password` | no |
+| POST | `login` | `email`, `password` | no |
+| POST | `logout` | `{}` | either |
+| POST | `reset-password` | `email`, `recoveryCode`, `password` | no |
+| POST | `onboarding` | `{}` | yes |
+| POST | `profile` | `name`, `email`, `currentPassword` (only needed when the email changes) | yes |
+| POST | `password` | `currentPassword`, `password` | yes |
+| POST | `recovery-code` | `currentPassword` | yes |
+| POST | `delete` | `currentPassword` | yes |
+| GET | `notes` | none | yes (notes the caller owns or collaborates on) |
+| POST | `note-create` | `title`, optional `body`, `courseId`, `lectureDate`, `category`, `visibility`, `tags` | yes |
+| GET | `note&id=<id>` | none | yes (owner or collaborator) |
+| POST | `note-title` | `id`, `title` | yes (owner or editor) |
+| POST | `note-content` | `id`, `body` | yes (owner or editor) |
+| POST | `note-save` | `id`, `title`, `body`, optional `courseId`, `lectureDate`, `category`, `visibility`, `tags` | yes (owner or editor) |
+| POST | `note-pin` | `id`, `pinned` (boolean) | yes (owner or editor) |
+| GET | `note-versions&id=<id>` | none | yes (owner or collaborator) |
+| POST | `note-restore` | `id`, `versionId` | yes (owner or editor) |
+| GET | `note-comments&id=<id>` | none | yes (owner or collaborator) |
+| POST | `note-comment` | `id`, `body` | yes (owner or collaborator, shared notes only) |
+| GET | `note-collaborators&id=<id>` | none | yes (owner or collaborator) |
+| POST | `note-invite` | `id`, `email` | yes (owner only, rate limited) |
+| POST | `note-permission` | `id`, `userId`, `permission` (`view` or `edit`) | yes (owner only) |
+| POST | `note-delete` | `id` | yes (owner only) |
+| POST | `syllabus-upload` | `courseId`, `fileName`, `content` (the file as base64) | yes (rate limited) |
+| GET | `import-job&id=<id>` | none | yes (owner only) |
+| POST | `import-confirm` | `id`, `events` (each `title`, `date`, optional `kind`, `time`), optional `courseId` | yes (job owner only) |
+| GET | `events` or `events&courseId=<id>` | none | yes (the caller's own events) |
+| POST | `import-extract` | `id`, `year` (the course year, for dates without one) | yes (job owner only, daily limits) |
+
+Every POST must include:
+- `Content-Type: application/json` (body at most 8 KB, except `syllabus-upload`)
+- `Origin` matching the configured origin
+- `X-CSRF-Token` set to the `csrfToken` from the latest response
+
+Successful responses have this shape:
+
+```json
+{ "user": { "id": "42", "name": "…", "email": "…" } | null,
+  "onboarding": { "completed": true, "step": 3 },
+  "csrfToken": "…",
+  "recoveryCode": "…"   // only from register, reset-password, and recovery-code
+}
+```
+
+The note routes return `{ "note": { "id": "…", "title": "…" } }` instead. `note-create` returns 201. `note-title` returns 403 for a user without edit permission and 404 for a missing note. Note titles must contain 1–255 visible characters.
+
+GET `note` additionally returns `body`. POST `note-content` returns `{ "note": { "id": "…", "body": "…" } }` and uses the same owner/edit-collaborator authorization and error statuses as `note-title`. Body text must be a UTF-8 string; empty bodies are allowed and whitespace is preserved exactly. The existing 8 KB JSON request limit applies. Title-only creation initializes an empty body. Apply migration 003 before deploying this backend, with note writes paused during the migration.
+
+POST `note-delete` returns `{ "note": { "id": "…" } }` and permanently removes the note and its collaborator rows. Only the owner, taken from the session, can delete; any owner ID sent with the request is ignored. Collaborators with `edit` or `view` permission get 403, signed-out users get 401, and a missing note gets 404.
+
+Since task 120, signed-in accounts use these routes for every note through [src/services/notes-http.ts](src/services/notes-http.ts). GET `note`, `notes`, `note-create`, `note-save`, `note-pin`, and `note-restore` return whole notes: `id`, `ownerId`, `title`, `body`, `courseId`, `lectureDate`, `category` (`School`, `Work`, `Meetings`, or `Personal`), `visibility` (`private` or `shared`), `tags` (at most 30 strings of up to 100 characters), `pinned`, `createdAt`, and `updatedAt` (ISO 8601, UTC). `note-save` keeps the current value of any field it doesn't receive, and saves the previous title and body as a version when either changes. Pinning doesn't change `updatedAt`. Notes the caller can't open return 404 from every read route, so their existence isn't revealed. Deleting a note also deletes its versions and comments. `note-invite` returns 404 for an unregistered email and is limited to 30 invitations per user every 15 minutes. Apply migration 004 before deploying this backend.
+
+Since card 43, POST `syllabus-upload` takes one syllabus (PDF, DOCX, TXT, Markdown, JPG, PNG, or WebP, at most 20 MB) and returns 201 with `{ "job": { "id", "kind": "syllabus", "courseId", "name", "type", "size", "state": "queued", "events": [], "createdAt" } }`. The file's contents must match its type, so a renamed file is refused: a PDF needs its header and end marker, a DOCX must be a Word document without macros, and an image header must parse as the named format. The file is only stored as data and read as text; it is never run, written to disk, or served back. Wrong types, empty files, and files over 20 MB get 422 with the same messages the upload window shows (413 when the whole request is too large). Each account can upload 20 files every 15 minutes. GET `import-job` returns the same job to its owner and 404 to anyone else. The stored file is cleared by `prune.php` after a day. Apply migration 005 before deploying this backend.
+
+Since card 47, POST `import-confirm` saves 1–200 reviewed events from the caller's own job to its course (or to `courseId`, when the student picked another course) and returns `{ "created": <count> }`. The job becomes `completed` and its file is dropped, so sending the same confirm again returns `{ "created": 0 }`. Every event needs a `title` (1–255 visible characters) and a real `date` (`YYYY-MM-DD`), otherwise 422 "Give every event a title and a date."; `kind` is one of `lecture`, `assignment`, `quiz`, `exam`, `deadline`, `other` (default), and `time` is empty or 24-hour `HH:MM`. GET `events` returns `{ "events": [{ "id", "courseId", "title", "kind", "date", "time", "location", "description", "source", "importJobId" }] }` ordered by date and time. Apply migration 006 before deploying this backend.
+
+Since card 127, POST `import-extract` proposes events for a job with the Gemini API ([backend/lib/syllabus-ai.php](backend/lib/syllabus-ai.php)) and returns the job in the `review` state with its `events`. The browser reads every syllabus with free rules first ([src/services/syllabus.ts](src/services/syllabus.ts)) and calls this route only when they find too little, such as for a scan or photo. To keep API use down:
+- A file whose identical copy was read in the last 180 days reuses those events, with no API call. A class uploading the same syllabus reads it once.
+- The file is token-counted first (free), and anything over `ai_max_input_tokens` gets 422 before it is read.
+- Each student gets `ai_user_daily_limit` reads per UTC day and the whole app `ai_daily_limit`; after that, 429.
+- A job being read can't be read again at the same time (409), so a double click pays once.
+- Without `gemini_api_key`, or from a local origin without `NOTELY_AI_LIVE=1`, the route returns 503 and never contacts the API. Every automated test uses a fake API.
+
+A syllabus can contain text written to trick the model (prompt injection), so the model is treated as untrusted too: it has no tools, its reply must match a fixed schema, and the server drops unknown fields, strips control and direction characters, shortens text, allows only known kinds, and clears any date that isn't a real day within a year of the course. The student then reviews every event, and saving goes through `import-confirm`'s checks and prepared statements. The API key is sent only in a request header, never to the browser or a log.
+
+Each read is logged with its token counts only. A failed read leaves the job `failed`, and it can be retried.
+
+Card 127's tests: `php backend/tests/syllabus-ai.php` (fake API, no database), `npm run test:import-extract` (fake API, against a DEV/TEST database with migrations 001–006; it cleans up after itself), and `NOTELY_TEST_ISOLATED=1 npm run test:import-extract-http` (local API, never calls Gemini). The aptitude steps use `backend/tests/data/cse442-syllabus-scan.png`, an image of the acceptance tests' syllabus.
+
+After adding a key, check it once with `NOTELY_AI_LIVE=1 NOTELY_GEMINI_API_KEY=<key> php backend/tests/gemini-smoke.php`. It sends a single small request (free on the free tier) and prints the events Gemini found; no other test or script calls the API.
+
+Errors return `{ "error": "<message>" }` with one of these statuses: 400 (bad JSON or plain HTTP in secure mode), 401 (not signed in, or wrong login), 403 (Origin or CSRF failure), 404 (unknown route), 405 (wrong method), 409 (email conflict), 413 (body too large), 415 (wrong content type), 422 (validation failure), 429 (rate limited, with `Retry-After`), 503 (service or configuration failure).
+
+The browser client is [src/services/auth.ts](src/services/auth.ts). It sends requests one at a time, refreshes the CSRF token after each response, and never caches recovery codes.
+
+---
+
+## Database schema
+
+Defined in [backend/migrations/001_accounts.sql](backend/migrations/001_accounts.sql) and [backend/migrations/002_note_titles.sql](backend/migrations/002_note_titles.sql). Also apply [backend/migrations/003_note_content.sql](backend/migrations/003_note_content.sql), which backfills existing notes with an empty body, and [backend/migrations/004_server_notes.sql](backend/migrations/004_server_notes.sql), which adds note metadata, history, and comments. Then apply [backend/migrations/005_import_jobs.sql](backend/migrations/005_import_jobs.sql), which stores syllabus uploads, and [backend/migrations/006_events.sql](backend/migrations/006_events.sql), which stores imported schedule events. Apply them in order, once each, separately to each environment. All timestamps are UTC.
+
+| Table | Contents |
+| --- | --- |
+| `notely_users` | `id`, `name` (utf8mb4, at most 100 characters), `email` (ASCII, unique, lowercased), `password_hash`, `recovery_code_hash` (SHA-256), `onboarding_completed`, timestamps |
+| `notely_sessions` | `token_hash` (SHA-256 of the cookie token), `user_id` (null for anonymous sessions; cascades on user delete), `created_at`, `last_seen_at`, `expires_at` |
+| `notely_rate_limits` | `bucket_hash` (HMAC of scope plus IP, email, or user), `window_start`, `attempts` |
+| `notely_notes` | Server-side note ID, owner, title, body (non-null TEXT), course ID, lecture date, category, visibility, tags (JSON text), pinned, timestamps |
+| `notely_note_editors` | Per-note user permission (`view` or `edit`) |
+| `notely_import_jobs` | A syllabus upload: owner (cascades on user delete), course ID, file name, type, size, SHA-256, the file itself until it is read, state, and proposed events (JSON text) |
+| `notely_events` | A schedule event: owner (cascades on user delete), course ID, title, kind, date, optional time, source (`manual` or `imported`), and the import job it came from (set to null if the job is deleted) |
+| `notely_note_versions` | Earlier title and body of a note, who saved over them, and when (cascades on note delete) |
+| `notely_note_comments` | Comment body, note, and author (cascades on note or author delete) |
+
+The database never stores a plaintext password, recovery code, session token, email-to-IP pairing, or raw IP address.
+
+---
+
+## Security model
+
+**Passwords**
+- Hashed with Argon2id (19 MiB, 2 iterations) when PHP supports it, otherwise bcrypt cost 12. Hashes are upgraded automatically on the next sign-in.
+- Length is 8–72 characters, printable ASCII only. Restricting to ASCII means bcrypt never silently truncates a password, and every password can be typed on any keyboard.
+- About 50 of the most common breached passwords, such as `password123` and `qwertyuiop`, are rejected, ignoring case.
+- Unknown emails still run a full hash, so response timing does not reveal whether an account exists. Login errors never say which field was wrong.
+
+**Recovery codes**
+- 128 random bits, shown once as `XXXX-XXXX-…`, and stored only as a SHA-256 hash.
+- Using a code replaces it, changes the password, and signs out every session.
+- Signed-in users can generate a replacement after entering their password.
+- There is no email-based reset. Losing both the password and the code means the account cannot be recovered.
+
+**Sessions**
+- 256-bit random token in an `HttpOnly`, `SameSite=Lax` cookie (also `Secure` outside local development). Only its hash is stored.
+- Sessions expire after 12 hours, or after 30 minutes without activity.
+- A new token is issued on sign-in, sign-up, logout, password change, email change, recovery, and deletion. Password and email changes revoke all other sessions.
+- Protected actions re-check inside a transaction that the session is still active, so a logout in another tab blocks a request that is already in progress (it returns 401).
+- The cookie name includes a hash of the cookie path, so it does not collide with other apps on a shared host.
+
+**Requests**
+- Same-origin `Origin` check plus an HMAC-derived CSRF token on every POST.
+- JSON only, 8 KB body cap, JSON depth limit, strict route and method allowlist.
+- All SQL uses prepared statements with emulation disabled. The database host is hard-coded to `localhost`.
+- Rate limits use 15-minute windows:
+
+  | Action | Limit per window |
+  | --- | --- |
+  | Sign-up | 10 per IP |
+  | Sign-in | 60 per IP, 20 per email |
+  | Recovery | 20 per IP, 10 per email |
+  | Account actions | 90 per IP, 20 per user |
+  | Note changes | 1000 per user |
+  | New anonymous sessions | 120 per IP |
+
+  Client-supplied forwarding headers are ignored.
+- Security headers: `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`. Errors never include stack traces or SQL.
+
+**Input validation**
+- Names: letters, accents, spaces, hyphens, apostrophes, and periods. No emoji, digits, hidden or control characters, or stacked combining marks (three or more on one letter).
+- Emails: ASCII only, exactly one `@`, at most 254 characters.
+- [src/services/validation.ts](src/services/validation.ts) mirrors [backend/lib/security.php](backend/lib/security.php) so people see the same message before submitting. **The server is the authority**, so keep the two files' wording in sync.
+
+**Files on the server**
+- Only `index.php` is meant to be requested. `lib/` contains `Require all denied`, and each library file also refuses to run unless loaded through `index.php`. Aptitude ignores `.htaccess`, so `lib/index.php` returns 403 to keep the folder from being listed.
+- `.htaccess` blocks `config*`, `.sql`, and `.md` files and turns off directory listings.
+
+These controls follow the [OWASP authentication](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) and [session management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html) cheat sheets. They are not a formal security audit.
+
+---
+
+## Where data lives
+
+| Data | Storage |
+| --- | --- |
+| Account identity, password hash, recovery-code hash, sessions, onboarding status | MySQL (server) |
+| A signed-in account's notes, their history, comments, and collaborators | MySQL (server) |
+| Demo workspace content | `localStorage["notely-data-v1"]` |
+| A signed-in account's courses and events | `localStorage["notely-workspace-v1-<user-id>"]` |
+| Theme preference | `localStorage["notely-theme"]` |
+| Demo mode flag for this tab | `sessionStorage["notely-demo"]` |
+
+Workspace content is kept separate for each account in the same browser, and is removed locally when the account is deleted. It is **not** synced between devices and is **not** protected by the server. Browser storage is a prototype convenience, not an authorization boundary. Seed dates are relative to when the workspace is created, so the demo dashboard always has upcoming items. **Settings → Reset sample data** recreates the demo content. **Clear workspace** for an account deletes the notes it owns on the server and clears its courses and events in this browser; the account itself stays. Notes a signed-in account saved in this browser before task 120 are not copied to the server.
+
+Real accounts start with an empty workspace. Only the demo is pre-filled.
+
+---
+
+## Deployment
+
+### Apache with rewrites (web root or subdirectory)
 
 ```sh
-npm ci
-npm test
-npm run build
-npx playwright install chromium
-npx playwright test tests/note-metadata.spec.ts --project=chromium --project=mobile
-npm run dev
+npm run build                          # site at /
+BASE_PATH=/notely/ npm run build       # site in a subdirectory
 ```
 
-Unit/repository tests cover formats, exact course matching, date precedence, missing/invalid/conflicting metadata, partial saves, review corrections, filename-only binary imports, read failures, and persistence. Browser tests cover real upload/review/open/reload flows, missing fields, course folders, and metadata visibility/overflow at 320, 375, 768, and 1440 pixels. To run all existing browser regressions as well, install all engines with `npx playwright install chromium firefox webkit`, then run `npm run test:e2e`.
+Copy the **contents** of `dist/` to the document root or subdirectory. The build includes:
+- the SPA
+- `public/.htaccess`, which falls back to `index.html` for deep links and skips `api/`
+- `dist/api/` with `index.php`, `lib/`, and `.htaccess`
 
-Replace the repository implementations in `src/services/repositories.ts` with HTTP adapters for future `/api/v1` PHP JSON endpoints. Keep the domain interfaces as the boundary. Suggested resource groups are `/auth`, `/courses`, `/notes` (including comments and versions), `/events`, and `/imports`. Server-side validation, authorization, session handling, file scanning/storage, and actual extraction belong in that later backend milestone. Do not treat localStorage as an authentication or authorization boundary.
+The build does **not** include the tests, `dev-router.php`, `prune.php`, migrations, or any config file.
 
-For Apache at the web root, copy `dist/` contents into the document root after building. Vite copies `public/.htaccess` into `dist`; enable `mod_rewrite` and `AllowOverride FileInfo` for SPA deep links. Requests under `api/` are excluded from the SPA fallback. Do not expose a PHP production service through the Vite development server.
+Enable `mod_rewrite` and allow the `FileInfo`, `AuthConfig`, and `Options` overrides. Set `NOTELY_CONFIG` for PHP, or place a `config-path.php` beside `api/index.php`. Match `origin` and `cookie_path` to the public URL. Never expose the PHP service through the Vite dev server.
 
-For a subdirectory such as `/notely/`, build with the matching base:
+### Course server (aptitude), no SPA rewrites
+
+Aptitude ignores the rewrite rules, so build with hash routing:
 
 ```sh
-BASE_PATH=/notely/ npm run build
+VITE_ROUTER_MODE=hash BASE_PATH=/CSE442/2026-Fall/cse-442c/ npm run build
+npm run test:static-build    # Verifies reloads, sign-in, API paths, and skip link on a host with no rewrites
 ```
 
-Copy the output into that Apache directory. React Router uses the generated base URL. PHP service URLs should continue to use the chosen `/api/v1` endpoint configuration independently of the frontend base.
+Page URLs look like `…/cse-442c/#/settings`. Asset and API URLs still use the class base path.
 
-## Design and verification
+When uploading, keep the server-only files intact:
 
-The interface uses the supplied sage, mint, brown, and slate palette, with semantic neutral surfaces and theme-specific text. CSS motion is limited to press feedback, anchored menus, and dialogs/sheets. Keyboard use bypasses motion, reduced motion removes positional transitions, and reduced transparency uses solid navigation. Base UI provides dialog/menu focus management and dismissal.
+```sh
+rsync -rv --exclude='/api/config-path.php' --exclude='/api/.notely-config.*/' \
+  dist/ YOUR_UBIT@aptitude.cse.buffalo.edu:/data/web/CSE442/2026-Fall/cse-442c/
+```
 
-Automated coverage includes repository behavior, onboarding, library search/filter/sort, lecture links, event creation, note saving/comments/history, imports, theme persistence, keyboard dismissal, responsive overflow, and accessibility. Final physical-device and additional-browser checks should be completed with the team’s target devices before release. Screenshots and traces are generated in ignored `test-results/` on browser runs.
+On the server:
+- Keep the real config file outside the web root and readable only by the PHP user. Use the HTTPS `origin`, the class `cookie_path`, `secure_cookies => true`, and a unique `app_key`.
+- TEST (aptitude) and PROD (cattle) have **separate** databases, keys, and credentials. Never copy data or sessions between them.
+- University network or VPN access is required.
 
-Verified on September 10, 2026:
+---
 
-- TypeScript and production build pass; JavaScript is approximately **128 KB gzip**, below the 200 KB target.
-- **7 repository tests** and **22 browser checks** pass. Browser coverage includes Chromium desktop/mobile workflows and Chromium, Firefox, and WebKit screen/theme/dialog checks.
-- Responsive checks cover 375, 768, 1024, and 1440 pixel widths; the notes library also passes a 200% text-size overflow check. Automated axe checks report no violations in the tested states.
-- Lighthouse on the production welcome page: **98 performance, 100 accessibility, 100 best practices**, LCP **2.0 s**, CLS **0**, and total blocking time **80 ms**. These are local lab measurements, not field metrics for every screen.
-- Dependency installation audit reports **zero vulnerabilities**.
+## Testing
 
-Physical iOS/Android devices and branded Microsoft Edge/Safari have not been tested here; WebKit testing is engine coverage rather than a claim of testing Safari itself.
+| Command | What it runs |
+| --- | --- |
+| `npm test` | Vitest unit tests: repository contracts, filtering, pinning, the auth adapter, validation, and the collaborator mock |
+| `npm run test:e2e` | Playwright browser tests (needs `npx playwright install chromium firefox webkit` once) |
+| `npx playwright test tests/note-metadata.spec.ts --project=chromium --project=mobile` | Card 35: upload a lecture note, check the detected course and date survive a reload, and that missing ones stay **Not detected** |
+| `npm run test:static-build` | Hash-routing build under a static server with no rewrites (build first) |
+| `npm run test:php` | PHP validation, hashing, and configuration checks. No database needed. |
+| `npm run test:schema` | Read-only check that a live DEV/TEST database matches the expected schema |
+| `npm run test:accounts` | Full HTTP contract test against a running API. Creates and then deletes uniquely named test accounts. |
+| `npm run test:note-titles` | HTTP tests for the three card 108 scenarios against a running DEV/TEST API with migration 002 applied. |
+| `php backend/tests/note-titles.php` | Owner, editor, viewer, and missing-note title tests against a DEV/TEST database with migration 002 applied. Creates and deletes test accounts. |
+| `php backend/tests/note-content.php` | Body validation plus owner/editor/viewer, persistence, and title-preservation tests against a DEV/TEST database with all three migrations applied. |
+| `node backend/tests/note-content-http.mjs` | Task 110 HTTP persistence, access, CSRF/Origin, validation, and request-limit checks against a running DEV/TEST API. |
+| `php backend/tests/note-delete.php` | Task 116 owner-only deletion: owner delete, edit/view collaborator, signed-out, and forged-owner rejection, and collaborator cascade, against a DEV/TEST database with migrations 002 and 003 applied. |
+| `node backend/tests/note-delete-http.mjs` | Task 116 HTTP deletion, ownership, CSRF/Origin, and validation checks against a running DEV/TEST API. |
+| `php backend/tests/server-notes.php` | Task 120 metadata, listing, versions, pinning, restore, sharing, permissions, comments, delete cascade, and lost collaborator access, against a DEV/TEST database with migrations 002–004 applied. |
+| `node backend/tests/server-notes-http.mjs` | Task 120 HTTP sharing, collaborator access, owner-only delete, and lost access after delete against a running DEV/TEST API. |
+
+The HTTP contract tests refuse any host except `localhost`, `127.0.0.1`, or aptitude. Point them with `NOTELY_TEST_URL` (and `NOTELY_TEST_ORIGIN` if needed). **Never run them against production.**
+
+Browser tests mock the account API ([tests/support/account-fixture.ts](tests/support/account-fixture.ts)). They cover:
+- onboarding and sign-up validation
+- login: valid and incorrect credentials, empty or invalid fields, duplicate submissions, and resuming unfinished onboarding
+- logout, including Back-button and direct-URL access afterwards
+- account changes and recovery-code acknowledgement
+- library search and filters
+- events and lecture folders
+- note editing, comments, history, and pinning
+- collaborators
+- imports and import failures
+- keyboard dialog behaviour and theme persistence
+- responsive layout at 375, 768, 1024, and 1440 px
+- axe accessibility checks
+
+Firefox and WebKit run the cross-engine screen, theme, and dialog suite. Screenshots and traces go to the git-ignored `test-results/`.
+
+Emulated browsers do not replace testing on physical iOS and Android devices, Safari, or Edge.
+
+---
+
+## Project structure
+
+```
+backend/
+  index.php               Only public PHP entry point: routing, headers, Origin/CSRF/JSON checks
+  lib/bootstrap.php       Config loading, PDO connection, sessions, rate limiting, CSRF
+  lib/security.php        Field validation, password hashing, recovery codes
+  lib/accounts.php        Account actions (register, login, logout, profile, password, recovery, delete)
+  migrations/             MySQL schema
+  prune.php               CLI cleanup of expired sessions and rate-limit rows
+  dev-router.php          Local PHP dev server router (not deployed)
+  config*.example.php     Templates only, with no real credentials
+  tests/                  PHP unit/config/schema tests and the HTTP contract test
+src/
+  domain.ts               Domain types and async repository interfaces; BRAND sets the product name
+  main.tsx                Entry point: picks browser or hash routing from VITE_ROUTER_MODE
+  app/                    App shell and routes, global state (context.tsx), theme, CSS tokens
+  features/               dashboard, onboarding, notes, schedule, imports, settings, account, collaborators
+  shared/ui.tsx           Accessible modal, empty state, note card, event row, page heading
+  services/
+    auth.ts               HTTP client for the PHP account API
+    app-repositories.ts   Combines server auth with per-account local workspaces and demo mode
+    repositories.ts       localStorage-backed courses/schedule/imports, and the demo's notes (prototype)
+    notes-http.ts         Server-backed notes for signed-in accounts (task 120)
+    collaborators.mock.ts Frontend-only collaborator invitations
+    fixtures.ts           Demo courses, notes, and events
+    validation.ts         Client-side copy of the server's validation rules
+tests/                    Playwright specs and the mocked account API fixture
+scripts/                  Build helpers (copy PHP into dist/api, static-host test)
+public/                   favicon and SPA .htaccess
+Notes/                    Team research notes (XAMPP, Figma)
+```
+
+Every screen talks to data through the interfaces in `domain.ts`. To replace a local prototype repository with an HTTP one, implement the same interface. Nothing in the UI needs to change.
+
+---
+
+## URL parameters
+
+- **Notes library** (`/notes`): `q`, `course`, `category`, `visibility`, `from`, `to`, `sort` (`modified` | `created` | `title`), `view` (`grid` | `list`)
+- **Schedule** (`/schedule`): `date` (`YYYY-MM-DD`), `view` (`agenda` | `month`)
+- **Course lecture folder**: `/courses/:id?lecture=YYYY-MM-DD`
+- **Sign-in screen**: `/welcome?mode=signin`
+
+---
+
+## Design and accessibility
+
+- Sage, mint, brown, and slate palette with semantic surface and text tokens for light and dark themes.
+- Motion is limited to press feedback, menus, and dialogs. It is skipped during keyboard use and reduced when the system asks for reduced motion. Reduced-transparency settings switch to solid navigation.
+- Base UI handles focus trapping and dismissal for dialogs and menus. Every page has a skip link, labelled navigation, and inline field errors linked with `aria-describedby`.
+- Desktop uses a sidebar. Mobile uses a bottom navigation bar that includes Settings and Log out.
+
+---
+
+## Known limitations and next steps
+
+- Courses and events are stored in the browser only. A collaborator sees a shared note's course as its category, because course IDs belong to the owner's browser.
+- The demo still uses the frontend collaborator mock (`collaborators.mock.ts`). Comments and shared notes are not real-time.
+- OCR, document parsing, and file storage are simulated. Uploaded files are never stored.
+- Email addresses are not verified, and no email is ever sent.
+- Accounts cannot be recovered without the recovery code.

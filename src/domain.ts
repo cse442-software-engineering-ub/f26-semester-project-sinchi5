@@ -1,4 +1,5 @@
 export const BRAND = "Notely";
+export type CollaboratorPermission = "view" | "edit";
 export type Visibility = "private" | "shared";
 export type EventKind =
   "lecture" | "assignment" | "quiz" | "exam" | "deadline" | "other";
@@ -24,6 +25,11 @@ export interface Category {
 }
 export interface Note {
   id: string;
+  ownerId?: string;
+  // Recorded at creation time so comment permission checks (task #65) can
+  // tell the creator apart from anyone else, since every mock user shares
+  // the literal id "student" - ownerId alone can't distinguish people.
+  ownerEmail?: string;
   title: string;
   body: string;
   courseId: string;
@@ -48,8 +54,13 @@ export interface Comment {
   noteId: string;
   body: string;
   author: string;
+  authorId: string;
   createdAt: string;
 }
+// Prototype-only: lets the UI demo loading/posting success/failure without a
+// real network layer to intercept, same purpose as ImportRepository's scenario.
+export type CommentScenario = "success" | "slow" | "failure";
+export const MAX_COMMENT_LENGTH = 2000;
 export interface CourseEvent {
   id: string;
   courseId: string;
@@ -68,6 +79,12 @@ export interface DetectedMetadata {
   category: string;
 }
 export type UploadKind = "document" | "scan" | "syllabus";
+// An event proposed from a syllabus. needsReview means it has no clear date yet (card 44);
+// include: false means the student left it out on the review screen (card 46).
+export interface DetectedEvent extends CourseEvent {
+  needsReview?: boolean;
+  include?: boolean;
+}
 export interface UploadJob {
   id: string;
   kind: UploadKind;
@@ -75,8 +92,13 @@ export interface UploadJob {
   state:
     "queued" | "processing" | "review" | "completed" | "partial" | "failed";
   metadata: DetectedMetadata;
+  // The text of an uploaded TXT/Markdown note, saved as the note's body (card 35).
   body?: string;
-  events: CourseEvent[];
+  events: DetectedEvent[];
+  // How a syllabus was read (card 45): by the free rules, by the AI reader after the rules found too
+  // little, by the rules alone because the AI reader couldn't help (notice says why), or a demo sample.
+  reader?: "rules" | "ai" | "rules-only" | "sample";
+  notice?: string;
 }
 export interface NoteQuery {
   q?: string;
@@ -89,8 +111,15 @@ export interface NoteQuery {
 }
 export interface AuthRepository {
   session(): Promise<User | null>;
-  signIn(email: string, name?: string): Promise<User>;
+  signIn(email: string, password: string): Promise<User>;
+  signUp(name: string, email: string, password: string): Promise<{ user: User; recoveryCode: string }>;
   signOut(): Promise<void>;
+  startDemo(): Promise<void>;
+  updateProfile(name: string, email: string, currentPassword: string): Promise<User>;
+  changePassword(currentPassword: string, password: string): Promise<void>;
+  resetPassword(email: string, recoveryCode: string, password: string): Promise<string>;
+  replaceRecoveryCode(currentPassword: string): Promise<string>;
+  deleteAccount(currentPassword: string): Promise<void>;
   onboarding(): Promise<OnboardingState>;
   completeOnboarding(): Promise<void>;
 }
@@ -100,14 +129,27 @@ export interface CourseRepository {
   folders(id: string): Promise<Record<string, Note[]>>;
 }
 export interface NoteRepository {
+  setCollaboratorPermission(id: string,collaboratorId: string,permission: CollaboratorPermission,): Promise<Collaborator>;
+  collaborators(id: string): Promise<Collaborator[]>;
+  inviteCollaborator(id: string, email: string): Promise<{ collaborator: Collaborator }>;
   list(query?: NoteQuery): Promise<Note[]>;
   get(id: string): Promise<Note>;
   save(note: Note): Promise<Note>;
+  setPinned(id: string, pinned: boolean): Promise<Note>;
   create(data: Partial<Note>): Promise<Note>;
-  comments(id: string): Promise<Comment[]>;
-  comment(id: string, body: string): Promise<Comment>;
+  // Removes the note with its comments, versions, and collaborator entries.
+  delete(id: string): Promise<void>;
+  comments(id: string, scenario?: CommentScenario): Promise<Comment[]>;
+  comment(id: string, body: string, scenario?: CommentScenario): Promise<Comment>;
   versions(id: string): Promise<NoteVersion[]>;
   restore(id: string, versionId: string): Promise<Note>;
+}
+export interface Collaborator {
+  id: string;
+  name: string;
+  email: string;
+  status?: "Pending" | "Invited" | "Accepted";
+  permission: CollaboratorPermission;
 }
 export interface ScheduleRepository {
   list(from?: string, to?: string): Promise<CourseEvent[]>;
@@ -116,11 +158,11 @@ export interface ScheduleRepository {
 }
 export interface ImportRepository {
   validate(file: Pick<File, "name" | "size">, kind: UploadKind): string | null;
-  start(
-    file: Pick<File, "name" | "size"> & Partial<Pick<File, "text">>,
-    kind: UploadKind,
-    scenario?: string,
-  ): Promise<UploadJob>;
+  // Registers the file as a queued job; a signed-in student's syllabus goes to the server (card 43).
+  start(file: File, kind: UploadKind, scenario?: string, courseId?: string): Promise<UploadJob>;
+  // Reads a queued job's file and proposes note details or schedule events (cards 44 and 45).
+  // onAutomaticReading is called when the AI reader is asked, which can take up to a minute.
+  process(job: UploadJob, file: File, scenario?: string, onAutomaticReading?: () => void): Promise<UploadJob>;
   confirm(job: UploadJob): Promise<void>;
 }
 export interface Repositories {

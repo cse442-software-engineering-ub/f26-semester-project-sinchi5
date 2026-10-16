@@ -8,6 +8,7 @@ import {
   ArrowUpRight,
   BookOpen,
   CalendarDays,
+  Trash2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useRef, useState, type ReactNode } from "react";
@@ -20,19 +21,21 @@ export function Modal({
   children,
   onClose,
   wide = false,
+  dismissible = true,
 }: {
   title: string;
   description?: string;
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
+  dismissible?: boolean;
 }) {
   const [open, setOpen] = useState(true);
   const previousFocus = useRef(document.activeElement as HTMLElement | null);
   return (
     <Dialog.Root
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={(next) => { if (next || dismissible) setOpen(next); }}
       onOpenChangeComplete={(isOpen) => {
         if (!isOpen) onClose();
       }}
@@ -54,7 +57,7 @@ export function Modal({
                 {description || "Make a little room for your ideas."}
               </Dialog.Description>
             </div>
-            <Dialog.Close className={s.iconButton} aria-label="Close">
+            <Dialog.Close className={s.iconButton} aria-label="Close" disabled={!dismissible}>
               <X size={20} />
             </Dialog.Close>
           </div>
@@ -62,6 +65,57 @@ export function Modal({
         </Dialog.Popup>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+export function DeleteNoteDialog({
+  title,
+  onDelete,
+  onClose,
+}: {
+  title: string;
+  // Resolves once the note is gone; the caller then unmounts the dialog.
+  onDelete: () => Promise<void>;
+  onClose: () => void;
+}) {
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+  const pending = useRef(false);
+  async function confirm() {
+    if (pending.current) return;
+    pending.current = true;
+    setDeleting(true);
+    setError("");
+    try {
+      await onDelete();
+    } catch (e) {
+      // Stay disabled after success until the caller removes the dialog.
+      pending.current = false;
+      setDeleting(false);
+      setError(`This note could not be deleted. ${(e as Error).message}`);
+    }
+  }
+  return (
+    <Modal
+      title="Delete this note?"
+      description={`“${title}” and its comments and history will be permanently removed. This can’t be undone.`}
+      dismissible={!deleting}
+      onClose={onClose}
+    >
+      {error && (
+        <p className={s.error} role="alert">
+          {error}
+        </p>
+      )}
+      {deleting && <p role="status">Deleting note…</p>}
+      <div className={s.actions}>
+        <Dialog.Close className={s.secondary} disabled={deleting}>
+          Cancel
+        </Dialog.Close>
+        <button className={s.danger} disabled={deleting} onClick={confirm}>
+          Delete note
+        </button>
+      </div>
+    </Modal>
   );
 }
 export function Empty({
@@ -79,10 +133,16 @@ export function Empty({
     </div>
   );
 }
-export function NoteCard({ note }: { note: Note }) {
+export function NoteCard({
+  note,
+  onDelete,
+}: {
+  note: Note;
+  onDelete?: () => void;
+}) {
   const { state } = useApp();
   const course = state.courses.find((c) => c.id === note.courseId);
-  return (
+  const card = (
     <Link to={`/notes/${note.id}`} className={s.noteCard}>
       <div className={s.cardTop}>
         <span
@@ -96,7 +156,11 @@ export function NoteCard({ note }: { note: Note }) {
           <i />
           {course?.code || note.category}
         </span>
-        {note.pinned ? <Pin size={14} /> : <FileText size={16} />}
+        {note.pinned ? (
+          <span className={s.pinnedBadge}>
+            <Pin size={14} aria-hidden="true" /> Pinned
+          </span>
+        ) : <FileText size={16} aria-hidden="true" />}
       </div>
       <h3>{note.title}</h3>
       <p className={s.excerpt}>{note.body}</p>
@@ -117,6 +181,21 @@ export function NoteCard({ note }: { note: Note }) {
         </span>
       </div>
     </Link>
+  );
+  if (!onDelete) return card;
+  // The card is one link, so its action sits beside it instead of inside it.
+  return (
+    <div className={s.noteItem}>
+      {card}
+      <button
+        type="button"
+        className={s.cardAction}
+        aria-label={`Delete ${note.title}`}
+        onClick={onDelete}
+      >
+        <Trash2 size={14} aria-hidden="true" /> Delete
+      </button>
+    </div>
   );
 }
 export function EventRow({

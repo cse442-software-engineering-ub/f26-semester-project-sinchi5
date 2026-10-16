@@ -88,6 +88,16 @@
   color: var(--text) !important;
   font-weight: 600 !important;
 }
+.signOutNav {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  color: var(--muted);
+}
+.signOutNav:hover {
+  color: var(--text);
+  background: var(--nav);
+}
 .sideSection {
   margin-top: 33px;
 }
@@ -506,10 +516,18 @@
 }
 .cardTop {
   display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 18px;
   color: var(--muted);
+}
+.pinnedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.65rem;
 }
 .courseBadge {
   display: inline-flex;
@@ -1201,6 +1219,17 @@
   font-size: 0.65rem;
   min-height: 32px;
 }
+/* Card 42: one section per category on the notes page. */
+.categoryGroup + .categoryGroup {
+  margin-top: 32px;
+}
+.categoryHeading {
+  margin: 0 0 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+}
 .noteGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1223,8 +1252,43 @@
 .noteGrid .courseBadge {
   font-size: 0.65rem;
 }
+.noteItem {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+/* Leave room for the action in grid and list views; narrow cards wrap whole items. */
+.noteItem .noteCard .cardFooter {
+  padding-right: 76px;
+  flex-wrap: wrap;
+}
+.noteItem .cardFooter > span {
+  white-space: nowrap;
+}
+.cardAction {
+  position: absolute;
+  right: 8px;
+  bottom: 0;
+  min-height: 44px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 8px;
+  font-size: 0.63rem;
+  font-weight: 500;
+  color: #9b392e;
+}
+.cardAction:hover {
+  background: #fff0ed;
+}
 .noteList {
   grid-template-columns: 1fr;
+}
+.noteList .cardAction {
+  top: 50%;
+  bottom: auto;
+  translate: 0 -50%;
 }
 .noteList .noteCard {
   min-height: 0;
@@ -1324,6 +1388,7 @@
 }
 .editorTop {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   align-items: center;
   justify-content: space-between;
@@ -1400,6 +1465,21 @@
   font-size: 0.72rem;
   margin-bottom: 16px;
 }
+.collaborators {
+  padding-bottom: 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.collaboratorList {
+  list-style: none;
+  padding: 0;
+}
+.collaboratorList li {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 16px;
+  overflow-wrap: anywhere;
+}
 .comment {
   border-bottom: 1px solid var(--line);
   padding: 0 0 18px;
@@ -1461,15 +1541,209 @@
   flex: 1;
 }
 .settingsGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 760px;
 }
-.settingsGrid .panel > h2 {
+.settingsGrid .panel {
+  padding: 24px;
+}
+.settingsHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0 16px;
   margin-bottom: 18px;
 }
-.settingsGrid .panel > p {
-  margin-bottom: 22px;
+.settingsHeading > h2,
+.settingsHeading > p {
+  flex-basis: 100%;
+}
+.settingsHeading > span {
+  flex: 1 1 240px;
+}
+.settingsHeading h2 {
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+.settingsHeading p {
+  font-size: 0.72rem;
+}
+.accountSummary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  background: var(--surface-soft);
+  flex-wrap: wrap;
+}
+.accountSummary > .avatar {
+  height: 44px;
+  width: 44px;
+  font-size: 0.9rem;
+}
+.accountSummary > span:not(.avatar) {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.accountSummary + p {
+  margin: 12px 0 4px;
+  font-size: 0.72rem;
+}
+.accountSummary strong,
+.accountSummary small {
+  display: block;
+}
+.accountSummary strong {
+  font-size: 0.85rem;
+}
+.accountSummary small {
+  font-size: 0.7rem;
+  margin-top: 3px;
+}
+.settingRows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.settingRows > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+.settingRows > li:first-child {
+  border-top: 0;
+}
+.settingRows > li:last-child {
+  padding-bottom: 0;
+}
+.settingRows > li:not(.settingCourse) > span:first-child {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.settingRows strong {
+  display: block;
+  font-size: 0.78rem;
+}
+.settingRows small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.68rem;
+  margin-top: 4px;
+  line-height: 1.5;
+}
+.dangerRow strong {
+  color: #9b392e;
+}
+.dangerOutline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 11px 17px;
+  border-radius: 7px;
+  border: 1px solid #cf8b81;
+  background: var(--surface);
+  color: #9b392e;
+  font-size: 0.76rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.dangerOutline:hover {
+  background: #fff0ed;
+}
+:global([data-theme="dark"]) .dangerRow strong,
+:global([data-theme="dark"]) .dangerOutline,
+:global([data-theme="dark"]) .cardAction {
+  color: #ffb7a9;
+}
+:global([data-theme="dark"]) .dangerOutline {
+  border-color: #80544a;
+}
+:global([data-theme="dark"]) .dangerOutline:hover,
+:global([data-theme="dark"]) .cardAction:hover {
+  background: #3c2925;
+}
+.courseEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  padding: 28px 20px;
+  margin-bottom: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+.courseEmpty strong {
+  color: var(--text);
+  font-size: 0.8rem;
+}
+.fieldError {
+  display: block;
+  margin-top: -8px;
+  color: #9b392e;
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+.passwordRules + .fieldError {
+  margin-top: 8px;
+}
+.accountFields input[aria-invalid="true"] {
+  border-color: #b4483c;
+}
+:global([data-theme="dark"]) .fieldError {
+  color: #ffb7a9;
+}
+:global([data-theme="dark"]) .accountFields input[aria-invalid="true"] {
+  border-color: #d98a7c;
+}
+.passwordRules {
+  list-style: none;
+  margin: -6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+.passwordRules li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.passwordRules li[data-met="true"] {
+  color: var(--text);
+}
+.passwordRules li[data-met="true"] svg {
+  color: #4f7a45;
+}
+:global([data-theme="dark"]) .passwordRules li[data-met="true"] svg {
+  color: #a9cf9c;
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 .themeOptions {
   display: grid;
@@ -1491,21 +1765,20 @@
   border: 2px solid var(--primary);
   background: var(--sage) !important;
 }
-.settingCourse {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 15px 0;
-  border-top: 1px solid var(--line);
-  font-size: 0.7rem;
-  flex-wrap: wrap;
+.settingRows > .settingCourse {
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  padding: 13px 0;
 }
 .settingCourse > span:nth-of-type(2) {
   flex: 1;
+  min-width: 0;
 }
 .settingCourse small {
-  color: var(--muted);
-  font-size: 0.6rem;
+  margin-top: 2px;
+}
+.settingCourse > small {
+  flex-shrink: 0;
 }
 .onboarding {
   min-height: 100dvh;
@@ -1653,6 +1926,9 @@
   bottom: 24px;
   font-size: 0.6rem;
   color: var(--muted);
+}
+.courseSetup:empty {
+  display: none;
 }
 .courseSetup {
   display: flex;
@@ -1869,14 +2145,16 @@
   .inspector {
     max-width: none;
   }
-  .settingsGrid {
-    grid-template-columns: 1fr;
-  }
   .noteList .noteCard {
     grid-template-columns: 90px 1fr;
   }
   .noteList .cardFooter {
     grid-column: 2;
+  }
+  .noteList .cardAction {
+    top: auto;
+    bottom: 0;
+    translate: none;
   }
   .onboardingArt h1 {
     font-size: 2.2rem;
@@ -2113,17 +2391,23 @@
     backdrop-filter: blur(14px);
     border-top: 1px solid var(--line);
   }
-  .mobileNav a {
+  .mobileNav a,
+  .mobileNav button {
     display: flex;
+    flex: 1;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 5px;
     font-size: 0.6rem;
     min-height: 45px;
-    min-width: 64px;
+    min-width: 48px;
     border-radius: 9px;
     color: var(--muted);
+  }
+  .mobileNav .signOutNav {
+    width: auto;
+    text-align: center;
   }
   .mobileNav .navActive {
     background: transparent;
@@ -2442,4 +2726,88 @@
 .chip {
   min-width: 44px;
   min-height: 44px;
+}
+
+.accountFields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.recoveryCode {
+  display: block;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-family: monospace;
+  font-size: 1.1rem;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+/* Card 45: the syllabus upload's steps, helper text, and tips. */
+.steps {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.steps li {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-top: 8px;
+  border-top: 3px solid var(--line);
+}
+.steps li[data-done] {
+  border-top-color: var(--mint);
+}
+.steps li[aria-current="step"] {
+  border-top-color: var(--primary);
+  color: var(--text);
+  font-weight: 600;
+}
+.hint {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.tips {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  line-height: 1.5;
+}
+.inlineLink {
+  color: var(--text);
+  font-weight: 500;
+  text-decoration: underline;
+}
+.checkLabel {
+  display: flex !important;
+  align-items: flex-start;
+  flex-direction: row !important;
+  gap: 10px;
+}
+.checkLabel input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  /* Text fields are at least 44px tall; a checkbox isn't, or it sits below its words. The whole
+     label stays the click target. */
+  min-height: 0;
+  padding: 0;
+  margin: 2px 0 0;
+}
+
+.accountText {
+  overflow-wrap: anywhere;
 }

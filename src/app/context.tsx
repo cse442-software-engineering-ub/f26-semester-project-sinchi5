@@ -4,9 +4,10 @@ import {
   useEffect,
   useReducer,
   useMemo,
+  useRef,
   type ReactNode,
 } from "react";
-import { createRepositories } from "../services/repositories";
+import { createAppRepositories } from "../services/app-repositories";
 import type { User, Course, Note, CourseEvent, Repositories } from "../domain";
 type State = {
   user: User | null;
@@ -36,20 +37,28 @@ const Context = createContext<{
   setError: (error: string) => void;
 }>(null!);
 export function Provider({ children }: { children: ReactNode }) {
-  const repo = useMemo(() => createRepositories(localStorage), []);
+  const repo = useMemo(() => createAppRepositories(localStorage, sessionStorage), []);
   const [state, dispatch] = useReducer(
     (s: State, a: Partial<State>) => ({ ...s, ...a }),
     initial,
   );
+  const refreshVersion = useRef(0);
   async function refresh() {
+    const version = ++refreshVersion.current;
     try {
-      const [user, onboarding, courses, notes, events] = await Promise.all([
-        repo.auth.session(),
+      const user = await repo.auth.session();
+      if (version !== refreshVersion.current) return;
+      if (!user) {
+        dispatch({ user: null, completed: false, courses: [], notes: [], events: [], ready: true, error: "" });
+        return;
+      }
+      const [onboarding, courses, notes, events] = await Promise.all([
         repo.auth.onboarding(),
         repo.courses.list(),
         repo.notes.list(),
         repo.schedule.list(),
       ]);
+      if (version !== refreshVersion.current) return;
       dispatch({
         user,
         completed: onboarding.completed,
@@ -57,13 +66,18 @@ export function Provider({ children }: { children: ReactNode }) {
         notes,
         events,
         ready: true,
+        error: "",
       });
     } catch (e) {
-      dispatch({ ready: true, error: (e as Error).message });
+      if (version !== refreshVersion.current) return;
+      dispatch({ user: null, completed: false, courses: [], notes: [], events: [], ready: true, error: (e as Error).message });
     }
   }
   useEffect(() => {
     void refresh();
+    const recheck = () => { if (document.visibilityState === "visible") void refresh(); };
+    window.addEventListener("focus", recheck);
+    return () => window.removeEventListener("focus", recheck);
   }, []);
   useEffect(() => {
     const media = matchMedia("(prefers-color-scheme: dark)");

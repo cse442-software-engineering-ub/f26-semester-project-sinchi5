@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+import { test, expect } from "./support/account-fixture";
 import AxeBuilder from "@axe-core/playwright";
 async function demo(page: Page) {
   await page.goto("/");
@@ -7,32 +8,41 @@ async function demo(page: Page) {
     page.getByRole("heading", { name: /Good (morning|afternoon|evening)/ }),
   ).toBeVisible();
 }
+// Real (empty) files, since a syllabus's contents must match its name (card 45).
+const EMPTY_PDF = "%PDF-1.4\n1 0 obj <</Type/Catalog/Pages 2 0 R>> endobj\n2 0 obj <</Type/Pages/Kids[]/Count 0>> endobj\n"
+  + "trailer <</Root 1 0 R>>\n%%EOF\n";
+const PNG_1PX = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 async function upload(page: Page, kind: string, name = "lecture.pdf") {
   await page.getByRole("button", { name: "Create", exact: true }).click();
   await page.getByRole("menuitem", { name: kind, exact: true }).click();
   await page.getByLabel("Choose upload file").setInputFiles({
     name,
     mimeType: name.endsWith(".png") ? "image/png" : "application/pdf",
-    buffer: Buffer.from("example file"),
+    buffer: name.endsWith(".png") ? Buffer.from(PNG_1PX, "base64") : Buffer.from(EMPTY_PDF),
   });
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await expect(page.getByLabel("Title", { exact: true })).toBeVisible();
+  // The review form ends with "Save to my notes", or "Add to schedule" for a syllabus (card 46).
+  await expect(page.getByRole("button", { name: /^(Save to my notes|Add to schedule)/ })).toBeVisible();
 }
 test("account and complete onboarding", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Create your workspace" }).click();
   await page.getByLabel("Your name").fill("Jamie");
   await page.getByLabel("Email address").fill("jamie@example.edu");
-  await page.getByLabel("Password", { exact: true }).fill("samplepassword");
+  await page.getByLabel("Password", { exact: true }).fill("Sample meadow password 42!");
+  await page.getByLabel("Confirm password", { exact: true }).fill("Sample meadow password 42!");
   await page
     .getByRole("button", { name: "Create account", exact: true })
     .click();
-  await page.getByRole("button", { name: "Add your own course" }).click();
+  await page.getByLabel("I saved my recovery code").check();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(page.getByText("No courses yet")).toBeVisible();
+  await page.getByRole("button", { name: "Add a course" }).click();
   await page.getByLabel("Course code").fill("ART 101");
   await page.getByLabel("Course name").fill("Ways of Seeing");
   await page.getByRole("button", { name: "Add course", exact: true }).click();
   await expect(page.getByText("ART 101", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Looks good" }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page.getByRole("button", { name: "I’ll do this later" }).click();
   await page.getByRole("button", { name: "Let’s begin" }).click();
   await expect(page.getByRole("heading", { name: /Jamie/ })).toBeVisible();
@@ -45,11 +55,23 @@ test("search, combined filters, clear and view persistence", async ({
   await demo(page);
   await page.goto("/notes");
   await page.getByLabel("Search notes").fill("scrum");
+  await expect(page).toHaveURL(/\bq=scrum\b/);
   await expect(
     page.getByRole("heading", {
       name: "Agile development & the Scrum framework",
     }),
   ).toBeVisible();
+  await expect(page.locator('a[href^="/notes/"] h3')).toHaveCount(1);
+  await page.getByLabel("Search notes").fill("transparency");
+  await expect(page.locator('a[href^="/notes/"] h3')).toHaveText(["Agile development & the Scrum framework"]);
+  await page.getByLabel("Search notes").fill("teamwork");
+  await expect(page.locator('a[href^="/notes/"] h3')).toHaveText(["Agile development & the Scrum framework"]);
+  await page.getByLabel("Search notes").fill("CSE 442");
+  await expect(page.getByRole("heading", { name: "No notes found" })).toBeVisible();
+  await page.getByLabel("Search notes").fill("scrum");
+  await page.reload();
+  await expect(page.getByLabel("Search notes")).toHaveValue("scrum");
+  await expect(page.locator('a[href^="/notes/"] h3')).toHaveText(["Agile development & the Scrum framework"]);
   await page.getByRole("button", { name: "Filters", exact: true }).click();
   await page
     .getByRole("combobox", { name: "Visibility", exact: true })
@@ -90,6 +112,7 @@ test("note edits, comments, history and reload", async ({ page }) => {
   await demo(page);
   await page.goto("/notes/note-1");
   await page.getByLabel("Note body").fill("A revised explanation of Scrum.");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(
     page.getByText("All changes saved", { exact: true }),
   ).toBeVisible();
@@ -182,13 +205,15 @@ test("responsive layout and accessibility", async ({ page }) => {
     )
     .toBe(true);
 });
-test("new note saves when leaving immediately", async ({ page }) => {
+test("new note saves explicitly before leaving", async ({ page }) => {
   await demo(page);
   await page.getByRole("button", { name: "New note", exact: true }).click();
   await page.getByLabel("Note title").fill("A brand-new idea");
   await page
     .getByLabel("Note body")
     .fill("Keep this even if I leave right away.");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("All changes saved", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "All notes", exact: true }).click();
   await page.getByRole("heading", { name: "A brand-new idea" }).click();
   await expect(page.getByLabel("Note body")).toHaveValue(
