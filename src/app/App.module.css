@@ -1219,6 +1219,17 @@
   font-size: 0.65rem;
   min-height: 32px;
 }
+/* Card 42: one section per category on the notes page. */
+.categoryGroup + .categoryGroup {
+  margin-top: 32px;
+}
+.categoryHeading {
+  margin: 0 0 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+}
 .noteGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2727,6 +2738,50 @@
   overflow-wrap: anywhere;
   user-select: all;
 }
+/* Card 45: the syllabus upload's steps, helper text, and tips. */
+.steps {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.steps li {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-top: 8px;
+  border-top: 3px solid var(--line);
+}
+.steps li[data-done] {
+  border-top-color: var(--mint);
+}
+.steps li[aria-current="step"] {
+  border-top-color: var(--primary);
+  color: var(--text);
+  font-weight: 600;
+}
+.hint {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.tips {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  line-height: 1.5;
+}
+.inlineLink {
+  color: var(--text);
+  font-weight: 500;
+  text-decoration: underline;
+}
 .checkLabel {
   display: flex !important;
   align-items: flex-start;
@@ -2737,6 +2792,11 @@
   width: 18px;
   height: 18px;
   flex: 0 0 18px;
+  /* Text fields are at least 44px tall; a checkbox isn't, or it sits below its words. The whole
+     label stays the click target. */
+  min-height: 0;
+  padding: 0;
+  margin: 2px 0 0;
 }
 
 .accountText {

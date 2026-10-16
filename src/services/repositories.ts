@@ -10,7 +10,11 @@ import type {
   NoteQuery,
   Collaborator,
   NoteRepository,
+  DetectedEvent,
 } from "../domain";
+import type { SyllabusApi } from "./imports-http";
+import { checkDates, extractEvents, mergeEvents, normalizeEvents, rulesVerdict, type ProposedEvent } from "./syllabus";
+import { fileTypeProblem, syllabusText } from "./syllabus-text";
 import { createMockCollaborators } from "./collaborators.mock";
 import { createMockComments } from "./comments.mock";
 import {
@@ -58,21 +62,13 @@ const initial = (sample = true): Store => sample ? ({
 export function filterNotes(
   notes: Note[],
   query: NoteQuery = {},
-  allCourses: Course[] = courses,
 ) {
   const q = (query.q || "").toLowerCase();
   return notes
     .filter(
       (n) =>
         (!q ||
-          [
-            n.title,
-            n.body,
-            n.category,
-            ...n.tags,
-            allCourses.find((c) => c.id === n.courseId)?.name,
-            allCourses.find((c) => c.id === n.courseId)?.code,
-          ]
+          [n.title, n.body, ...n.tags]
             .join(" ")
             .toLowerCase()
             .includes(q)) &&
@@ -98,6 +94,8 @@ export function createRepositories(
   sample = true,
   // Signed-in accounts keep notes on the server; courses and events stay here.
   serverNotes?: NoteRepository,
+  // Signed-in accounts upload syllabi to the server (cards 43 and 45).
+  serverSyllabus?: SyllabusApi,
 ): Repositories {
   let db = initial(sample);
   try {
@@ -133,6 +131,33 @@ export function createRepositories(
     if (!n) throw new Error("This note could not be found.");
     return n;
   };
+  // Card 45: the free rules read every syllabus first. The AI reader on the server is asked only when
+  // they can't stand alone (rulesVerdict), and its dates are checked against the file. When it can't
+  // help, the rules' events are still shown with the reason, and the student can fix or add events.
+  async function readSyllabus(jobId: string, file: File, year: number, onAutomaticReading?: () => void):
+    Promise<{ proposed: ProposedEvent[]; reader: NonNullable<UploadJob["reader"]>; notice?: string }> {
+    const text = await syllabusText(file);
+    const rules = extractEvents(text, year);
+    const verdict = rulesVerdict(text, rules);
+    const checkThem = "Check these events against your syllabus, and add any that are missing.";
+    if (!verdict) return { proposed: rules, reader: "rules" };
+    if (!serverSyllabus) {
+      // The demo has no server, so a file without text shows sample results.
+      if (verdict !== "no-text") return { proposed: rules, reader: "rules-only", notice: checkThem };
+      return { reader: "sample", notice: "This preview shows sample events. Sign in to read your own syllabus.", proposed: normalizeEvents([
+        { title: "Assignment 1", kind: "assignment", date: offsetDate(7), time: "23:59", source: "Detected from syllabus. Review before saving." },
+        { title: "Midterm exam", kind: "exam", date: offsetDate(21), time: "10:00", source: "Detected from syllabus." },
+      ]) };
+    }
+    onAutomaticReading?.();
+    try {
+      const ai = normalizeEvents((await serverSyllabus.extract(jobId, year)).events);
+      return { proposed: mergeEvents(checkDates(ai, text), rules), reader: "ai" };
+    } catch (error) {
+      // A daily limit, a busy service, or no key: what the rules found is still worth reviewing.
+      return { proposed: rules, reader: "rules-only", notice: `${(error as Error).message} ${checkThem}` };
+    }
+  }
   let invitations = new Map<string, Collaborator[]>();
   const repo: Repositories = {
     auth: {
@@ -188,7 +213,7 @@ export function createRepositories(
       ...createMockCollaborators(invitations),
       ...createMockComments(db, get, persist, (noteId) => repo.notes.collaborators(noteId)),
       async list(q) {
-        return filterNotes(db.notes, q, db.courses);
+        return filterNotes(db.notes, q);
       },
       async get(noteId) {
         return { ...get(noteId) };
@@ -285,7 +310,12 @@ export function createRepositories(
     },
     schedule: {
       async list(from, to) {
-        return db.events
+        // A signed-in student's imported events are on the server (card 48). Editing one saves a
+        // copy with the same ID in this browser, which then takes the server copy's place.
+        // ponytail: edits to imported events stay in this browser; add an event update route if
+        // they must follow the student to other devices.
+        const imported = serverSyllabus ? await serverSyllabus.events() : [];
+        return [...db.events, ...imported.filter((e) => !db.events.some((local) => local.id === e.id))]
           .filter((e) => (!from || e.date >= from) && (!to || e.date <= to))
           .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
       },
@@ -313,61 +343,50 @@ export function createRepositories(
         if (!file.size) return "This file is empty. Please choose another.";
         return null;
       },
-      async start(file, kind, scenario = "success") {
+      async start(file, kind, _scenario, courseId = db.courses[0]?.id || "") {
         const error = repo.imports.validate(file, kind);
         if (error) throw new Error(error);
-        return {
-          id: id(),
-          kind,
-          name: file.name,
-          state:
-            scenario === "failure"
-              ? "failed"
-              : scenario === "partial"
-                ? "partial"
-                : "review",
-          metadata: {
-            title: file.name.replace(/\.[^.]+$/, ""),
-            courseId: db.courses[0]?.id || "",
-            lectureDate: dateKey(),
-            category: "School",
-          },
-          events:
-            kind === "syllabus"
-              ? [
-                  {
-                    id: "",
-                    courseId: db.courses[0]?.id || "",
-                    title: "Assignment 1",
-                    date: offsetDate(7),
-                    time: "23:59",
-                    kind: "assignment",
-                    location: "",
-                    description:
-                      "Detected from syllabus. Review before saving.",
-                    source: "imported",
-                  },
-                  {
-                    id: "",
-                    courseId: db.courses[0]?.id || "",
-                    title: "Midterm exam",
-                    date: offsetDate(21),
-                    time: "10:00",
-                    kind: "exam",
-                    location: "",
-                    description: "Detected from syllabus.",
-                    source: "imported",
-                  },
-                ]
-              : [],
-        };
+        const job = { kind, name: file.name, state: "queued" as const, events: [], metadata: {
+          title: file.name.replace(/\.[^.]+$/, ""), courseId, lectureDate: dateKey(), category: "School",
+        } };
+        // A renamed file is caught here with a message that says how to fix it; the server checks again.
+        const problem = kind === "syllabus" ? await fileTypeProblem(file) : null;
+        if (problem) throw new Error(problem);
+        if (kind === "syllabus" && serverSyllabus) return { ...job, id: (await serverSyllabus.upload(file, courseId)).id };
+        return { ...job, id: id() };
+      },
+      async process(job, file, scenario = "success", onAutomaticReading) {
+        // "Processing failed" in the prototype preview options shows the failure screen on purpose.
+        if (scenario === "failure") return { ...job, state: "failed" };
+        let events: DetectedEvent[] = [];
+        let read: Pick<UploadJob, "reader" | "notice"> = {};
+        if (job.kind === "syllabus") {
+          const { courseId } = job.metadata;
+          const term = db.courses.find((c) => c.id === courseId)?.term ?? "";
+          const year = Number(/\b(20\d\d)\b/.exec(term)?.[1]) || new Date().getFullYear();
+          const result = await readSyllabus(job.id, file, year, onAutomaticReading);
+          read = { reader: result.reader, ...(result.notice ? { notice: result.notice } : {}) };
+          events = result.proposed.map(({ source, time, needsReview, ...event }) => ({
+            ...event, id: "", courseId, time: time ?? "", location: "", description: source, source: "imported",
+            ...(needsReview ? { needsReview } : {}),
+          }));
+        }
+        const partial = scenario === "partial" || events.some((e) => e.needsReview);
+        return { ...job, state: partial ? "partial" : "review", events, ...read };
       },
       async confirm(job) {
         if (job.state !== "review" && job.state !== "partial")
           throw new Error("This upload is not ready to save.");
         if (job.kind === "syllabus") {
-          for (const e of job.events)
-            await repo.schedule.save({ ...e, courseId: job.metadata.courseId });
+          // Events the student left out are skipped, and review-only fields aren't saved (card 46).
+          const included = job.events.filter((e) => e.include !== false);
+          const { courseId } = job.metadata;
+          // A signed-in student's events are saved on the server with the job (cards 47 and 48).
+          if (serverSyllabus)
+            await serverSyllabus.confirm(job.id, courseId, included.map(({ title, kind, date, time }) => ({ title, kind, date, time })));
+          else
+            for (const { include: _include, needsReview: _needsReview, ...event } of included)
+              await repo.schedule.save({ ...event, courseId });
         } else
           await repo.notes.create({
             ...job.metadata,

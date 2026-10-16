@@ -79,6 +79,12 @@ export interface DetectedMetadata {
   category: string;
 }
 export type UploadKind = "document" | "scan" | "syllabus";
+// An event proposed from a syllabus. needsReview means it has no clear date yet (card 44);
+// include: false means the student left it out on the review screen (card 46).
+export interface DetectedEvent extends CourseEvent {
+  needsReview?: boolean;
+  include?: boolean;
+}
 export interface UploadJob {
   id: string;
   kind: UploadKind;
@@ -86,7 +92,11 @@ export interface UploadJob {
   state:
     "queued" | "processing" | "review" | "completed" | "partial" | "failed";
   metadata: DetectedMetadata;
-  events: CourseEvent[];
+  events: DetectedEvent[];
+  // How a syllabus was read (card 45): by the free rules, by the AI reader after the rules found too
+  // little, by the rules alone because the AI reader couldn't help (notice says why), or a demo sample.
+  reader?: "rules" | "ai" | "rules-only" | "sample";
+  notice?: string;
 }
 export interface NoteQuery {
   q?: string;
@@ -146,11 +156,11 @@ export interface ScheduleRepository {
 }
 export interface ImportRepository {
   validate(file: Pick<File, "name" | "size">, kind: UploadKind): string | null;
-  start(
-    file: Pick<File, "name" | "size">,
-    kind: UploadKind,
-    scenario?: string,
-  ): Promise<UploadJob>;
+  // Registers the file as a queued job; a signed-in student's syllabus goes to the server (card 43).
+  start(file: File, kind: UploadKind, scenario?: string, courseId?: string): Promise<UploadJob>;
+  // Reads a queued job's file and proposes note details or schedule events (cards 44 and 45).
+  // onAutomaticReading is called when the AI reader is asked, which can take up to a minute.
+  process(job: UploadJob, file: File, scenario?: string, onAutomaticReading?: () => void): Promise<UploadJob>;
   confirm(job: UploadJob): Promise<void>;
 }
 export interface Repositories {

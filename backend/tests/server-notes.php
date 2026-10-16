@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Card 120 server-side notes. Run only against DEV/TEST with migrations 002, 003, and 004 applied.
+// Server-side notes, including card 55 search. Run only against DEV/TEST with migrations 002, 003, and 004 applied.
 require_once __DIR__ . '/../lib/bootstrap.php';
 require_once __DIR__ . '/../lib/accounts.php';
 require_once __DIR__ . '/../lib/notes.php';
@@ -59,6 +59,41 @@ try {
     $titles = fn (array $session) => array_column(noteAction($db, $session, 'notes', [])['notes'], 'title');
     check($titles($a) === ['Shared study guide'] && $titles($b) === [], 'List leaked or lost a note.');
 
+    // Card 55: keyword search covers title, body, and tags without treating wildcards as patterns.
+    $searchTitles = static function (array $session, string $keyword) use ($db): array {
+        $_GET['q'] = $keyword;
+        try {
+            return array_column(noteAction($db, $session, 'notes', [])['notes'], 'title');
+        } finally {
+            unset($_GET['q']);
+        }
+    };
+    $searchIds = [];
+    foreach ([
+        ['title' => 'Math Homework'],
+        ['title' => 'History Notes', 'tags' => ['mid!term']],
+        ['title' => 'Class Notes', 'body' => 'Binary search algorithm'],
+        ['title' => 'Score 50% done'],
+    ] as $input) {
+        $searchIds[] = noteAction($db, $a, 'note-create', $input)['note']['id'];
+    }
+    check($searchTitles($a, 'Math') === ['Math Homework'], 'Title search included unrelated notes.');
+    check($searchTitles($a, 'BINARY') === ['Class Notes'], 'Body search was not case-insensitive.');
+    check($searchTitles($a, 'mid!term') === ['History Notes'], 'Tag search or escape-character search failed.');
+    check($searchTitles($a, '50%') === ['Score 50% done'], 'Percent sign was treated as a wildcard.');
+    check($searchTitles($a, '_') === [], 'Underscore was treated as a wildcard.');
+    check($searchTitles($b, 'Math') === [], 'Search leaked another student’s note.');
+    check($searchTitles($a, str_repeat('a', 100)) === [], 'A 100-character search was rejected.');
+    try {
+        $searchTitles($a, str_repeat('a', 101));
+        throw new RuntimeException('A 101-character search was accepted.');
+    } catch (HttpError $error) {
+        check($error->status === 422 && $error->getMessage() === 'Keep the search to 100 characters of plain text.',
+            'A 101-character search did not return the expected error.');
+    }
+    foreach ($searchIds as $searchId) noteAction($db, $a, 'note-delete', ['id' => $searchId]);
+    echo "PASS: card 55 title, body, and tag search, literal wildcards, length limit, and access scope\n";
+
     // Save keeps the previous text as a version; pin keeps the edit date.
     $saved = noteAction($db, $a, 'note-save', ['id' => $id, 'title' => 'Shared study guide', 'body' => 'Chapter 2',
         'courseId' => 'cse442', 'lectureDate' => '2026-10-05', 'category' => 'Work', 'visibility' => 'shared', 'tags' => []])['note'];
@@ -69,6 +104,21 @@ try {
     check($pinned['pinned'] === true && $pinned['updatedAt'] === $saved['updatedAt'], 'Pinning changed the edit date.');
     $restored = noteAction($db, $a, 'note-restore', ['id' => $id, 'versionId' => $versions[0]['id']])['note'];
     check($restored['body'] === 'Chapter 1' && count(read($db, $a, 'note-versions', $id)['versions']) === 2, 'Restore lost history.');
+
+    // Card 56: the title-only and body-only saves keep the previous text too; an unchanged title keeps nothing.
+    noteAction($db, $a, 'note-title', ['id' => $id, 'title' => 'Renamed guide']);
+    $versions = read($db, $a, 'note-versions', $id)['versions'];
+    check(count($versions) === 3 && $versions[0]['title'] === 'Shared study guide' && $versions[0]['body'] === 'Chapter 1',
+        'A title change kept no version.');
+    noteAction($db, $a, 'note-content', ['id' => $id, 'body' => 'Chapter 3']);
+    $versions = read($db, $a, 'note-versions', $id)['versions'];
+    check(count($versions) === 4 && $versions[0]['title'] === 'Renamed guide' && $versions[0]['body'] === 'Chapter 1',
+        'A body change kept no version.');
+    noteAction($db, $a, 'note-title', ['id' => $id, 'title' => 'Renamed guide']);
+    check(count(read($db, $a, 'note-versions', $id)['versions']) === 4, 'An unchanged title kept a version.');
+    noteAction($db, $a, 'note-title', ['id' => $id, 'title' => 'Shared study guide']);
+    noteAction($db, $a, 'note-content', ['id' => $id, 'body' => 'Chapter 1']);
+    echo "PASS: card 56 title and body saves keep the previous version\n";
 
     // Sharing: only the owner invites and sets permissions; collaborators see the note.
     expectStatus($db, fn () => noteAction($db, $a, 'note-invite', ['id' => $id, 'email' => 'nobody-' . bin2hex(random_bytes(4)) . '@example.edu']), 404);

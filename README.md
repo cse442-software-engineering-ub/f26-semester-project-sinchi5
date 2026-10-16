@@ -55,7 +55,7 @@ Accounts and signed-in users' notes (with their history, comments, and collabora
 
 **Imports**
 - Upload documents (PDF, DOCX, TXT, Markdown, images), scan photos, or upload a syllabus. Files are validated (type, empty file, 20 MB limit), then shown on a review screen before anything is saved.
-- Syllabus imports detect assignments and exams and add them to the calendar after review.
+- Syllabus imports detect assignments and exams and add them to the calendar after review. TXT, Markdown, PDF, and Word syllabi are read in the browser with free rules ([src/services/syllabus.ts](src/services/syllabus.ts), with PDF text from pdf.js), so most uploads never reach an API.
 - Extraction is simulated. A **Prototype preview options** control in the dialog exercises success, partial, and failure outcomes.
 
 **Settings**
@@ -111,6 +111,8 @@ You need PHP 8 with `pdo_mysql`, and a local MySQL or MariaDB server (XAMPP work
    mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/002_note_titles.sql
    mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/003_note_content.sql
    mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/004_server_notes.sql
+   mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/005_import_jobs.sql
+   mysql -h localhost -u YOUR_DEV_USER -p YOUR_DEV_DATABASE < backend/migrations/006_events.sql
    ```
 
    You can also import the file through phpMyAdmin.
@@ -161,6 +163,11 @@ The API looks for configuration in this order:
 | `origin` | `NOTELY_ORIGIN` | The exact scheme and host the frontend is served from. POST requests from any other `Origin` are rejected. |
 | `cookie_path` | `NOTELY_COOKIE_PATH` | Session cookie path, for example `/` locally or the class directory on the server. |
 | `secure_cookies` | `NOTELY_ALLOW_LOCAL_HTTP=1` disables it | HTTPS-only cookies. HTTP is accepted only for `localhost`, `127.0.0.1`, or `[::1]` origins. |
+| `gemini_api_key` | `NOTELY_GEMINI_API_KEY` | Optional. A Google AI Studio key (aistudio.google.com/apikey) that turns on automatic reading for syllabi the browser's free rules can't read, such as scans and photos. Without it, students review what the rules found and add the rest by hand. Local origins never call the API unless `NOTELY_AI_LIVE=1` is set for that run. Keep the key only in the private config, never in the repository or the frontend. |
+| `gemini_model` | none | Model for syllabus reading. Default `gemini-3.5-flash-lite`, the cheapest; `gemini-3.8-flash` is stronger. Both have a free tier, where Google may use the uploads to improve its products. |
+| `ai_user_daily_limit` | none | Automatic reads per student per UTC day. Default 5. |
+| `ai_daily_limit` | none | Automatic reads for all students per UTC day. Default 50. |
+| `ai_max_input_tokens` | none | Files over this many input tokens are refused before any read. Default 60000. |
 
 A missing or invalid configuration **fails closed**: the API returns HTTP 503 and logs only the exception class.
 
@@ -197,9 +204,14 @@ The API has a single entry point, `api/index.php?route=<name>`. Every response i
 | POST | `note-invite` | `id`, `email` | yes (owner only, rate limited) |
 | POST | `note-permission` | `id`, `userId`, `permission` (`view` or `edit`) | yes (owner only) |
 | POST | `note-delete` | `id` | yes (owner only) |
+| POST | `syllabus-upload` | `courseId`, `fileName`, `content` (the file as base64) | yes (rate limited) |
+| GET | `import-job&id=<id>` | none | yes (owner only) |
+| POST | `import-confirm` | `id`, `events` (each `title`, `date`, optional `kind`, `time`), optional `courseId` | yes (job owner only) |
+| GET | `events` or `events&courseId=<id>` | none | yes (the caller's own events) |
+| POST | `import-extract` | `id`, `year` (the course year, for dates without one) | yes (job owner only, daily limits) |
 
 Every POST must include:
-- `Content-Type: application/json` (body at most 8 KB)
+- `Content-Type: application/json` (body at most 8 KB, except `syllabus-upload`)
 - `Origin` matching the configured origin
 - `X-CSRF-Token` set to the `csrfToken` from the latest response
 
@@ -221,6 +233,25 @@ POST `note-delete` returns `{ "note": { "id": "…" } }` and permanently removes
 
 Since task 120, signed-in accounts use these routes for every note through [src/services/notes-http.ts](src/services/notes-http.ts). GET `note`, `notes`, `note-create`, `note-save`, `note-pin`, and `note-restore` return whole notes: `id`, `ownerId`, `title`, `body`, `courseId`, `lectureDate`, `category` (`School`, `Work`, `Meetings`, or `Personal`), `visibility` (`private` or `shared`), `tags` (at most 30 strings of up to 100 characters), `pinned`, `createdAt`, and `updatedAt` (ISO 8601, UTC). `note-save` keeps the current value of any field it doesn't receive, and saves the previous title and body as a version when either changes. Pinning doesn't change `updatedAt`. Notes the caller can't open return 404 from every read route, so their existence isn't revealed. Deleting a note also deletes its versions and comments. `note-invite` returns 404 for an unregistered email and is limited to 30 invitations per user every 15 minutes. Apply migration 004 before deploying this backend.
 
+Since card 43, POST `syllabus-upload` takes one syllabus (PDF, DOCX, TXT, Markdown, JPG, PNG, or WebP, at most 20 MB) and returns 201 with `{ "job": { "id", "kind": "syllabus", "courseId", "name", "type", "size", "state": "queued", "events": [], "createdAt" } }`. The file's contents must match its type, so a renamed file is refused: a PDF needs its header and end marker, a DOCX must be a Word document without macros, and an image header must parse as the named format. The file is only stored as data and read as text; it is never run, written to disk, or served back. Wrong types, empty files, and files over 20 MB get 422 with the same messages the upload window shows (413 when the whole request is too large). Each account can upload 20 files every 15 minutes. GET `import-job` returns the same job to its owner and 404 to anyone else. The stored file is cleared by `prune.php` after a day. Apply migration 005 before deploying this backend.
+
+Since card 47, POST `import-confirm` saves 1–200 reviewed events from the caller's own job to its course (or to `courseId`, when the student picked another course) and returns `{ "created": <count> }`. The job becomes `completed` and its file is dropped, so sending the same confirm again returns `{ "created": 0 }`. Every event needs a `title` (1–255 visible characters) and a real `date` (`YYYY-MM-DD`), otherwise 422 "Give every event a title and a date."; `kind` is one of `lecture`, `assignment`, `quiz`, `exam`, `deadline`, `other` (default), and `time` is empty or 24-hour `HH:MM`. GET `events` returns `{ "events": [{ "id", "courseId", "title", "kind", "date", "time", "location", "description", "source", "importJobId" }] }` ordered by date and time. Apply migration 006 before deploying this backend.
+
+Since card 127, POST `import-extract` proposes events for a job with the Gemini API ([backend/lib/syllabus-ai.php](backend/lib/syllabus-ai.php)) and returns the job in the `review` state with its `events`. The browser reads every syllabus with free rules first ([src/services/syllabus.ts](src/services/syllabus.ts)) and calls this route only when they find too little, such as for a scan or photo. To keep API use down:
+- A file whose identical copy was read in the last 180 days reuses those events, with no API call. A class uploading the same syllabus reads it once.
+- The file is token-counted first (free), and anything over `ai_max_input_tokens` gets 422 before it is read.
+- Each student gets `ai_user_daily_limit` reads per UTC day and the whole app `ai_daily_limit`; after that, 429.
+- A job being read can't be read again at the same time (409), so a double click pays once.
+- Without `gemini_api_key`, or from a local origin without `NOTELY_AI_LIVE=1`, the route returns 503 and never contacts the API. Every automated test uses a fake API.
+
+A syllabus can contain text written to trick the model (prompt injection), so the model is treated as untrusted too: it has no tools, its reply must match a fixed schema, and the server drops unknown fields, strips control and direction characters, shortens text, allows only known kinds, and clears any date that isn't a real day within a year of the course. The student then reviews every event, and saving goes through `import-confirm`'s checks and prepared statements. The API key is sent only in a request header, never to the browser or a log.
+
+Each read is logged with its token counts only. A failed read leaves the job `failed`, and it can be retried.
+
+Card 127's tests: `php backend/tests/syllabus-ai.php` (fake API, no database), `npm run test:import-extract` (fake API, against a DEV/TEST database with migrations 001–006; it cleans up after itself), and `NOTELY_TEST_ISOLATED=1 npm run test:import-extract-http` (local API, never calls Gemini). The aptitude steps use `backend/tests/data/cse442-syllabus-scan.png`, an image of the acceptance tests' syllabus.
+
+After adding a key, check it once with `NOTELY_AI_LIVE=1 NOTELY_GEMINI_API_KEY=<key> php backend/tests/gemini-smoke.php`. It sends a single small request (free on the free tier) and prints the events Gemini found; no other test or script calls the API.
+
 Errors return `{ "error": "<message>" }` with one of these statuses: 400 (bad JSON or plain HTTP in secure mode), 401 (not signed in, or wrong login), 403 (Origin or CSRF failure), 404 (unknown route), 405 (wrong method), 409 (email conflict), 413 (body too large), 415 (wrong content type), 422 (validation failure), 429 (rate limited, with `Retry-After`), 503 (service or configuration failure).
 
 The browser client is [src/services/auth.ts](src/services/auth.ts). It sends requests one at a time, refreshes the CSRF token after each response, and never caches recovery codes.
@@ -229,7 +260,7 @@ The browser client is [src/services/auth.ts](src/services/auth.ts). It sends req
 
 ## Database schema
 
-Defined in [backend/migrations/001_accounts.sql](backend/migrations/001_accounts.sql) and [backend/migrations/002_note_titles.sql](backend/migrations/002_note_titles.sql). Also apply [backend/migrations/003_note_content.sql](backend/migrations/003_note_content.sql), which backfills existing notes with an empty body, and [backend/migrations/004_server_notes.sql](backend/migrations/004_server_notes.sql), which adds note metadata, history, and comments. Apply all four in order, once each, separately to each environment. All timestamps are UTC.
+Defined in [backend/migrations/001_accounts.sql](backend/migrations/001_accounts.sql) and [backend/migrations/002_note_titles.sql](backend/migrations/002_note_titles.sql). Also apply [backend/migrations/003_note_content.sql](backend/migrations/003_note_content.sql), which backfills existing notes with an empty body, and [backend/migrations/004_server_notes.sql](backend/migrations/004_server_notes.sql), which adds note metadata, history, and comments. Then apply [backend/migrations/005_import_jobs.sql](backend/migrations/005_import_jobs.sql), which stores syllabus uploads, and [backend/migrations/006_events.sql](backend/migrations/006_events.sql), which stores imported schedule events. Apply them in order, once each, separately to each environment. All timestamps are UTC.
 
 | Table | Contents |
 | --- | --- |
@@ -238,6 +269,8 @@ Defined in [backend/migrations/001_accounts.sql](backend/migrations/001_accounts
 | `notely_rate_limits` | `bucket_hash` (HMAC of scope plus IP, email, or user), `window_start`, `attempts` |
 | `notely_notes` | Server-side note ID, owner, title, body (non-null TEXT), course ID, lecture date, category, visibility, tags (JSON text), pinned, timestamps |
 | `notely_note_editors` | Per-note user permission (`view` or `edit`) |
+| `notely_import_jobs` | A syllabus upload: owner (cascades on user delete), course ID, file name, type, size, SHA-256, the file itself until it is read, state, and proposed events (JSON text) |
+| `notely_events` | A schedule event: owner (cascades on user delete), course ID, title, kind, date, optional time, source (`manual` or `imported`), and the import job it came from (set to null if the job is deleted) |
 | `notely_note_versions` | Earlier title and body of a note, who saved over them, and when (cascades on note delete) |
 | `notely_note_comments` | Comment body, note, and author (cascades on note or author delete) |
 

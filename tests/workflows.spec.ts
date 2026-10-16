@@ -8,16 +8,21 @@ async function demo(page: Page) {
     page.getByRole("heading", { name: /Good (morning|afternoon|evening)/ }),
   ).toBeVisible();
 }
+// Real (empty) files, since a syllabus's contents must match its name (card 45).
+const EMPTY_PDF = "%PDF-1.4\n1 0 obj <</Type/Catalog/Pages 2 0 R>> endobj\n2 0 obj <</Type/Pages/Kids[]/Count 0>> endobj\n"
+  + "trailer <</Root 1 0 R>>\n%%EOF\n";
+const PNG_1PX = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 async function upload(page: Page, kind: string, name = "lecture.pdf") {
   await page.getByRole("button", { name: "Create", exact: true }).click();
   await page.getByRole("menuitem", { name: kind, exact: true }).click();
   await page.getByLabel("Choose upload file").setInputFiles({
     name,
     mimeType: name.endsWith(".png") ? "image/png" : "application/pdf",
-    buffer: Buffer.from("example file"),
+    buffer: name.endsWith(".png") ? Buffer.from(PNG_1PX, "base64") : Buffer.from(EMPTY_PDF),
   });
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await expect(page.getByLabel("Title", { exact: true })).toBeVisible();
+  // The review form ends with "Save to my notes", or "Add to schedule" for a syllabus (card 46).
+  await expect(page.getByRole("button", { name: /^(Save to my notes|Add to schedule)/ })).toBeVisible();
 }
 test("account and complete onboarding", async ({ page }) => {
   await page.goto("/");
@@ -50,11 +55,23 @@ test("search, combined filters, clear and view persistence", async ({
   await demo(page);
   await page.goto("/notes");
   await page.getByLabel("Search notes").fill("scrum");
+  await expect(page).toHaveURL(/\bq=scrum\b/);
   await expect(
     page.getByRole("heading", {
       name: "Agile development & the Scrum framework",
     }),
   ).toBeVisible();
+  await expect(page.locator('a[href^="/notes/"] h3')).toHaveCount(1);
+  await page.getByLabel("Search notes").fill("transparency");
+  await expect(page.locator('a[href^="/notes/"] h3')).toHaveText(["Agile development & the Scrum framework"]);
+  await page.getByLabel("Search notes").fill("teamwork");
+  await expect(page.locator('a[href^="/notes/"] h3')).toHaveText(["Agile development & the Scrum framework"]);
+  await page.getByLabel("Search notes").fill("CSE 442");
+  await expect(page.getByRole("heading", { name: "No notes found" })).toBeVisible();
+  await page.getByLabel("Search notes").fill("scrum");
+  await page.reload();
+  await expect(page.getByLabel("Search notes")).toHaveValue("scrum");
+  await expect(page.locator('a[href^="/notes/"] h3')).toHaveText(["Agile development & the Scrum framework"]);
   await page.getByRole("button", { name: "Filters", exact: true }).click();
   await page
     .getByRole("combobox", { name: "Visibility", exact: true })
