@@ -105,6 +105,21 @@ try {
     $restored = noteAction($db, $a, 'note-restore', ['id' => $id, 'versionId' => $versions[0]['id']])['note'];
     check($restored['body'] === 'Chapter 1' && count(read($db, $a, 'note-versions', $id)['versions']) === 2, 'Restore lost history.');
 
+    // Card 56: the title-only and body-only saves keep the previous text too; an unchanged title keeps nothing.
+    noteAction($db, $a, 'note-title', ['id' => $id, 'title' => 'Renamed guide']);
+    $versions = read($db, $a, 'note-versions', $id)['versions'];
+    check(count($versions) === 3 && $versions[0]['title'] === 'Shared study guide' && $versions[0]['body'] === 'Chapter 1',
+        'A title change kept no version.');
+    noteAction($db, $a, 'note-content', ['id' => $id, 'body' => 'Chapter 3']);
+    $versions = read($db, $a, 'note-versions', $id)['versions'];
+    check(count($versions) === 4 && $versions[0]['title'] === 'Renamed guide' && $versions[0]['body'] === 'Chapter 1',
+        'A body change kept no version.');
+    noteAction($db, $a, 'note-title', ['id' => $id, 'title' => 'Renamed guide']);
+    check(count(read($db, $a, 'note-versions', $id)['versions']) === 4, 'An unchanged title kept a version.');
+    noteAction($db, $a, 'note-title', ['id' => $id, 'title' => 'Shared study guide']);
+    noteAction($db, $a, 'note-content', ['id' => $id, 'body' => 'Chapter 1']);
+    echo "PASS: card 56 title and body saves keep the previous version\n";
+
     // Sharing: only the owner invites and sets permissions; collaborators see the note.
     expectStatus($db, fn () => noteAction($db, $a, 'note-invite', ['id' => $id, 'email' => 'nobody-' . bin2hex(random_bytes(4)) . '@example.edu']), 404);
     expectStatus($db, fn () => noteAction($db, $a, 'note-invite', ['id' => $id, 'email' => $emails[0]]), 422);
