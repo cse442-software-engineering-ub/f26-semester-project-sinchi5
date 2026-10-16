@@ -56,7 +56,8 @@ Accounts and signed-in users' notes (with their history, comments, and collabora
 **Imports**
 - Upload documents (PDF, DOCX, TXT, Markdown, images), scan photos, or upload a syllabus. Files are validated (type, empty file, 20 MB limit), then shown on a review screen before anything is saved.
 - Syllabus imports detect assignments and exams and add them to the calendar after review. TXT, Markdown, PDF, and Word syllabi are read in the browser with free rules ([src/services/syllabus.ts](src/services/syllabus.ts), with PDF text from pdf.js), so most uploads never reach an API.
-- Extraction is simulated. A **Prototype preview options** control in the dialog exercises success, partial, and failure outcomes.
+- Uploaded notes are sorted into course and lecture folders (card 35): the course code and lecture date are read from TXT/Markdown text or the file name by local rules in [src/services/noteMetadata.ts](src/services/noteMetadata.ts) (`Course:` and `Lecture date:` headers win; deadlines in prose are ignored). Anything not found shows **Not detected** and can be filled in on the review screen, and TXT/Markdown text becomes the note body. Try it with [tests/fixtures/cse442-lecture.txt](tests/fixtures/cse442-lecture.txt).
+- Document extraction for PDF, DOCX, and images is simulated. A **Prototype preview options** control in the dialog exercises success, partial, and failure outcomes.
 
 **Settings**
 - **Account**: edit name and email, change password, replace the recovery code, delete the account. Each sensitive action asks for the current password.
@@ -396,6 +397,7 @@ On the server:
 | --- | --- |
 | `npm test` | Vitest unit tests: repository contracts, filtering, pinning, the auth adapter, validation, and the collaborator mock |
 | `npm run test:e2e` | Playwright browser tests (needs `npx playwright install chromium firefox webkit` once) |
+| `npx playwright test tests/note-metadata.spec.ts --project=chromium --project=mobile` | Card 35: upload a lecture note, check the detected course and date survive a reload, and that missing ones stay **Not detected** |
 | `npm run test:static-build` | Hash-routing build under a static server with no rewrites (build first) |
 | `npm run test:php` | PHP validation, hashing, and configuration checks. No database needed. |
 | `npm run test:schema` | Read-only check that a live DEV/TEST database matches the expected schema |

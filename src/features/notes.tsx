@@ -754,7 +754,7 @@ export function NoteWorkspace() {
                 disabled={!canEdit || saving}
                 onChange={(e) => edit({ courseId: e.target.value })}
               >
-                <option value="">No course</option>
+                <option value="">Not detected</option>
                 {state.courses.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.code}
@@ -766,10 +766,13 @@ export function NoteWorkspace() {
               Lecture date
               <input
                 type="date"
+                aria-label="Lecture date"
+                aria-describedby={!note.lectureDate ? "note-date-missing" : undefined}
                 value={note.lectureDate}
                 disabled={!canEdit || saving}
                 onChange={(e) => edit({ lectureDate: e.target.value })}
               />
+              {!note.lectureDate && <small id="note-date-missing">Not detected</small>}
             </label>
             <label>
               Category
@@ -1105,10 +1108,10 @@ export function CoursePage() {
           <section key={date} className={s.section}>
             <div className={s.sectionHeading}>
               <h2>
-                {new Date(date + "T12:00:00").toLocaleDateString(undefined, {
+                {date ? new Date(date + "T12:00:00").toLocaleDateString(undefined, {
                   month: "long",
                   day: "numeric",
-                })}
+                }) : "Lecture date: Not detected"}
               </h2>
               <span className={s.muted}>{notes.length} notes</span>
             </div>
