@@ -11,7 +11,28 @@ const NOTE_ROUTES = [...NOTE_READ_ROUTES, 'note-create', 'note-title', 'note-con
     'note-restore', 'note-delete', 'note-comment', 'note-invite', 'note-permission'];
 const NOTE_CATEGORIES = ['School', 'Work', 'Meetings', 'Personal'];
 const NOTE_COLUMNS = 'n.id, n.owner_user_id, n.title, n.body, n.course_id, n.lecture_date, n.category,
-    n.visibility, n.tags, n.pinned, n.created_at, n.updated_at';
+    n.visibility, n.tags, n.pinned, n.created_at, n.updated_at, n.checklist';
+
+// Task #79 / Story #19: retain ordered tasks and exact boolean completion states.
+// HTTP JSON objects arrive as stdClass; PHP callers may supply associative items.
+// The existing 8 KB request cap bounds item count/text size without new arbitrary limits.
+function noteChecklist(mixed $value): string
+{
+    if (!is_array($value) || array_values($value) !== $value) {
+        throw new HttpError(422, 'Send the checklist as an array of text and done items.');
+    }
+    $items = [];
+    foreach ($value as $item) {
+        if ($item instanceof stdClass) $item = (array) $item;
+        if (!is_array($item) || !is_string($item['text'] ?? null)
+            || !preg_match('//u', $item['text']) || !is_bool($item['done'] ?? null)) {
+            throw new HttpError(422, 'Each checklist item needs UTF-8 text and a boolean done value.');
+        }
+        // Task Test 2: discard blank tasks, preserving meaningful text and relative order.
+        if (trimEdges($item['text']) !== '') $items[] = ['text' => $item['text'], 'done' => $item['done']];
+    }
+    return json_encode($items, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+}
 
 function recordId(mixed $value, string $message): string
 {
@@ -184,6 +205,8 @@ function noteJson(array $row): array
         'ownerId' => (string) $row['owner_user_id'],
         'title' => $row['title'],
         'body' => $row['body'],
+        // Task #79: NULL on pre-existing notes means no tasks; expose an array, never JSON text.
+        'checklist' => json_decode($row['checklist'] ?? '[]', true, 16, JSON_THROW_ON_ERROR),
         'courseId' => $row['course_id'],
         'lectureDate' => $row['lecture_date'] ?? '',
         'category' => $row['category'],
@@ -272,8 +295,9 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
     if ($route === 'note-create') {
         $title = noteTitle($input);
         $body = array_key_exists('body', $input) ? noteBody($input) : '';
-        query($db, 'INSERT INTO notely_notes (owner_user_id, title, body, course_id, lecture_date, category, visibility, tags)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [$user['id'], $title, $body, ...noteFields($input)]);
+        $checklist = noteChecklist(array_key_exists('checklist', $input) ? $input['checklist'] : []);
+        query($db, 'INSERT INTO notely_notes (owner_user_id, title, body, course_id, lecture_date, category, visibility, tags, checklist)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [$user['id'], $title, $body, ...noteFields($input), $checklist]);
         $id = (string) $db->lastInsertId();
         http_response_code(201);
         return ['note' => loadNote($db, $id)];
@@ -309,14 +333,19 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
         return ['note' => ['id' => $id, $route === 'note-content' ? 'body' : 'title' => $value]];
     }
     if ($route === 'note-save') {
-        $title = noteTitle($input);
-        $body = noteBody($input);
         requireEditor($db, $id, $user);
-        // Fields left out of the request keep their current values.
-        $fields = noteFields($input + loadNote($db, $id));
+        // Task #79 / Story #19: merge after locking so checklist-only saves and legacy
+        // title/body saves preserve every omitted field, including existing tasks.
+        $merged = $input + loadNote($db, $id);
+        $title = noteTitle($merged);
+        $body = noteBody($merged);
+        $fields = noteFields($merged);
+        $checklist = noteChecklist($merged['checklist']);
+        // History remains title/body-only; checklist saves update the edit date like metadata.
+        // Restoring text therefore leaves the current Story #19 task states untouched.
         keepVersion($db, $id, $user, $title, $body);
         query($db, 'UPDATE notely_notes SET title = ?, body = ?, course_id = ?, lecture_date = ?, category = ?,
-            visibility = ?, tags = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [$title, $body, ...$fields, $id]);
+            visibility = ?, tags = ?, checklist = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [$title, $body, ...$fields, $checklist, $id]);
         return ['note' => loadNote($db, $id)];
     }
     if ($route === 'note-pin') {
