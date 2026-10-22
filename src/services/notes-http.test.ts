@@ -91,3 +91,28 @@ it("creates notes with the same defaults as the browser repository", async () =>
     title: "Untitled note", body: "", courseId: "c1", lectureDate: dateKey(), category: "School", visibility: "private", tags: [],
   } });
 });
+
+it("round-trips ordered checklist booleans, strips blanks and preserves legacy omission", async () => {
+  let stored = { ...seedNotes()[0], checklist: [{ text: "Existing", done: true }] };
+  const api = fakeApi((call) => {
+    if (call.route === "session") return { json: { csrfToken: "token" } };
+    if (call.route === "note-save") stored = { ...stored, ...call.body } as typeof stored;
+    return { json: { note: stored } };
+  });
+  const repo = createHttpNotes(courses, "/api", api.fetcher);
+  const legacy = { ...seedNotes()[0], title: "Title and body still save", body: "Updated body" };
+  await repo.save(legacy);
+  expect(api.calls.at(-1)?.body).not.toHaveProperty("checklist");
+  expect((await repo.get(legacy.id)).checklist).toEqual([{ text: "Existing", done: true }]);
+  await repo.save({ ...legacy, checklist: [
+    { text: "First", done: true }, { text: "  ", done: false }, { text: "Second", done: false },
+  ] });
+  expect(api.calls.at(-1)?.body).toMatchObject({ checklist: [
+    { text: "First", done: true }, { text: "Second", done: false },
+  ], title: legacy.title, body: legacy.body });
+  expect((await repo.get(legacy.id)).checklist).toEqual([
+    { text: "First", done: true }, { text: "Second", done: false },
+  ]);
+  await repo.save({ ...legacy, checklist: [] });
+  expect((await repo.get(legacy.id)).checklist).toEqual([]);
+});

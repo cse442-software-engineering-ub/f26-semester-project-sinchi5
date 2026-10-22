@@ -23,7 +23,12 @@ export interface Category {
   id: string;
   name: string;
 }
+export interface ChecklistItem {
+  text: string;
+  done: boolean;
+}
 export interface Note {
+  checklist?: ChecklistItem[];
   id: string;
   ownerId?: string;
   // Recorded at creation time so comment permission checks (task #65) can

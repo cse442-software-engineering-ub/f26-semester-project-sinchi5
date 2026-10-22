@@ -3,6 +3,7 @@ import { test as base, expect } from "@playwright/test";
 const CODE = "ABCD-1234-ABCD-1234-ABCD-1234-ABCD-1234";
 type Account = { id: string; name: string; email: string; password: string; code: string; completed: boolean };
 type Note = {
+  checklist: { text: string; done: boolean }[];
   id: string; ownerId: string; title: string; body: string; courseId: string; lectureDate: string; category: string;
   visibility: string; tags: string[]; pinned: boolean; createdAt: string; updatedAt: string;
 };
@@ -57,6 +58,9 @@ export const test = base.extend<{ accountApi: void }>({
         courseId: String(body.courseId ?? note.courseId ?? ""), lectureDate: String(body.lectureDate ?? note.lectureDate ?? ""),
         category: String(body.category ?? note.category ?? "School"), visibility: String(body.visibility ?? note.visibility ?? "private"),
         tags: (body.tags ?? note.tags ?? []) as string[],
+        // Task #78 browser fixture mirrors #79; this is not database persistence evidence.
+        checklist: ((body.checklist ?? note.checklist ?? []) as Note["checklist"])
+          .filter((item) => item.text.trim()).map(({ text, done }) => ({ text, done })),
       });
       if (action === "notes") {
         return { notes: [...notes.values()].filter((n) => n.ownerId === user!.id || editors.get(n.id)?.has(user!.id)) };

@@ -1,3 +1,4 @@
+import { checklistPayload } from "./checklists";
 import type {
   Repositories,
   Note,
@@ -281,7 +282,8 @@ export function createRepositories(
             createdAt: previous.updatedAt,
           });
 
-        const saved = { ...note, updatedAt: now() };
+        // Task #78 / Story #19 AT3: demo storage follows the same blank-item contract as PHP.
+        const saved = { ...note, checklist: checklistPayload(note.checklist ?? previous.checklist ?? []), updatedAt: now() };
         db.notes = db.notes.map((n) => (n.id === note.id ? saved : n));
         persist();
         return saved;

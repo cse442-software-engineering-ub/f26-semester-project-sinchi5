@@ -2802,3 +2802,8 @@
 .accountText {
   overflow-wrap: anywhere;
 }
+.checklist { margin-block: 1rem; }
+.checklistRow { display: flex; gap: .5rem; align-items: center; margin-block: .5rem; }
+.checklistRow input[type="checkbox"] { width: 1.25rem; height: 1.25rem; flex: 0 0 auto; }
+.checklistRow input[type="text"], .checklistRow input:not([type]) { flex: 1; min-width: 0; width: 0; }
+.checklistDone { text-decoration: line-through; }
