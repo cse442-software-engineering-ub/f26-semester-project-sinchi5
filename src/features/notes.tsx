@@ -1,3 +1,5 @@
+import { ChecklistEditor } from "./checklist-editor";
+import { checklistDraft, checklistPayload, type ChecklistDraft } from "../services/checklists";
 import { useEffect, useRef, useState } from "react";
 import {
   useParams,
@@ -439,6 +441,11 @@ function sameNoteFields(a: Note, b: Note) {
   );
 }
 export function NoteWorkspace() {
+  const { id } = useParams();
+  // Task #78 / Story #19 AT1: isolate drafts and pending responses when switching notes.
+  return <NoteEditor key={id} />;
+}
+function NoteEditor() {
   const { id = "" } = useParams();
   // The quick-create editor still autosaves its first title; reopened notes use Save/Cancel.
   const isNewNote = useLocation().state?.newNote === true;
@@ -465,6 +472,7 @@ export function NoteWorkspace() {
   const [preview, setPreview] = useState<NoteVersion>();
   const [restore, setRestore] = useState(false);
   const [draftBody, setDraftBody] = useState("");
+  const [checklist, setChecklist] = useState<ChecklistDraft[]>([]);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const pendingSave = useRef<Promise<Note>>();
@@ -495,6 +503,7 @@ export function NoteWorkspace() {
         if (active) {
           setNote(n);
           setDraftBody(n.body);
+          setChecklist(checklistDraft(n.checklist));
           setTitleDraft(n.title);
           noteRef.current = n;
           savedNote.current = n;
@@ -505,6 +514,7 @@ export function NoteWorkspace() {
       .catch((e) => active && setError(e.message));
     return () => {
       active = false;
+      generation.current++;
     };
   }, [id, repo]);
   useEffect(() => {
@@ -540,6 +550,7 @@ export function NoteWorkspace() {
           await refresh();
         }
       } catch (e) {
+        if (current !== generation.current) return;
         const lastSaved = savedNote.current;
         if (lastSaved && note.category !== lastSaved.category) {
           // The category did not save, so show the last saved one again and say why.
@@ -599,7 +610,7 @@ export function NoteWorkspace() {
     setSaving(true);
     setError("");
     setStatus("Saving…");
-    generation.current++;
+    const current = ++generation.current;
     try {
       // Finish metadata autosave before submitting both drafts, so an older
       // write cannot overwrite the explicitly saved title or body.
@@ -608,16 +619,22 @@ export function NoteWorkspace() {
         ...noteRef.current!,
         title,
         body: draftBody,
+        checklist: checklistPayload(checklist),
       });
+      // Task #78 / Story #19 AT1-3: ignore responses after leaving this editor.
+      // Disabled controls during Save protect the submitted draft from newer edits.
+      if (current !== generation.current) return;
       noteRef.current = saved;
       savedNote.current = saved;
       setNote(saved);
       setTitleDraft(saved.title);
       setDraftBody(saved.body);
+      setChecklist(checklistDraft(saved.checklist));
       dirtyRef.current = false;
       setDirty(false);
       setStatus("All changes saved");
     } catch (e) {
+      if (current !== generation.current) return;
       setError("Changes could not be saved. Please try again. " + (e as Error).message);
       setStatus("Not saved");
       return;
@@ -637,6 +654,7 @@ export function NoteWorkspace() {
     if (!note || savingRef.current) return;
     setTitleDraft(note.title);
     setDraftBody(note.body);
+    setChecklist(checklistDraft(note.checklist));
     setError("");
     setStatus(dirtyRef.current ? "Saving…" : "All changes saved");
   }
@@ -698,7 +716,8 @@ export function NoteWorkspace() {
     !state.user ||
     isOwner ||
     currentCollaborator?.permission === "edit";
-  const hasDraftChanges = titleDraft !== note.title || draftBody !== note.body;
+  const hasDraftChanges = titleDraft !== note.title || draftBody !== note.body ||
+    JSON.stringify(checklist.map(({ text, done }) => ({ text, done }))) !== JSON.stringify(note.checklist ?? []);
   return (
     <>
       <div className={s.editorTop}>
@@ -818,6 +837,7 @@ export function NoteWorkspace() {
             disabled={!canEdit || saving}
             onChange={(e) => setDraftBody(e.target.value)}
           />
+          <ChecklistEditor items={checklist} onChange={setChecklist} disabled={!canEdit || saving} />
           <div className={s.actions}>
             <button
               type="button"
@@ -1042,6 +1062,7 @@ export function NoteWorkspace() {
                 setDirty(false);
                 setNote(restored);
                 setDraftBody(restored.body);
+                setChecklist(checklistDraft(restored.checklist));
                 setTitleDraft(restored.title);
                 noteRef.current = restored;
                 savedNote.current = restored;

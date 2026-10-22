@@ -1,4 +1,5 @@
 import type { Collaborator, Comment, Course, Note, NoteRepository, NoteVersion } from "../domain";
+import { checklistPayload } from "./checklists";
 import { filterNotes } from "./repositories";
 import { dateKey } from "./fixtures";
 
@@ -52,6 +53,8 @@ export function createHttpNotes(
   const content = (note: Partial<Note>) => ({
     title: note.title, body: note.body, courseId: note.courseId, lectureDate: note.lectureDate,
     category: note.category, visibility: note.visibility, tags: note.tags,
+    // Task #78 / Story #19 AT1-3: omit legacy fields, but send [] to explicitly clear tasks.
+    ...(note.checklist === undefined ? {} : { checklist: checklistPayload(note.checklist) }),
   });
   return {
     async list(q) {
