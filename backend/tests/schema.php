@@ -19,7 +19,7 @@ $tables = [
     ],
     'notely_notes' => [
         'id' => ['bigint unsigned', 'NO'], 'owner_user_id' => ['bigint unsigned', 'NO'],
-        'title' => ['varchar(255)', 'NO'], 'body' => ['text', 'NO'],
+        'title' => ['varchar(255)', 'NO'], 'body' => ['text', 'NO'], 'highlights' => ['text', 'YES'],
         'course_id' => ['varchar(64)', 'NO'], 'lecture_date' => ['date', 'YES'], 'category' => ['varchar(20)', 'NO'],
         'visibility' => ["enum('private','shared')", 'NO'], 'tags' => ['varchar(4000)', 'NO'], 'pinned' => ['tinyint', 'NO'],
         'created_at' => ['datetime', 'NO'], 'updated_at' => ['datetime', 'NO'],

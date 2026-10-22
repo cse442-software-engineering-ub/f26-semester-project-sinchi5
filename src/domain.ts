@@ -27,8 +27,16 @@ export interface ChecklistItem {
   text: string;
   done: boolean;
 }
+export type HighlightColor = "yellow" | "green" | "pink";
+
+export interface NoteHighlight {
+  start: number;
+  end: number;
+  color: HighlightColor;
+}
 export interface Note {
   checklist?: ChecklistItem[];
+  highlights?: NoteHighlight[];
   id: string;
   ownerId?: string;
   // Recorded at creation time so comment permission checks (task #65) can
