@@ -1447,6 +1447,86 @@
   padding: 25px 0;
   min-height: 480px;
 }
+.highlightToolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+
+.highlightChoices {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.highlightChoices button {
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  font-size: 0.7rem;
+}
+
+.highlightEditor {
+  position: relative;
+  width: 100%;
+}
+
+.highlightLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1.95;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+
+  padding: 25px 0;
+  min-height: 480px;
+  color: var(--text);
+}
+
+.highlightTextarea {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: var(--text);
+  background: transparent;
+}
+
+.highlightTextarea::placeholder {
+  color: var(--muted);
+  -webkit-text-fill-color: var(--muted);
+}
+
+.highlightLayer mark {
+  color: #1f2a24;
+  padding: 1px 2px;
+  border-radius: 3px;
+}
+
+.highlightYellow {
+  background: #f6d85e;
+}
+
+.highlightGreen {
+  background: #7fd38a;
+}
+
+.highlightPink {
+  background: #f29ab2;
+}
 .inspector {
   padding: 20px;
   background: var(--surface);
@@ -2554,6 +2634,10 @@
     font-size: 1.45rem;
   }
   .editor .noteBody {
+    min-height: 420px;
+    font-size: 0.85rem;
+  }
+  .highlightLayer {
     min-height: 420px;
     font-size: 0.85rem;
   }
