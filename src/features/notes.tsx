@@ -680,6 +680,88 @@ function NoteEditor() {
 
     return parts;
   }
+  function adjustHighlightsForBodyChange(
+    previousBody: string,
+    nextBody: string,
+    highlights: NoteHighlight[],
+  ) {
+    let start = 0;
+
+    while (
+      start < previousBody.length &&
+      start < nextBody.length &&
+      previousBody[start] === nextBody[start]
+    ) {
+      start++;
+    }
+
+    let previousEnd = previousBody.length;
+    let nextEnd = nextBody.length;
+
+    while (
+      previousEnd > start &&
+      nextEnd > start &&
+      previousBody[previousEnd - 1] === nextBody[nextEnd - 1]
+    ) {
+      previousEnd--;
+      nextEnd--;
+    }
+
+    const delta = nextEnd - previousEnd;
+    const adjusted: NoteHighlight[] = [];
+
+    for (const highlight of highlights) {
+      // Highlight is completely before the edited text.
+      if (highlight.end <= start) {
+        adjusted.push(highlight);
+        continue;
+      }
+
+      // Highlight is completely after the edited text.
+      if (highlight.start >= previousEnd) {
+        adjusted.push({
+          ...highlight,
+          start: highlight.start + delta,
+          end: highlight.end + delta,
+        });
+        continue;
+      }
+
+      // Edit happened inside an existing highlight.
+      if (highlight.start < start && highlight.end > previousEnd) {
+        adjusted.push({
+          ...highlight,
+          end: highlight.end + delta,
+        });
+        continue;
+      }
+
+      // Keep the part before the edited text.
+      if (highlight.start < start) {
+        adjusted.push({
+          ...highlight,
+          end: start,
+        });
+        continue;
+      }
+
+      // Keep the part after the edited text.
+      if (highlight.end > previousEnd) {
+        adjusted.push({
+          ...highlight,
+          start: nextEnd,
+          end: highlight.end + delta,
+        });
+      }
+    }
+
+    return adjusted.filter(
+      (highlight) =>
+        highlight.start >= 0 &&
+        highlight.end > highlight.start &&
+        highlight.end <= nextBody.length,
+    );
+  }
   async function saveNote() {
     if (!noteRef.current || !canEdit || savingRef.current) return;
     const title = titleDraft.trim();
@@ -1008,7 +1090,15 @@ function NoteEditor() {
                   highlightLayerRef.current.scrollLeft = e.currentTarget.scrollLeft;
                 }
               }}
-              onChange={(e) => setDraftBody(e.target.value)}
+              onChange={(e) => {
+                const nextBody = e.target.value;
+
+                setDraftHighlights((current) =>
+                  adjustHighlightsForBodyChange(draftBody, nextBody, current),
+                );
+
+                setDraftBody(nextBody);
+              }}
             />
           </div>
           <ChecklistEditor items={checklist} onChange={setChecklist} disabled={!canEdit || saving} />
@@ -1236,6 +1326,7 @@ function NoteEditor() {
                 setDirty(false);
                 setNote(restored);
                 setDraftBody(restored.body);
+                setDraftHighlights(restored.highlights ?? []);
                 setChecklist(checklistDraft(restored.checklist));
                 setTitleDraft(restored.title);
                 noteRef.current = restored;
