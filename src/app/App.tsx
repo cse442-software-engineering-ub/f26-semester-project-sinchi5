@@ -190,7 +190,6 @@ export default function App() {
           <LogOut size={18} /> {signingOut ? "Logging out…" : "Log out"}
         </button>
         <div className={s.sideFooter}>
-          <span className={s.avatar}>{state.user.name[0].toUpperCase()}</span>
           <span>
             <strong>{state.user.name}</strong>
             <small>Curious mind, always.</small>
