@@ -20,7 +20,6 @@ import {
   UploadCloud,
   Camera,
   FileText,
-  ChevronDown,
   ArrowUpRight,
   X,
   LogOut,
@@ -115,13 +114,13 @@ export default function App() {
           {BRAND}
           <i>✦</i>
         </Link>
+        {/* Keep workspace details non-interactive: there is no menu to open. */}
         <div className={s.workspace}>
           <span className={s.avatar}>{state.user.name[0].toUpperCase()}</span>
           <span>
             <strong>My workspace</strong>
             <small>A little room to think</small>
           </span>
-          <ChevronDown size={15} />
         </div>
         <nav aria-label="Main navigation">
           {nav.map(({ to, label, icon: Icon }) => (
