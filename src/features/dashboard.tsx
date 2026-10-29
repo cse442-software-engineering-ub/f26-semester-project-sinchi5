@@ -19,9 +19,11 @@ import s from "../app/App.module.css";
 export function Dashboard({
   onImport,
   onCreate,
+  onAddCourse,
 }: {
   onImport: (kind: UploadKind) => void;
   onCreate: () => void;
+  onAddCourse: () => void;
 }) {
   const { state } = useApp();
   const [event, setEvent] = useState<CourseEvent>();
@@ -156,9 +158,13 @@ export function Dashboard({
           <section className={s.section}>
             <div className={s.sectionHeading}>
               <h2>Your courses</h2>
-              <Link className={s.textLink} to="/settings">
-                Manage <ArrowUpRight size={15} />
-              </Link>
+              <button
+                type="button"
+                className={s.secondary}
+                onClick={onAddCourse}
+              >
+                <Plus size={15} /> Add course
+              </button>
             </div>
             <div className={s.courseTiles}>
               {state.courses.map((c) => (

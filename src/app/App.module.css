@@ -112,7 +112,8 @@
   padding: 0 12px;
   margin-bottom: 14px;
 }
-.sideLabel a {
+.sideLabel a,
+.sideLabel button {
   min-width: 24px;
   min-height: 24px;
   display: grid;
@@ -875,7 +876,8 @@
   min-height: 44px;
 }
 .segment > button,
-.sideLabel a {
+.sideLabel a,
+.sideLabel button {
   min-width: 44px;
   min-height: 44px;
 }
