@@ -1,7 +1,9 @@
 ﻿import { useState } from "react";
 import { useApp } from "../app/context";
 import { Modal } from "../shared/ui";
+import { ImportDialog } from "./imports";
 import s from "../app/App.module.css";
+
 
 export function AddCourseDialog({
   onClose,
@@ -10,6 +12,23 @@ export function AddCourseDialog({
 }) {
   const { repo, refresh } = useApp();
   const [error, setError] = useState("");
+  const [syllabus, setSyllabus] = useState<File>();
+  const [syllabusError, setSyllabusError] = useState("");
+  const [startingImport, setStartingImport] = useState<{
+    file: File;
+    courseId: string;
+ }>();
+
+ if (startingImport) {
+    return (
+        <ImportDialog
+        kind="syllabus"
+        startingFile={startingImport.file}
+        startingCourseId={startingImport.courseId}
+        onClose={onClose}
+        />
+    );
+    }
 
   return (
     <Modal
@@ -26,14 +45,23 @@ export function AddCourseDialog({
           setError("");
 
           try {
-            await repo.courses.create({
-              code: String(data.get("code")),
-              name: String(data.get("name")),
-              term: String(data.get("term")),
-              color: String(data.get("color")),
+            const course = await repo.courses.create({
+            code: String(data.get("code")),
+            name: String(data.get("name")),
+            term: String(data.get("term")),
+            color: String(data.get("color")),
             });
 
             await refresh();
+
+            if (syllabus) {
+            setStartingImport({
+                file: syllabus,
+                courseId: course.id,
+            });
+            return;
+            }
+
             onClose();
           } catch (e) {
             setError((e as Error).message);
@@ -62,13 +90,66 @@ export function AddCourseDialog({
           <input name="color" type="color" defaultValue="#869D7A" />
         </label>
 
+        <label>
+            Syllabus (optional)
+            <input
+                type="file"
+                aria-label="Choose a syllabus file"
+                accept=".pdf,.docx,.txt,.md,.jpg,.jpeg,.png,.webp"
+                onChange={(e) => {
+                const file = e.target.files?.[0];
+
+                if (!file) {
+                    setSyllabus(undefined);
+                    setSyllabusError("");
+                    return;
+                }
+
+                const validationError = repo.imports.validate(
+                    file,
+                    "syllabus",
+                );
+
+                setSyllabus(file);
+                setSyllabusError(validationError ?? "");
+                }}
+            />
+            </label>
+
+            {syllabus && (
+            <div>
+                <span>{syllabus.name}</span>
+
+                <button
+                type="button"
+                onClick={() => {
+                    setSyllabus(undefined);
+                    setSyllabusError("");
+                }}
+                >
+                Remove file
+                </button>
+            </div>
+            )}
+
+            {syllabusError && (
+            <p className={s.error} role="alert">
+                {syllabusError}
+            </p>
+            )}
+
         {error && (
           <p className={s.error} role="alert">
             {error}
           </p>
         )}
 
-        <button className={s.primary}>Add course</button>
+        <button
+            className={s.primary}
+            disabled={Boolean(syllabusError)}
+            >
+            Add course
+            </button>
       </form>
     </Modal>
   );

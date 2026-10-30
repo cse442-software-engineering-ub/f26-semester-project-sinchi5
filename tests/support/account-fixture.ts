@@ -15,6 +15,30 @@ export const SYLLABUS_PDF_EVENTS = [
   { title: "Lab practical", kind: "exam", date: "", time: "", source: "Lab practical: date TBA" },
 ];
 
+const ADD_COURSE_SYLLABUS_EVENTS = [
+  {
+    title: "Homework 1",
+    kind: "assignment",
+    date: "2026-09-28",
+    time: "",
+    source: "Homework 1 due September 28, 2026",
+  },
+  {
+    title: "Midterm exam",
+    kind: "exam",
+    date: "2026-10-14",
+    time: "10:00",
+    source: "Midterm exam October 14, 2026 at 10:00 AM",
+  },
+  {
+    title: "Final project",
+    kind: "assignment",
+    date: "2026-12-04",
+    time: "",
+    source: "Final project due December 4, 2026",
+  },
+];
+
 export const test = base.extend<{ accountApi: void }>({
   accountApi: [async ({ context }, use) => {
     // Several accounts can share one browser, so tests can switch between students.
@@ -132,13 +156,56 @@ export const test = base.extend<{ accountApi: void }>({
       if (!user) throw new ApiError(401, "Sign in to continue.");
       if (action === "syllabus-upload") {
         const name = String(body.fileName ?? "");
-        const type = name.split(".").pop()!.toLowerCase().replace("jpeg", "jpg");
-        if (!["pdf", "docx", "txt", "md", "jpg", "png", "webp"].includes(type)) {
-          throw new ApiError(422, "Choose a PDF, DOCX, TXT, Markdown, or supported image file.");
+
+        if (name === "failed-read.txt") {
+          throw new ApiError(
+            500,
+            "That file needs another try",
+          );
         }
-        if (!body.content) throw new ApiError(422, "This file is empty. Please choose another.");
-        const job = { id: String(nextId++), ownerId: user.id, courseId: String(body.courseId), name, type, state: "queued", events: [] };
+
+        const type = name
+          .split(".")
+          .pop()!
+          .toLowerCase()
+          .replace("jpeg", "jpg");
+
+        if (
+          ![
+            "pdf",
+            "docx",
+            "txt",
+            "md",
+            "jpg",
+            "png",
+            "webp",
+          ].includes(type)
+        ) {
+          throw new ApiError(
+            422,
+            "Choose a PDF, DOCX, TXT, Markdown, or supported image file.",
+          );
+        }
+
+        if (!body.content) {
+          throw new ApiError(
+            422,
+            "This file is empty. Please choose another.",
+          );
+        }
+
+        const job = {
+          id: String(nextId++),
+          ownerId: user.id,
+          courseId: String(body.courseId),
+          name,
+          type,
+          state: "queued",
+          events: [],
+        };
+
         jobs.set(job.id, job);
+
         return { job };
       }
       if (action === "events") {
@@ -163,9 +230,20 @@ export const test = base.extend<{ accountApi: void }>({
       }
       if (job.name.startsWith("limit.")) {
         job.state = "failed";
-        throw new ApiError(429, "You can read 5 syllabi automatically each day. Try again tomorrow.");
+        throw new ApiError(
+          429,
+          "You can read 5 syllabi automatically each day. Try again tomorrow.",
+        );
       }
-      Object.assign(job, { state: "review", events: SYLLABUS_PDF_EVENTS });
+
+      Object.assign(job, {
+        state: "review",
+        events:
+          job.name === "cse442-syllabus.txt"
+            ? ADD_COURSE_SYLLABUS_EVENTS
+            : SYLLABUS_PDF_EVENTS,
+      });
+
       return { job };
     }
     await context.route("**/api/index.php?route=*", async route => {
