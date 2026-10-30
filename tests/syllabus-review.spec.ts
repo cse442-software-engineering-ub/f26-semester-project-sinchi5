@@ -108,7 +108,7 @@ test("a date the automatic reader gives that isn't in the file must be checked",
   // Names and dates on separate lines send the file to the mocked automatic reader, whose
   // "Reading response 1" date (September 21) appears nowhere in this text.
   const split = [SYLLABUS, "Midterm exam 2", "Quiz 3", "Project 2 due", "Final exam", "Oct 30 Nov 13 Dec 1 Dec 10"].join("\n");
-  const dialog = await reviewSyllabus(page, split);
+  const dialog = await reviewSyllabus(page, split, "split-schedule.txt");
   await expect(dialog.getByText("with automatic reading", { exact: false })).toBeVisible();
   const reading = dialog.getByRole("group").filter({ has: page.locator('[value="Reading response 1"]') });
   await expect(reading.getByText("Needs review: check this date. It isn’t written this way in your file.", { exact: false })).toBeVisible();
