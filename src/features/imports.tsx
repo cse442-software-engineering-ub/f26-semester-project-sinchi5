@@ -47,18 +47,25 @@ function Steps({ phase }: { phase: string }) {
 export function ImportDialog({
   kind,
   onClose,
+  startingFile,
+  startingCourseId,
 }: {
   kind: UploadKind;
   onClose: () => void;
+  startingFile?: File;
+  startingCourseId?: string;
 }) {
   const { repo, state, refresh } = useApp();
-  const [file, setFile] = useState<File>();
+  const [file, setFile] = useState<File | undefined>(startingFile);
   const [job, setJob] = useState<UploadJob>();
-  const [phase, setPhase] = useState("pick");
+  const [phase, setPhase] = useState(startingFile ? "queued" : "pick");
+  const [importError, setImportError] = useState("");
   const [error, setError] = useState("");
   const [scenario, setScenario] = useState("success");
   const [busy, setBusy] = useState(false);
-  const [courseId, setCourseId] = useState(state.courses[0]?.id || "");
+  const [courseId, setCourseId] = useState(
+    startingCourseId ?? state.courses[0]?.id ?? "",
+  );
   // Set while the AI reader double-checks a syllabus the free rules couldn't read well.
   const [checking, setChecking] = useState(false);
   // A slow upload must not update the window after it closes. Setting it on every mount matters:
@@ -71,40 +78,74 @@ export function ImportDialog({
     };
   }, []);
   // Card 45: queued while the file is registered, processing while it is read, then review or failed.
-  async function run(result = scenario) {
-    if (!file) return;
-    setError("");
-    setChecking(false);
-    setPhase("queued");
-    let queued: UploadJob;
+  async function run(
+    result = scenario,
+    sourceFile = file,
+    targetCourseId = courseId,
+  ) {
+    if (!sourceFile) return;
+
+    setImportError("");
+
     try {
-      // The short waits keep each step on screen long enough to read.
-      [queued] = await Promise.all([repo.imports.start(file, kind, result, courseId), wait(250)]);
-    } catch (e) {
-      if (open.current) {
-        setError((e as Error).message);
-        setPhase("pick");
-      }
-      return;
-    }
-    if (!open.current) return;
-    setPhase("processing");
-    try {
-      const [done] = await Promise.all([repo.imports.process(queued, file, result, () => open.current && setChecking(true)), wait(900)]);
+      setPhase("queued");
+
+      const [queued] = await Promise.all([
+        repo.imports.start(
+          sourceFile,
+          kind,
+          result,
+          targetCourseId,
+        ),
+        wait(250),
+      ]);
+
       if (!open.current) return;
+
+      setJob(queued);
+      setPhase("processing");
+
+      const [done] = await Promise.all([
+        repo.imports.process(
+          queued,
+          sourceFile,
+          result,
+          () => open.current && setChecking(true),
+        ),
+        wait(900),
+      ]);
+
+      if (!open.current) return;
+
+      setChecking(false);
       setJob(done);
       setPhase(done.state === "failed" ? "failed" : "review");
     } catch (e) {
-      // The file was uploaded but couldn't be read, so offer another try, another file, or typing events in.
-      if (open.current) {
-        setError((e as Error).message);
-        setJob({ ...queued, state: "failed" });
-        setPhase("failed");
-      }
+      if (!open.current) return;
+
+      setChecking(false);
+      setImportError((e as Error).message);
+      setPhase("failed");
     }
   }
+
+  const startedInitialFile = useRef(false);
+
+  useEffect(() => {
+    if (!startingFile || startedInitialFile.current) return;
+
+    startedInitialFile.current = true;
+
+    void run(
+      "success",
+      startingFile,
+      startingCourseId ?? courseId,
+    );
+  }, [startingFile, startingCourseId]);
+
   function chooseAnother() {
     setError("");
+    setImportError("");
     setFile(undefined);
     setJob(undefined);
     setPhase("pick");
@@ -166,9 +207,9 @@ export function ImportDialog({
       onClose={onClose}
     >
       {kind === "syllabus" && <Steps phase={phase} />}
-      {error && (
+      {(error || importError) && (
         <p role="alert" className={s.error}>
-          {error}
+          {error || importError}
         </p>
       )}
       {/* Why the AI reader couldn't help, when the rules' events are shown instead (card 45). */}
