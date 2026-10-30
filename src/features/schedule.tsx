@@ -3,7 +3,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { useSearchParams, Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Plus, ArrowUpRight } from "lucide-react";
 import { useApp } from "../app/context";
-import { Modal, PageHeading, EventRow, Empty } from "../shared/ui";
+import { Modal, PageHeading, EventRow, Empty, formatEventTime } from "../shared/ui";
 import { dateKey } from "../services/fixtures";
 import type { CourseEvent, EventKind } from "../domain";
 import s from "../app/App.module.css";
@@ -335,7 +335,7 @@ export function Schedule() {
                           )?.color,
                         }}
                       />
-                      {e.kind}: {e.title}
+                      {e.time ? `${formatEventTime(e.time)} ` : ""}{e.kind}: {e.title}
                     </small>
                   ))}
                   {events.length > 2 && (

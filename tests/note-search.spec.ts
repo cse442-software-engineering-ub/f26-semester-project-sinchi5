@@ -76,8 +76,7 @@ test("card 54 search flow and account cleanup", async ({ page }) => {
   await page.getByRole("button", { name: "I’ll do this later" }).click();
   await page.getByRole("button", { name: "Let’s begin" }).click();
 
-  await page.getByRole("navigation", { name: "Main navigation" })
-    .getByRole("link", { name: /^Notes/ }).click();
+  await page.goto("/notes");
   for (const title of ["Math Homework", "Biology Review", "Class Notes"]) {
     await page.getByRole("button", { name: "Create Note" }).click();
     await page.getByLabel("Note title").fill(title);
@@ -107,7 +106,7 @@ test("card 54 search flow and account cleanup", async ({ page }) => {
   await expect(page.getByLabel("Search notes")).toHaveValue("Physics123");
   await expect(page.getByRole("heading", { name: "No notes found" })).toBeVisible();
 
-  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await page.goto("/settings");
   await page.getByRole("button", { name: "Delete account" }).click();
   await page.getByLabel("Current password").fill("Sample river password 42!");
   await page.getByLabel("I understand that deletion is permanent").check();

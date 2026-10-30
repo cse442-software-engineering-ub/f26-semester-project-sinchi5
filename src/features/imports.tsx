@@ -602,18 +602,20 @@ export function ImportDialog({
             return <p>{`Added ${added} ${added === 1 ? "event" : "events"} to ${course}.`}</p>;
           })()}
           {/* Card 48: open the schedule on the earliest added event, so it is in view. */}
-          {kind === "syllabus" && (
-            <Link
-              className={s.textLink}
-              to={`/schedule?date=${job?.events.filter((e) => e.include !== false).map((e) => e.date).sort()[0] ?? ""}`}
-              onClick={onClose}
-            >
-              View schedule <ArrowUpRight size={16} />
-            </Link>
-          )}
-          <button className={s.primary} onClick={onClose}>
-            All done
-          </button>
+          <div className={`${s.actions} ${s.completionActions}`}>
+            {kind === "syllabus" && (
+              <Link
+                className={s.primary}
+                to={`/schedule?date=${job?.events.filter((e) => e.include !== false).map((e) => e.date).sort()[0] ?? ""}`}
+                onClick={onClose}
+              >
+                View schedule <ArrowUpRight size={16} />
+              </Link>
+            )}
+            <button className={kind === "syllabus" ? s.secondary : s.primary} onClick={onClose}>
+              All done
+            </button>
+          </div>
         </div>
       )}
     </Modal>

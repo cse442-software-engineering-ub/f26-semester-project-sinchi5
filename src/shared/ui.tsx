@@ -198,6 +198,14 @@ export function NoteCard({
     </div>
   );
 }
+// Use an ordinary space before AM/PM, regardless of the browser's locale spacing.
+export function formatEventTime(time: string) {
+  const parts = /^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/.exec(time);
+  if (!parts) return time;
+  const hours = Number(parts[1]);
+  return `${hours % 12 || 12}:${parts[2]} ${hours < 12 ? "AM" : "PM"}`;
+}
+
 export function EventRow({
   event,
   onClick,
@@ -209,7 +217,7 @@ export function EventRow({
   const course = state.courses.find((c) => c.id === event.courseId);
   return (
     <button className={s.eventRow} onClick={() => onClick?.(event)}>
-      <span className={s.eventTime}>{event.time || "All day"}</span>
+      <span className={s.eventTime}>{event.time ? formatEventTime(event.time) : "All day"}</span>
       <span
         className={s.eventBar}
         style={{ background: course?.color || "#869D7A" }}
