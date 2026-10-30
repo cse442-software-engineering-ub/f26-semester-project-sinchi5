@@ -327,6 +327,19 @@ export function createRepositories(
         persist();
         return e;
       },
+      async remove(event) {
+        // Card 173: a syllabus event is deleted on the server first, so a failure keeps it (and any
+        // edited copy saved here). One already gone from the server (404) only needs its copy removed.
+        if (event.source === "imported" && serverSyllabus) {
+          try {
+            await serverSyllabus.deleteEvent(event.id);
+          } catch (e) {
+            if ((e as { status?: number }).status !== 404) throw e;
+          }
+        }
+        db.events = db.events.filter((x) => x.id !== event.id);
+        persist();
+      },
       async lectureNotes(event) {
         return repo.notes.list({ course: event.courseId, from: event.date, to: event.date });
       },

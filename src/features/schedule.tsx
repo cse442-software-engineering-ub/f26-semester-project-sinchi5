@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { Dialog } from "@base-ui/react/dialog";
 import { useSearchParams, Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Plus, ArrowUpRight } from "lucide-react";
 import { useApp } from "../app/context";
@@ -31,6 +32,7 @@ export function EventDialog({
   );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const update = (key: keyof CourseEvent, v: string) =>
     setValue({ ...value, [key]: v });
   return (
@@ -151,10 +153,79 @@ export function EventDialog({
             Open lecture notes <ArrowUpRight size={16} />
           </Link>
         )}
-        <button className={s.primary} disabled={busy}>
-          {busy ? "Saving…" : event ? "Save changes" : "Create event"}
-        </button>
+        <div className={s.actions}>
+          {event && (
+            <button type="button" className={s.dangerOutline} disabled={busy} onClick={() => setConfirming(true)}>
+              Delete event
+            </button>
+          )}
+          <button className={s.primary} disabled={busy}>
+            {busy ? "Saving…" : event ? "Save changes" : "Create event"}
+          </button>
+        </div>
       </form>
+      {event && confirming && (
+        <DeleteEventDialog
+          title={event.title}
+          onDelete={async () => {
+            await repo.schedule.remove(event);
+            await refresh();
+            onClose();
+          }}
+          onClose={() => setConfirming(false)}
+        />
+      )}
+    </Modal>
+  );
+}
+// Card 173: confirms deleting one event. Cancel, Escape, and the X keep it and return to Event details.
+function DeleteEventDialog({
+  title,
+  onDelete,
+  onClose,
+}: {
+  title: string;
+  // Resolves once the event is gone; the caller then closes Event details too.
+  onDelete: () => Promise<void>;
+  onClose: () => void;
+}) {
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+  const pending = useRef(false);
+  async function confirm() {
+    if (pending.current) return;
+    pending.current = true;
+    setDeleting(true);
+    setError("");
+    try {
+      await onDelete();
+    } catch {
+      // Stay disabled after success until the caller removes the dialog.
+      pending.current = false;
+      setDeleting(false);
+      setError("Could not delete this event. Please try again.");
+    }
+  }
+  return (
+    <Modal
+      title="Delete this event?"
+      description={`${title} will be removed from your schedule.`}
+      dismissible={!deleting}
+      onClose={onClose}
+    >
+      {error && (
+        <p className={s.error} role="alert">
+          {error}
+        </p>
+      )}
+      <div className={s.actions}>
+        <Dialog.Close className={s.secondary} disabled={deleting}>
+          Cancel
+        </Dialog.Close>
+        <button className={s.danger} disabled={deleting} onClick={confirm}>
+          {deleting ? "Deleting…" : "Delete event"}
+        </button>
+      </div>
     </Modal>
   );
 }

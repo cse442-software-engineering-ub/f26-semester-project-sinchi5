@@ -8,7 +8,7 @@ type Note = {
   visibility: string; tags: string[]; pinned: boolean; createdAt: string; updatedAt: string;
 };
 class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
-const IMPORT_ROUTES = ["syllabus-upload", "import-job", "import-extract", "import-confirm", "events"];
+const IMPORT_ROUTES = ["syllabus-upload", "import-job", "import-extract", "import-confirm", "events", "event-delete"];
 // What the fake server reader "finds" in any uploaded PDF.
 export const SYLLABUS_PDF_EVENTS = [
   { title: "Reading response 1", kind: "assignment", date: "2026-09-21", time: "23:59", source: "Reading response 1 due Sept. 21" },
@@ -210,6 +210,13 @@ export const test = base.extend<{ accountApi: void }>({
       }
       if (action === "events") {
         return { events: savedEvents.filter((e) => e.ownerId === user!.id).map(({ ownerId: _owner, ...e }) => e) };
+      }
+      // Like the PHP route (card 172): another student's event looks the same as a missing one.
+      if (action === "event-delete") {
+        const index = savedEvents.findIndex((e) => e.id === String(body.id) && e.ownerId === user!.id);
+        if (index < 0) throw new ApiError(404, "This event could not be found.");
+        savedEvents.splice(index, 1);
+        return { event: { id: String(body.id) } };
       }
       const job = jobs.get(String(query.get("id") ?? body.id));
       if (!job || job.ownerId !== user.id) throw new ApiError(404, "This upload could not be found.");
