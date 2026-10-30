@@ -69,6 +69,53 @@ describe("syllabus event extraction (card 44)", () => {
     expect(extractEvents("Participation counts 1/2 of the grade", 2026)).toEqual([]);
     expect(extractEvents("Midterm exam October 14, 2026\nMidterm exam Oct 14", 2026)).toHaveLength(1);
   });
+
+  it("Task test 4: keeps two different items on one shared date", () => {
+    const line = "October 21, 2026: Reading Chapter 3 due; Exam 1";
+    const events = extractEvents(line, 2026);
+    expect(withoutSource(events)).toEqual([
+      { title: "Reading Chapter 3", kind: "assignment", date: "2026-10-21" },
+      { title: "Exam 1", kind: "exam", date: "2026-10-21" },
+    ]);
+    expect(events.map((event) => event.source)).toEqual([line, line]);
+  });
+
+  it("Task test 5: keeps separate dates without splitting a reading title", () => {
+    expect(withoutSource(extractEvents("Homework 2 due October 5, 2026 and Quiz 2 October 7, 2026", 2026))).toEqual([
+      { title: "Homework 2", kind: "assignment", date: "2026-10-05" },
+      { title: "Quiz 2", kind: "quiz", date: "2026-10-07" },
+    ]);
+    expect(withoutSource(extractEvents("Reading: chapters 3 and 4 by October 9, 2026", 2026))).toEqual([
+      { title: "Reading: chapters 3 and 4", kind: "assignment", date: "2026-10-09" },
+    ]);
+  });
+
+  it("Task test 6: uses the graded item rather than a table's week or topic", () => {
+    const row = "3 | September 14, 2026 | Unit 2: Requirements and user stories | Homework 2 due";
+    expect(withoutSource(extractEvents(row, 2026))).toEqual([
+      { title: "Homework 2", kind: "assignment", date: "2026-09-14" },
+    ]);
+    expect(extractEvents(row, 2026)[0].source).toBe(row);
+    expect(extractEvents("3    September 14, 2026    Unit 2: Requirements    Homework 2 due", 2026)[0].title).toBe("Homework 2");
+    expect(withoutSource(extractEvents("4 | September 21, 2026 | Unit 2 exam", 2026))).toEqual([
+      { title: "Unit 2 exam", kind: "exam", date: "2026-09-21" },
+    ]);
+    expect(withoutSource(extractEvents("5 | September 28, 2026 | Unit 3: Design | Homework 3 due; Quiz 2", 2026))).toEqual([
+      { title: "Homework 3", kind: "assignment", date: "2026-09-28" },
+      { title: "Quiz 2", kind: "quiz", date: "2026-09-28" },
+    ]);
+    expect(extractEvents("3 | Unit 2: Requirements | Homework 2 due September 14, 2026", 2026)[0].title).toBe("Homework 2");
+  });
+
+  it("Task test 7: joins only a lowercase continuation to a wrapped title", () => {
+    const source = "Homework 4: Build the sign-up page and its tests due November 2, 2026";
+    expect(extractEvents("Homework 4: Build the sign-up\npage and its tests due November 2, 2026", 2026)).toEqual([
+      { title: "Homework 4: Build the sign-up page and its tests", kind: "assignment", date: "2026-11-02", source },
+    ]);
+    expect(withoutSource(extractEvents("Final project\nOctober 30, 2026: Exam 2", 2026))).toEqual([
+      { title: "Exam 2", kind: "exam", date: "2026-10-30" },
+    ]);
+  });
 });
 
 describe("normalizing proposed events (card 44)", () => {
@@ -141,5 +188,30 @@ describe("rules first, AI only when needed (card 44)", () => {
     expect(mergeEvents(ai, rules).map((e) => [e.title, e.date])).toEqual([
       ["Midterm", "2026-10-14"], ["Homework 1", "2026-09-28"], ["Final project", "2026-12-04"],
     ]);
+  });
+
+  it("Task test 8: keeps different AI and rules items on the same date", () => {
+    const exam = extractEvents("Exam 1 October 21, 2026", 2026);
+    const reading = { title: "Reading: Chapter 3", kind: "assignment" as const, date: "2026-10-21", source: "" };
+    expect(mergeEvents([reading], exam).map((e) => [e.title, e.kind, e.date])).toEqual([
+      ["Reading: Chapter 3", "assignment", "2026-10-21"],
+      ["Exam 1", "exam", "2026-10-21"],
+    ]);
+    expect(mergeEvents(
+      [{ title: "Midterm", kind: "exam", date: "2026-10-14", source: "" }],
+      extractEvents("Midterm exam October 14, 2026", 2026),
+    ).map((e) => e.title)).toEqual(["Midterm"]);
+    expect(mergeEvents([], extractEvents("Homework 1 due September 28, 2026", 2026))).toHaveLength(1);
+    const homework = extractEvents("Homework 1 due September 28, 2026\nHomework 2 due September 28, 2026", 2026);
+    expect(mergeEvents([homework[0]], homework).map((e) => e.title)).toEqual(["Homework 1", "Homework 2"]);
+  });
+
+  it("Task test 9: flags an AI year that contradicts the source", () => {
+    const event = { title: "Homework 1", kind: "assignment" as const, date: "2025-09-28", source: "Homework 1 due September 28, 2026" };
+    expect(checkDates([event], event.source)[0].needsReview).toBe(true);
+    const correct = { ...event, date: "2026-09-28" };
+    expect(checkDates([correct], correct.source)[0].needsReview).toBeUndefined();
+    expect(checkDates([correct], "Homework 1 due September 28")[0].needsReview).toBeUndefined();
+    expect(checkDates([event], `${event.source}\nReview on September 28`)[0].needsReview).toBe(true);
   });
 });

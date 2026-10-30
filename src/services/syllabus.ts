@@ -44,11 +44,11 @@ const TIME_RULES: { pattern: RegExp; time: (m: RegExpExecArray) => string }[] = 
 // Dates the rules must not guess: relative days, placeholders, and course weeks.
 const RELATIVE = new RegExp(
   String.raw`\b(?:(?:next|this|following)\s+(?:week|${WEEKDAY_NAME})|tomorrow|tba|tbd|to be (?:announced|determined)|week\s*\d+)\b`, "gi");
-const EVENT_WORDS = /\b(?:exams?|midterms?|quiz(?:zes)?|homework|hw|assignments?|problem sets?|psets?|labs?|projects?|papers?|essays?|reports?|drafts?|proposals?|presentations?|due|deadlines?|submissions?)\b/i;
+const EVENT_WORDS = /\b(?:exams?|midterms?|quiz(?:zes)?|homework|hw|assignments?|problem sets?|psets?|labs?|projects?|papers?|essays?|reports?|drafts?|proposals?|presentations?|readings?|due|deadlines?|submissions?)\b/i;
 const KINDS: [SyllabusEventKind, RegExp][] = [
   ["exam", /\b(?:exam|examination|midterm|test\s*#?\d)s?\b/i],
   ["quiz", /\bquiz/i],
-  ["assignment", /\b(?:homework|hw\s*#?\d|assignment|problem set|pset|lab|worksheet|exercise)s?\b/i],
+  ["assignment", /\b(?:homework|hw\s*#?\d|assignment|problem set|pset|lab|worksheet|exercise|reading)s?\b/i],
   ["deadline", /\b(?:project|paper|essay|report|draft|proposal|presentation|due|deadline|submission)s?\b/i],
 ];
 const EDGE = String.raw`[\s\-–—:;,.|@•▪◦·]`;
@@ -80,10 +80,10 @@ function cleanTitle(text: string) {
   return plainText(title, 255);
 }
 
-function parseLine(line: string, year: number): ProposedEvent | null {
-  const source = plainText(line, 500);
+function parseLine(line: string, year: number, originalLine = line): ProposedEvent | null {
+  const source = plainText(originalLine, 500);
   // Table bars and Markdown markers separate words the way spaces do.
-  const text = source.replace(/[|*#>`_]+/g, " ");
+  const text = plainText(line, 500).replace(/[|*#>`_]+/g, " ");
   const keyword = EVENT_WORDS.test(text);
   const claimed: [number, number][] = [];
   const take = (pattern: RegExp, accept: (m: RegExpExecArray) => boolean = () => true) => {
@@ -127,10 +127,54 @@ function parseLine(line: string, year: number): ProposedEvent | null {
   };
 }
 
-// Proposes one event per syllabus line that has a date (or a relative date next to an event word).
+function dateText(line: string): string {
+  for (const rule of DATE_RULES) {
+    const match = new RegExp(rule.pattern.source, rule.pattern.flags).exec(line);
+    if (match) return match[0];
+  }
+  return "";
+}
+
+// Keeps a title wrapped by text extraction together without joining unrelated headings.
+function syllabusLines(text: string): string[] {
+  const lines: string[] = [];
+  for (const raw of text.split(/\r\n|\r|\n/)) {
+    const line = raw.trim();
+    if (line && lines.length && /^\p{Ll}/u.test(line) && !dateText(lines[lines.length - 1])) {
+      lines[lines.length - 1] += ` ${line}`;
+    } else {
+      lines.push(line);
+    }
+  }
+  return lines;
+}
+
+// A semicolon separates items. "And" separates them only when it introduces another
+// graded item, so "Reading: chapters 3 and 4" remains one title.
+function itemParts(text: string): string[] {
+  return text.split(/\s*;\s*|\s+and\s+(?=(?:quiz(?:zes)?|homework|hw\b|assignment|exam|midterm|reading|project|paper|lab)\b)/i)
+    .map((part) => part.trim()).filter(Boolean);
+}
+
+function eventsFromLine(line: string, year: number): ProposedEvent[] {
+  const columns = line.includes("|") ? line.split(/\s*\|\s*/).filter(Boolean)
+    : /\s{2,}/.test(line) ? line.split(/\s{2,}/).filter(Boolean) : [];
+  const sharedDate = dateText(line);
+  // In schedule tables, the dated row and the graded-item cell supply different fields.
+  // Ignore week numbers and the adjacent course topic when an item cell is present.
+  const itemCells = columns.filter((column) => EVENT_WORDS.test(column));
+  const sections = itemCells.length ? itemCells.flatMap(itemParts) : itemParts(line);
+  return sections.flatMap((section) => {
+    const localDate = dateText(section);
+    const text = !localDate && sharedDate ? `${section} ${sharedDate}` : section;
+    const event = parseLine(text, year, line);
+    return event ? [event] : [];
+  });
+}
+
 // Dates without a year use `year`, normally the course term's year.
 export function extractEvents(text: string, year: number): ProposedEvent[] {
-  return normalizeEvents(text.split(/\r\n|\r|\n/).map((line) => parseLine(line, year)).filter(Boolean));
+  return normalizeEvents(syllabusLines(text).flatMap((line) => eventsFromLine(line, year)));
 }
 
 // Cleans events proposed by any reader (these rules or the server) into the same safe shape:
@@ -164,7 +208,7 @@ export function normalizeEvents(items: unknown): ProposedEvent[] {
 }
 
 // Short lines that name a graded item, like a table cell or heading ("Midterm exam", "Project 2 due").
-const GRADED_ITEM = /\b(?:exams?|midterms?|finals?|quiz(?:zes)?|homework|hw\s*#?\d|assignments?|projects?|papers?|due|deadlines?)\b/i;
+const GRADED_ITEM = /\b(?:exams?|midterms?|finals?|quiz(?:zes)?|homework|hw\s*#?\d|assignments?|projects?|papers?|readings?|due|deadlines?)\b/i;
 
 // Why the rules' events can't be trusted on their own, or null when they're good enough to show as
 // they are. The browser asks the AI reader only for a reason, so most syllabi cost nothing.
@@ -186,19 +230,31 @@ export function rulesVerdict(text: string, events: ProposedEvent[]): RulesVerdic
 // reader misread or made up. A photo has no text to compare, so its dates are left as they are.
 export function checkDates(events: ProposedEvent[], text: string): ProposedEvent[] {
   if (!text.trim()) return events;
-  const days = new Set<string>();
+  const days = new Map<string, Set<string>>();
   for (const rule of DATE_RULES) {
     for (const m of text.matchAll(rule.pattern)) {
-      const [, month, day] = rule.parts(m);
-      days.add(`${month}-${day}`);
+      const [writtenYear, month, day] = rule.parts(m);
+      const key = `${month}-${day}`;
+      const years = days.get(key) ?? new Set<string>();
+      years.add(writtenYear ? String(writtenYear.length === 2 ? 2000 + +writtenYear : +writtenYear) : "");
+      days.set(key, years);
     }
   }
-  return events.map((e) =>
-    !e.date || days.has(`${+e.date.slice(5, 7)}-${+e.date.slice(8)}`) ? e : { ...e, needsReview: true as const });
+  return events.map((e) => {
+    if (!e.date) return e;
+    const years = days.get(`${+e.date.slice(5, 7)}-${+e.date.slice(8)}`);
+    const writtenYears = [...(years ?? [])].filter(Boolean);
+    const supported = writtenYears.length ? writtenYears.includes(e.date.slice(0, 4)) : years?.has("");
+    return supported ? e : { ...e, needsReview: true as const };
+  });
 }
 
-// The AI reader's events, plus each dated exam, quiz, assignment, or deadline the rules found on a day
-// the AI left empty, so neither reader's miss is lost.
+// The AI reader's events, plus distinct dated items the rules found.
 export function mergeEvents(ai: ProposedEvent[], rules: ProposedEvent[]): ProposedEvent[] {
-  return normalizeEvents([...ai, ...rules.filter((r) => r.date && r.kind !== "other" && !ai.some((a) => a.date === r.date))]);
+  const identity = (event: ProposedEvent) => {
+    const title = event.kind === "exam" ? event.title.replace(/\bexam(?:ination)?\b/gi, "") : event.title;
+    return title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  };
+  return normalizeEvents([...ai, ...rules.filter((r) => r.date && r.kind !== "other" && !ai.some((a) =>
+    a.date === r.date && a.kind === r.kind && identity(a) === identity(r)))]);
 }
