@@ -36,6 +36,10 @@ export function createHttpSyllabus(endpoint = `${import.meta.env.BASE_URL}api/in
     async events() {
       return (await send<{ events: CourseEvent[] }>("events")).events;
     },
+    // Deletes one of the student's syllabus events (card 172).
+    async deleteEvent(id: string) {
+      await send<{ event: { id: string } }>("event-delete", { id });
+    },
   };
 }
 export type SyllabusApi = ReturnType<typeof createHttpSyllabus>;

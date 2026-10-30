@@ -165,6 +165,8 @@ export interface Collaborator {
 export interface ScheduleRepository {
   list(from?: string, to?: string): Promise<CourseEvent[]>;
   save(event: CourseEvent): Promise<CourseEvent>;
+  // Card 173: removes the event from the schedule (a syllabus event also from the server).
+  remove(event: CourseEvent): Promise<void>;
   lectureNotes(event: CourseEvent): Promise<Note[]>;
 }
 export interface ImportRepository {
