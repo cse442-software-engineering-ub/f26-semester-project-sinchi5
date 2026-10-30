@@ -8,9 +8,10 @@ if (PHP_SAPI !== 'cli' && !defined('NOTELY_INTERNAL')) {
 // Card 43: a syllabus upload becomes an import job that only its owner can read.
 // Card 47: the student's reviewed events from a job are saved to their schedule.
 // import-extract reads a job with the Gemini API (syllabus-ai.php) when the browser's free rules can't.
+// Card 172: event-delete removes one of the student's own saved events.
 // Needs notes.php for recordId() and isoTime().
 const IMPORT_READ_ROUTES = ['import-job', 'events'];
-const IMPORT_ROUTES = [...IMPORT_READ_ROUTES, 'syllabus-upload', 'import-confirm', 'import-extract'];
+const IMPORT_ROUTES = [...IMPORT_READ_ROUTES, 'syllabus-upload', 'import-confirm', 'import-extract', 'event-delete'];
 const EVENT_KINDS = ['lecture', 'assignment', 'quiz', 'exam', 'deadline', 'other'];
 const MAX_IMPORTED_EVENTS = 200;
 const SYLLABUS_MAX_BYTES = 20 * 1024 * 1024;
@@ -269,6 +270,15 @@ function importAction(PDO $db, array $config, array $session, string $route, arr
         $rows = query($db, 'SELECT id, course_id, title, kind, event_date, event_time, source, import_job_id FROM notely_events
             WHERE owner_user_id = ?' . $filter . ' ORDER BY event_date, event_time, id', $values)->fetchAll();
         return ['events' => array_map('eventJson', $rows)];
+    }
+    if ($route === 'event-delete') {
+        $id = recordId($input['id'] ?? null, 'Choose a valid event.');
+        // Another student's event gets the same answer as a missing one, so IDs can't be probed.
+        $deleted = query($db, 'DELETE FROM notely_events WHERE id = ? AND owner_user_id = ?', [$id, $user['id']])->rowCount();
+        if ($deleted === 0) {
+            throw new HttpError(404, 'This event could not be found.');
+        }
+        return ['event' => ['id' => $id]];
     }
     // Each upload can store up to 20 MB, so one account can't fill the shared database.
     rateLimit($db, $config, 'syllabus-upload', (string) $user['id'], 20);
