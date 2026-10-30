@@ -147,3 +147,20 @@ foreach (['jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'] a
     check(syllabusPart($type, 'img')['inlineData']['mimeType'] === $media, "Wrong media type for $type.");
 }
 echo "PASS 5: DOCX and text files are sent as text, image types are kept, and unreadable DOCX files are refused\n";
+
+// 6. A schedule row can contain several separately named graded items. The request must tell Gemini
+// to use each item's own name and the row's date, and the reply must keep same-day items separate.
+$table = pdfOf('Week 3 | September 14, 2026 | Unit 2: Requirements | Homework 2 due; Quiz 1');
+$sameDay = [
+    ['title' => 'Homework 2', 'kind' => 'assignment', 'date' => '2026-09-14', 'time' => '', 'source' => 'Homework 2 due'],
+    ['title' => 'Quiz 1', 'kind' => 'quiz', 'date' => '2026-09-14', 'time' => '', 'source' => 'Quiz 1'],
+];
+check(readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($sameDay)), 'pdf', $table, 2026) === $sameDay,
+    'Separate items on the same date must remain separate events.');
+$instructions = $calls[1][1]['systemInstruction']['parts'][0]['text'] ?? '';
+foreach (['each separately named graded item', 'share a date, line, table row, or Due cell',
+    'use the Date column', 'topic, and unit columns', "item's own name and number",
+    'Remove', '"due"', 'never combine multiple item names', '"Homework 2" (assignment)', '"Quiz 1" (quiz)'] as $rule) {
+    check(str_contains($instructions, $rule), "The Gemini request is missing the schedule rule: $rule");
+}
+echo "PASS 6: the request asks for one item per graded item, even on a shared day, line, or table row, titled by its own name, not the column beside it\n";
