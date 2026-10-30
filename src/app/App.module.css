@@ -940,6 +940,12 @@
 .empty a {
   text-decoration: underline;
 }
+.empty a.primary {
+  text-decoration: none;
+}
+.completionActions {
+  justify-content: center;
+}
 .boot {
   min-height: 100dvh;
   display: flex;

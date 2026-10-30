@@ -38,8 +38,8 @@ async function opened(page: Page, name: string) {
   await dialog.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
   return dialog;
 }
-// A day-list row is named by its time ("18:00" or "All day"), then its title.
-const row = (page: Page, title: string) => page.getByRole("button", { name: new RegExp(`^(All day|\\d{1,2}:\\d{2}) ${title} `) });
+// A day-list row is named by its time ("6:00 PM" or "All day"), then its title.
+const row = (page: Page, title: string) => page.getByRole("button", { name: new RegExp(`^(All day|\\d{1,2}:\\d{2} (?:AM|PM)) ${title} `) });
 function countDeletes(page: Page) {
   const deletes: string[] = [];
   page.on("request", (request) => { if (request.url().includes("route=event-delete")) deletes.push(request.postData() ?? ""); });
