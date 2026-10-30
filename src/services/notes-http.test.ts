@@ -88,7 +88,7 @@ it("creates notes with the same defaults as the browser repository", async () =>
   const api = fakeApi((call) => call.route === "session" ? { json: { csrfToken: "token" } } : { status: 201, json: { note: { id: "9" } } });
   await createHttpNotes(courses, "/api/index.php", api.fetcher).create({ courseId: "c1" });
   expect(api.calls[1]).toEqual({ route: "note-create", method: "POST", csrf: "token", body: {
-    title: "Untitled note", body: "", courseId: "c1", lectureDate: dateKey(), category: "School", visibility: "private", tags: [],
+    title: "Untitled note", body: "", highlights: [], courseId: "c1", lectureDate: dateKey(), category: "School", visibility: "private", tags: [],
   } });
 });
 

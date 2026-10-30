@@ -248,7 +248,7 @@ A syllabus can contain text written to trick the model (prompt injection), so th
 
 Each read is logged with its token counts only. A failed read leaves the job `failed`, and it can be retried.
 
-Card 127's tests: `php backend/tests/syllabus-ai.php` (fake API, no database), `npm run test:import-extract` (fake API, against a DEV/TEST database with migrations 001–006; it cleans up after itself), and `NOTELY_TEST_ISOLATED=1 npm run test:import-extract-http` (local API, never calls Gemini). The aptitude steps use `backend/tests/data/cse442-syllabus-scan.png`, an image of the acceptance tests' syllabus.
+Card 127's tests: `php backend/tests/syllabus-ai.php` (fake API, no database), `npm run test:import-extract` (fake API, against a DEV/TEST database with migrations 001–006; it cleans up after itself), and `NOTELY_TEST_ISOLATED=1 npm run test:import-extract-http` (local API, never calls Gemini). The aptitude steps use `backend/tests/data/cse442-syllabus-scan.png`, an image of the acceptance tests' syllabus. The regression fixture `backend/tests/data/cse442-schedule-table-scan.png` has Homework 2 and Quiz 1 in the same Due cell on September 14, 2026, and Exam 1 on September 21. The reader should propose those three separate events, titled by the Due items rather than the neighboring Topic cells.
 
 After adding a key, check it once with `NOTELY_AI_LIVE=1 NOTELY_GEMINI_API_KEY=<key> php backend/tests/gemini-smoke.php`. It sends a single small request (free on the free tier) and prints the events Gemini found; no other test or script calls the API.
 

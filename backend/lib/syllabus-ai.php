@@ -12,7 +12,16 @@ if (PHP_SAPI !== 'cli' && !defined('NOTELY_INTERNAL')) {
 const SYLLABUS_AI_PROMPT = <<<'PROMPT'
 You read course syllabi and list the dated events a student should put on a calendar: assignments,
 exams, quizzes, project and paper deadlines, and other one-time course events.
-- Give one item per event, with a short title written the way the syllabus writes it.
+- Give one event for each separately named graded item. If several assignments, quizzes, or exams
+  share a date, line, table row, or Due cell, return a separate event for each one with that date.
+- In a schedule table, use the Date column for each item in the Due or assessment column. Week,
+  topic, and unit columns give context; they are not event titles.
+- Title each event with the item's own name and number, such as "Homework 2" or "Quiz 1". Remove
+  trailing words such as "due" and the date or time from the title. Never use the adjacent week,
+  topic, or unit text as a title, and never combine multiple item names into one title.
+- For example, a row dated September 14, 2026 with topic "Unit 2: Requirements" and Due cell
+  "Homework 2 due; Quiz 1" yields two events on September 14: "Homework 2" (assignment) and
+  "Quiz 1" (quiz). This example is an instruction, not an event in the uploaded syllabus.
 - date is the event's day as YYYY-MM-DD. When the syllabus gives a month and day without a year, use
   the course year from the request. When it gives no specific day (for example "next Friday",
   "week 5", or "TBA"), still list the event, with date set to "".
