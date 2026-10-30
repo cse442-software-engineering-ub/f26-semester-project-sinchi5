@@ -1,0 +1,6 @@
+Course: CSE 442
+Lecture date: September 14, 2026
+
+Sprint planning
+Write user stories and define acceptance criteria before implementation.
+Assignment due: September 21, 2026

@@ -105,6 +105,8 @@ export interface UploadJob {
   state:
     "queued" | "processing" | "review" | "completed" | "partial" | "failed";
   metadata: DetectedMetadata;
+  // The text of an uploaded TXT/Markdown note, saved as the note's body (card 35).
+  body?: string;
   events: DetectedEvent[];
   // How a syllabus was read (card 45): by the free rules, by the AI reader after the rules found too
   // little, by the rules alone because the AI reader couldn't help (notice says why), or a demo sample.
