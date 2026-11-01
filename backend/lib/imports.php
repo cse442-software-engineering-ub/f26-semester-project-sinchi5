@@ -243,7 +243,7 @@ function extractImport(PDO $db, array $config, array $user, array $input, ?calla
             if (!is_string($content)) {
                 throw new HttpError(422, 'This upload expired. Please choose the file again.');
             }
-            set_time_limit(180);
+            set_time_limit(240);
             $read = json_encode(readSyllabusWithAi($config, $send, $job['type'], $content, $year),
                 JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         } catch (Throwable $error) {

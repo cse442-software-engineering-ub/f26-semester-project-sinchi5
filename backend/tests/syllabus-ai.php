@@ -52,7 +52,7 @@ $pdf = pdfOf('Homework 1 due September 28');
 $config = ['origin' => 'https://aptitude.cse.buffalo.edu', 'gemini_api_key' => 'test-key-never-sent'];
 $model = 'models/' . SYLLABUS_AI_MODEL;
 
-// 1. A PDF is counted for free first, then read once with the default model, high thinking, and a schema.
+// 1. A PDF is counted for free first, then read once with the default model, medium thinking, and a schema.
 check(readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($events)), 'pdf', $pdf, 2026)
     === ['isSyllabus' => true, 'meetings' => [], 'noClassDates' => [], 'events' => $events], 'The events from the reply were not returned.');
 [[$countPath, $countBody], [$readPath, $readBody]] = $calls;
@@ -63,7 +63,7 @@ check($countPath === "$model:countTokens" && $countBody === ['contents' => [['ro
 check($readPath === "$model:generateContent" && $readBody['contents'] === $countBody['contents'], 'The read must send what was counted.');
 check($readBody['systemInstruction'] === ['parts' => [['text' => SYLLABUS_AI_PROMPT]]], 'The instructions must be the system instruction.');
 check($readBody['generationConfig'] === ['responseMimeType' => 'application/json', 'responseSchema' => SYLLABUS_AI_SCHEMA,
-    'maxOutputTokens' => 65536, 'thinkingConfig' => ['thinkingLevel' => 'HIGH']], 'The read must use JSON, the schema, and high thinking.');
+    'maxOutputTokens' => 65536, 'thinkingConfig' => ['thinkingLevel' => 'MEDIUM']], 'The read must use JSON, the schema, and medium thinking.');
 check(!isset($readBody['tools']), 'The model must have no tools.');
 check(SYLLABUS_AI_MODEL === 'gemini-3.8-flash', 'The stronger model is the default.');
 readSyllabusWithAi($config + ['gemini_model' => 'gemini-3.5-flash-lite'], fakeApi($calls, $counted, $reply([])), 'pdf', $pdf, 2026);
@@ -73,7 +73,7 @@ try {
     throw new LogicException('A bad model name must be refused.');
 } catch (RuntimeException) {
 }
-echo "PASS 1: a PDF is token-counted, then read once with high thinking, the read schema, and the configured model\n";
+echo "PASS 1: a PDF is token-counted, then read once with medium thinking, the read schema, and the configured model\n";
 
 // 2. Nothing is paid for when the file is too long, and failures, blocks, or cut-off replies become clear messages.
 // Arrow functions copy outer variables, so the fake is made outside them to record into $calls.

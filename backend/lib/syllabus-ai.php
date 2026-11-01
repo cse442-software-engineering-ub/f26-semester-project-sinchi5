@@ -256,7 +256,8 @@ function liveGemini(array $config): callable
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
             CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_TIMEOUT => 150,
+            // A long syllabus can take Gemini over two minutes to think through.
+            CURLOPT_TIMEOUT => 200,
             // The key goes in a header, never the URL, so it can't end up in a log.
             CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'x-goog-api-key: ' . $key],
             CURLOPT_POSTFIELDS => json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE),
@@ -324,7 +325,8 @@ function readSyllabusWithAi(array $config, callable $send, string $type, string 
             'responseSchema' => SYLLABUS_AI_SCHEMA,
             // Thinking counts toward this limit, and a cut-off reply is thrown away, so it's the most allowed.
             'maxOutputTokens' => 65536,
-            'thinkingConfig' => ['thinkingLevel' => 'HIGH'],
+            // HIGH read the team's real syllabi no better, and took long enough to risk timing out.
+            'thinkingConfig' => ['thinkingLevel' => 'MEDIUM'],
         ],
     ]);
     if ($status !== 200) {
