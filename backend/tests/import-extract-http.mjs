@@ -58,7 +58,7 @@ try {
   }
   assert.equal((await anonymous.call("session")).status, 200);
 
-  // The browser asks only when its free rules couldn't read a file, whatever the type.
+  // Every file type goes to the reader the same way.
   const text = await upload("cse442-syllabus.txt", "Homework 1 due September 28, 2026");
   const pdf = await upload("syllabus.pdf", "%PDF-1.7\nHomework 1 due September 28, 2026\n%%EOF\n");
   for (const job of [text, pdf]) {

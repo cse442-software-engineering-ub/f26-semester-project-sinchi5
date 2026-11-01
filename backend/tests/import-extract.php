@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 // import-extract's spending guards with a fake Gemini API, so no request leaves the machine.
-// Run only against DEV/TEST with migrations 001-006 applied: php backend/tests/import-extract.php
+// Run only against DEV/TEST with migrations 001-009 applied: php backend/tests/import-extract.php
 ini_set('error_log', '/dev/null');
 // The rate limiter sends a Retry-After header, which PHP can only do before any output.
 ob_start();
@@ -68,7 +68,7 @@ $broken = function () use (&$requests): array {
 $state = fn (string $id) => query($db, 'SELECT state, content IS NULL AS cleared FROM notely_import_jobs WHERE id = ?', [$id])->fetch();
 $read = fn (array $settings, array $user, string $id, ?callable $send = null, mixed $year = 2026)
     => extractImport($db, $settings, $user, ['id' => $id, 'year' => $year], $send ?? $gemini);
-$midterm = [['title' => 'Midterm exam', 'kind' => 'exam', 'date' => '2026-10-14', 'time' => '10:00', 'source' => 'Midterm exam October 14']];
+$midterm = [['title' => 'Midterm exam', 'kind' => 'exam', 'date' => '2026-10-14', 'time' => '10:00', 'location' => '', 'source' => 'Midterm exam October 14']];
 
 try {
     // Task test 4: an identical file is read once, a finished job isn't read again, and only one
@@ -95,6 +95,18 @@ try {
     query($db, 'UPDATE notely_import_jobs SET updated_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 181 DAY) WHERE id IN (?, ?)', [$first, $copy]);
     $read($roomy, $b, job($db, $b, $pdf));
     check($requests === 6, 'A read older than 180 days should not be reused.');
+    // Dates without years depend on the course year, and an older reader's reply has another shape.
+    $read($roomy, $b, job($db, $b, $pdf), null, 2027);
+    check($requests === 8, 'A read for another course year should not be reused.');
+    query($db, 'UPDATE notely_import_jobs SET reader_key = ? WHERE file_sha256 = ?', ['1:2026', hash('sha256', $pdf)]);
+    query($db, 'UPDATE notely_import_jobs SET updated_at = UTC_TIMESTAMP() WHERE file_sha256 = ?', [hash('sha256', $pdf)]);
+    $read($roomy, $b, job($db, $b, $pdf));
+    check($requests === 10, "An older reader's read should not be reused.");
+    // A job saved before weekly classes existed still comes back in today's shape.
+    $older = job($db, $a, pdfOf('Older job ' . bin2hex(random_bytes(8))));
+    query($db, "UPDATE notely_import_jobs SET state = 'review', events = ? WHERE id = ?", [json_encode($midterm), $older]);
+    $job = ownedImport($db, $a, $older);
+    check($job['events'] === $midterm && $job['meetings'] === [] && $job['isSyllabus'] === true, 'An older job should read as dated events with no classes.');
     echo "PASS 1: an identical file is read once, finished and busy jobs aren't read again, and old reads expire\n";
 
     // Task test 5: each student, and the whole app, gets a fixed number of reads a day (2 and 3 here).
@@ -127,6 +139,28 @@ try {
         fails(fn () => $read($usual, $e, $retry, null, $year), 422, 'Choose a valid course year.');
     }
     echo "PASS 3: a failed read can be retried with its file, and other students' jobs and bad years are refused\n";
+
+    // A read can find nothing, and that answer is saved like any other, so the same file stays free.
+    $classes = '{"isSyllabus":true,"meetings":[{"title":"Lecture","kind":"lecture","section":"","days":["TUE","THU"],"time":"09:30","location":"NSC 201",'
+        . '"firstDate":"2026-08-25","lastDate":"2026-12-03","source":"Tuesdays and Thursdays"}],"noClassDates":[{"from":"2026-10-13","to":"2026-10-13"}],"events":[]}';
+    $answer = function (string $reply) use (&$requests): callable {
+        return function (string $path) use (&$requests, $reply): array {
+            $requests++;
+            return str_ends_with($path, ':countTokens') ? [200, ['totalTokens' => 900]]
+                : [200, ['candidates' => [['finishReason' => 'STOP', 'content' => ['parts' => [['text' => $reply]]]]]]];
+        };
+    };
+    $weekly = $read($roomy, $a, job($db, $a, pdfOf('Weekly ' . bin2hex(random_bytes(8)))), $answer($classes))['job'];
+    check($weekly['meetings'][0]['days'] === [2, 4] && $weekly['noClassDates'] === [['from' => '2026-10-13', 'to' => '2026-10-13']] && $weekly['events'] === [],
+        'Weekly classes and no-class dates should come back with the job.');
+    $blank = pdfOf('Nothing ' . bin2hex(random_bytes(8)));
+    $before = $requests;
+    $none = $read($roomy, $a, job($db, $a, $blank), $answer('{"isSyllabus":true,"meetings":[],"noClassDates":[],"events":[]}'))['job'];
+    check([$none['state'], $none['events'], $none['meetings'], $none['isSyllabus']] === ['review', [], [], true], 'A syllabus with no events should reach review.');
+    check($read($roomy, $b, job($db, $b, $blank))['job']['events'] === [] && $requests === $before + 2, 'An empty read should be reused like any other.');
+    $resume = $read($roomy, $a, job($db, $a, pdfOf('Resume ' . bin2hex(random_bytes(8)))), $answer('{"isSyllabus":false,"meetings":[],"noClassDates":[],"events":[]}'))['job'];
+    check([$resume['state'], $resume['isSyllabus']] === ['review', false], 'A file that is not a syllabus should say so.');
+    echo "PASS 4: weekly classes, no events, and not a syllabus are saved with the job and reused for the same file\n";
 } finally {
     // Deleting each test student also deletes their jobs (ON DELETE CASCADE); the throwaway counters
     // are found by their keys.
