@@ -25,11 +25,18 @@ $event = fn (array $fields) => (object) ($fields + ['title' => 'Homework 1', 'ki
 
 // Task test 1: reviewed events become rows with a 24-hour time or none.
 check(reviewedEvents([$event([]), $event(['title' => '  Midterm exam ', 'kind' => 'exam', 'date' => '2026-10-14', 'time' => '10:00'])])
-    === [['Homework 1', 'assignment', '2026-09-28', null], ['Midterm exam', 'exam', '2026-10-14', '10:00:00']],
+    === [['Homework 1', 'assignment', '2026-09-28', null, '', null], ['Midterm exam', 'exam', '2026-10-14', '10:00:00', '', null]],
     'Valid events were not accepted as given.');
-check(reviewedEvents([['title' => 'Exposé – final draft', 'date' => '2026-12-01']]) === [['Exposé – final draft', 'other', '2026-12-01', null]],
+check(reviewedEvents([['title' => 'Exposé – final draft', 'date' => '2026-12-01']]) === [['Exposé – final draft', 'other', '2026-12-01', null, '', null]],
     'An event without a kind should default to other and keep its accented title.');
 echo "PASS 1: reviewed events keep their title, kind, date, and time\n";
+
+// Weekly classes: the class types, a room, and the series that ties a class's meetings together.
+foreach (['lecture', 'recitation', 'lab'] as $kind) {
+    check(reviewedEvents([$event(['kind' => $kind, 'location' => ' Knox 109 ', 'series' => 0])])[0] === ['Homework 1', $kind, '2026-09-28', null, 'Knox 109', 0],
+        "A $kind meeting should keep its room and series.");
+}
+echo "PASS 2: class meetings keep their type, room, and series\n";
 
 // Task test 3: an event needs a title and a date, and every other field must be valid.
 rejects([$event(['title' => ''])], 'Give every event a title and a date.');
@@ -42,6 +49,8 @@ rejects([$event(['title' => "Quiz\u{200B}"])], 'Keep each event title to 255 vis
 foreach (['2026-02-30', '09/28/2026', '1999-12-31', '2026-9-28'] as $date) rejects([$event(['date' => $date])], 'Choose a real date for every event.');
 rejects([$event(['kind' => 'party'])], 'Choose a valid event type.');
 foreach (['24:00', '10:00 AM', '7:5', 10] as $time) rejects([$event(['time' => $time])], 'Use a 24-hour time like 10:00.');
-foreach ([null, [], 'events', ['a' => $event([])], array_fill(0, 201, $event([]))] as $events) rejects($events, 'Choose 1 to 200 events to add.');
-check(count(reviewedEvents(array_fill(0, 200, $event([])))) === 200, '200 events should be accepted.');
+foreach ([str_repeat('a', 121), "Knox\u{200B} 109", 5, "\xFF"] as $location) rejects([$event(['location' => $location])], 'Keep each location to 120 visible characters.');
+foreach ([-1, 1000, '1', 1.5, true] as $series) rejects([$event(['series' => $series])], 'Choose a valid class series.');
+foreach ([null, [], 'events', ['a' => $event([])], array_fill(0, 601, $event([]))] as $events) rejects($events, 'Choose 1 to 600 events to add.');
+check(count(reviewedEvents(array_fill(0, 600, $event([])))) === 600, '600 events should be accepted.');
 echo "PASS 3: events without a title or date, and invalid fields or counts, are rejected\n";

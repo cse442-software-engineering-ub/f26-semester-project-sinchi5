@@ -1,5 +1,5 @@
 // Card 47: real HTTP tests for saving reviewed syllabus events. Requires PHP/PDO MySQL, a disposable
-// local database with migrations 001-006, and backend/dev-router.php on port 8080.
+// local database with migrations 001-009, and backend/dev-router.php on port 8080.
 // Only after confirming that the API uses an isolated DEV/TEST database:
 // NOTELY_TEST_ISOLATED=1 node backend/tests/import-confirm-http.mjs
 // Optional: NOTELY_TEST_URL and NOTELY_TEST_ORIGIN (the configured PHP origin).
@@ -68,7 +68,7 @@ try {
 
   const job = await newJob(owner);
   const confirmed = await owner.call("import-confirm", { id: job.id, events: reviewed });
-  assert.deepEqual([confirmed.status, confirmed.data], [200, { created: 2 }]);
+  assert.deepEqual([confirmed.status, confirmed.data], [200, { created: 2, skipped: 0 }]);
   const saved = await events(owner);
   assert.deepEqual(saved.map((e) => [e.title, e.date, e.source]),
     [["Homework 1", "2026-09-28", "imported"], ["Midterm exam", "2026-10-14", "imported"]]);
@@ -78,7 +78,7 @@ try {
   pass(1, "reviewed events are saved to the job's course as imported events");
 
   const again = await owner.call("import-confirm", { id: job.id, events: reviewed });
-  assert.deepEqual([again.status, again.data], [200, { created: 0 }]);
+  assert.deepEqual([again.status, again.data], [200, { created: 0, skipped: 0 }]);
   assert.equal((await events(owner)).length, 2);
   pass(2, "repeating the same confirm creates no duplicates");
 
@@ -96,7 +96,7 @@ try {
   assert.deepEqual(await events(other), []);
   assert.deepEqual(await events(other, ""), []);
   const moved = await owner.call("import-confirm", { id: second.id, courseId: "cse443", events: [reviewed[0]] });
-  assert.deepEqual([moved.status, moved.data], [200, { created: 1 }]);
+  assert.deepEqual([moved.status, moved.data], [200, { created: 1, skipped: 0 }]);
   assert.deepEqual((await events(owner, "&courseId=cse443")).map((e) => e.title), ["Homework 1"]);
   assert.equal((await events(owner, "")).length, 3);
   expectError(await owner.call("events&courseId=../x"), 422, "Choose a valid course.");
@@ -109,12 +109,38 @@ try {
   assert.equal(sneaky.data.job.name, "x'); DROP TABLE notely_events; --.txt");
   const titles = ["Robert'); DROP TABLE notely_events; --", "Quiz\" OR 1=1 --", "<img src=x onerror=alert(1)>"];
   const added = await owner.call("import-confirm", { id: sneaky.data.job.id, events: titles.map((title) => ({ title, date: "2026-11-02" })) });
-  assert.deepEqual([added.status, added.data], [200, { created: 3 }]);
+  assert.deepEqual([added.status, added.data], [200, { created: 3, skipped: 0 }]);
   assert.deepEqual((await events(owner)).filter((e) => e.date === "2026-11-02").map((e) => e.title).sort(), [...titles].sort());
   assert.equal((await events(owner, "")).length, 6);
   pass(5, "SQL and HTML in file names and titles are saved as plain text");
+
+  // A semester of classes is well over the 8 KB most requests are limited to, and keeps its room and series.
+  const semester = await newJob(owner);
+  const meetings = Array.from({ length: 300 }, (_, i) => ({
+    title: `CSE 442 ${i % 2 ? "Lab A1" : "Lecture"} meeting ${i}`, kind: i % 2 ? "lab" : "lecture",
+    date: new Date(Date.UTC(2027, 0, 1 + i)).toISOString().slice(0, 10), time: "10:00", location: "Knox 109", series: i % 2,
+  }));
+  assert(JSON.stringify(meetings).length > 8192);
+  const classes = await owner.call("import-confirm", { id: semester.id, courseId: "cse444", events: meetings });
+  assert.deepEqual([classes.status, classes.data], [200, { created: 300, skipped: 0 }]);
+  const savedClasses = await events(owner, "&courseId=cse444");
+  assert.deepEqual(savedClasses.slice(0, 2).map((e) => [e.kind, e.location, e.seriesId]),
+    [["lecture", "Knox 109", `${semester.id}-0`], ["lab", "Knox 109", `${semester.id}-1`]]);
+  pass(6, "a semester of weekly classes saves with its types, room, and series");
+
+  // Uploading again adds only what's new, even inside one request.
+  const firstRead = await newJob(owner);
+  assert.deepEqual((await owner.call("import-confirm", { id: firstRead.id, courseId: "cse445", events: reviewed })).data, { created: 2, skipped: 0 });
+  const secondRead = await newJob(owner);
+  const corrected = { title: "Homework 1 (revised)", kind: "assignment", date: "2026-09-30" };
+  const repeat = await owner.call("import-confirm", { id: secondRead.id, courseId: "cse445", events: [...reviewed, corrected, corrected] });
+  assert.deepEqual([repeat.status, repeat.data], [200, { created: 1, skipped: 3 }]);
+  assert.deepEqual((await events(owner, "&courseId=cse445")).map((e) => e.title), ["Homework 1", "Homework 1 (revised)", "Midterm exam"]);
+  const otherCourse = await newJob(owner);
+  assert.deepEqual((await owner.call("import-confirm", { id: otherCourse.id, courseId: "cse446", events: reviewed })).data, { created: 2, skipped: 0 });
+  pass(7, "an event already in that course is skipped, and other courses are unaffected");
 } catch (error) {
-  console.error(`FAIL: ${passed}/5 task tests passed; remaining tests did not complete.`);
+  console.error(`FAIL: ${passed}/7 task tests passed; remaining tests did not complete.`);
   throw error;
 } finally {
   // Deleting each account also deletes its import jobs and events (ON DELETE CASCADE).
