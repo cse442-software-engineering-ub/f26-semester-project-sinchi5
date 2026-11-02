@@ -663,6 +663,16 @@ test("Remove file clears the syllabus", async ({ page }) => {
     }),
   ).toBeDisabled();
 
+  const removeBox = await dialog
+    .getByRole("button", {
+      name: "Remove file",
+      exact: true,
+    })
+    .boundingBox();
+
+  expect(removeBox).not.toBeNull();
+  expect(removeBox!.height).toBeGreaterThanOrEqual(44);
+
   await dialog
     .getByRole("button", {
       name: "Remove file",
