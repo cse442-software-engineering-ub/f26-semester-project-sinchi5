@@ -24,7 +24,7 @@ export function pdfFile(name: string, lines: string[]) {
 export const photoFile = (name: string) => ({ name, mimeType: "image/png", buffer: Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64") });
 
-export async function signUpWithCourse(page: Page, email = "notely-syllabus-442@example.edu") {
+export async function signUpWithCourse(page: Page, email = "notely-syllabus-442@example.edu", classes?: { start: string; end: string }) {
   await page.goto("/");
   await page.getByRole("button", { name: "Create your workspace" }).click();
   await page.getByLabel("Your name").fill("Task Tester");
@@ -38,6 +38,10 @@ export async function signUpWithCourse(page: Page, email = "notely-syllabus-442@
   await page.getByLabel("Course code").fill("CSE 442");
   await page.getByLabel("Term").fill("Fall 2026");
   await page.getByLabel("Course name").fill("Software Engineering");
+  if (classes) {
+    await page.getByLabel("Classes start").fill(classes.start);
+    await page.getByLabel("Classes end").fill(classes.end);
+  }
   await page.getByRole("button", { name: "Add course" }).click();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page.getByRole("button", { name: "I’ll do this later" }).click();
@@ -50,6 +54,14 @@ export async function openUpload(page: Page) {
   await expect(page.getByRole("dialog", { name: "Your semester, sorted" })).toBeVisible();
   return page.getByRole("dialog");
 }
+
+// A file the mocked API's reader answers with exactly this read, so a test can ask for any answer.
+export const readOf = (read: Record<string, unknown>) => JSON.stringify(read);
+// Weekly classes as the reader returns them.
+export const LECTURE = { title: "Lecture", kind: "lecture", section: "", days: [1, 3], time: "10:00", location: "Davis 101",
+  firstDate: "2026-08-24", lastDate: "2026-09-04", source: "Lectures meet Mondays and Wednesdays, 10:00-10:50 AM, Davis 101." };
+export const section = (name: string, days: number[], time: string, location: string) =>
+  ({ title: "Recitation", kind: "recitation", section: name, days, time, location, firstDate: "2026-08-24", lastDate: "2026-09-04", source: `Recitation ${name}` });
 
 // Uploads a text syllabus and waits for the review screen.
 export async function reviewSyllabus(page: Page, text = SYLLABUS, name = "cse442-syllabus.txt") {

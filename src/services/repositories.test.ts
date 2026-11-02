@@ -208,6 +208,42 @@ describe("repository contracts", () => {
     await r.schedule.save({ ...midterm, title: "Midterm exam (room 101)" });
     expect((await r.schedule.list()).map((e) => e.title)).toEqual(["Midterm exam (room 101)"]);
   });
+  it("saves each included weekly class as one event per meeting, tied together by a series (card 46)", async () => {
+    const confirmed: unknown[][] = [];
+    const lecture = { title: "Lecture", kind: "lecture", section: "", days: [1, 3], time: "10:00", location: "Davis 101", firstDate: "2026-08-24", lastDate: "2026-09-02", source: "" };
+    const server = {
+      upload: async () => ({ id: "11" }),
+      extract: async () => ({ isSyllabus: true, noClassDates: [{ from: "2026-08-26", to: "2026-08-26" }], events: [],
+        meetings: [lecture, { ...lecture, title: "Lab", kind: "lab", section: "A1", days: [2] }, { ...lecture, title: "Lab", kind: "lab", section: "A2", days: [4] }] }),
+      confirm: async (...args: unknown[]) => { confirmed.push(args); return { created: 1, skipped: 0 }; },
+    } as never;
+    const r = createRepositories(undefined, undefined, false, undefined, server);
+    const course = await r.courses.create({ code: "CSE 442", name: "Software Engineering", color: "#000000", term: "Fall 2026" });
+    const job = await r.imports.process(await r.imports.start(new File(["syllabus"], "s.txt"), "syllabus", "success", course.id));
+    // The student picks lab A2 and leaves A1 out. Series numbers count only what's included.
+    job.meetings![2].include = true;
+    await r.imports.confirm(job);
+    const rows = confirmed[0][2] as { title: string; kind: string; date: string; time: string; location: string; series: number }[];
+    expect(rows.map((row) => [row.title, row.kind, row.date, row.time, row.location, row.series])).toEqual([
+      ["CSE 442 Lecture", "lecture", "2026-08-24", "10:00", "Davis 101", 0],
+      ["CSE 442 Lecture", "lecture", "2026-08-31", "10:00", "Davis 101", 0],
+      ["CSE 442 Lecture", "lecture", "2026-09-02", "10:00", "Davis 101", 0],
+      ["CSE 442 Lab A2", "lab", "2026-08-27", "10:00", "Davis 101", 1],
+    ]);
+  });
+  it("adds the demo's sample class to the schedule in the browser (card 46)", async () => {
+    const r = createRepositories();
+    const job = await r.imports.process(await r.imports.start(new File(["syllabus"], "s.txt"), "syllabus", "success", "cse442"));
+    expect(job.meetings!.map((m) => [m.title, m.include])).toEqual([["Lecture", true]]);
+    job.events.forEach((e) => { e.include = false; });
+    const before = (await r.schedule.list()).length;
+    await r.imports.confirm(job);
+    const added = (await r.schedule.list()).filter((e) => e.seriesId);
+    expect(added.length).toBeGreaterThan(0);
+    expect((await r.schedule.list()).length).toBe(before + added.length);
+    expect(new Set(added.map((e) => e.seriesId)).size).toBe(1);
+    expect(added.every((e) => e.title === "CSE 442 Lecture" && e.kind === "lecture" && e.source === "imported")).toBe(true);
+  });
   it("passes on the reader's reason when it can't read a file (card 45)", async () => {
     const server = {
       upload: async () => ({ id: "10" }),

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   UploadCloud,
@@ -12,14 +12,18 @@ import {
 } from "lucide-react";
 import { useApp } from "../app/context";
 import { fileTypeProblem } from "../services/syllabus-file";
-import { Modal } from "../shared/ui";
-import type { DetectedEvent, EventKind, UploadKind, UploadJob } from "../domain";
+import { checkMeeting } from "../services/syllabus";
+import { formatEventTime, Modal } from "../shared/ui";
+import type { DetectedEvent, DetectedMeeting, EventKind, UploadKind, UploadJob } from "../domain";
 import s from "../app/App.module.css";
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const STEPS = ["Choose", "Read", "Check", "Done"];
 const PHASE_STEP: Record<string, number> = { pick: 0, queued: 1, processing: 1, failed: 1, review: 2, completed: 3 };
 // Card 46: the event types a syllabus can add, as the review screen names them.
 const EVENT_TYPES: [EventKind, string][] = [["assignment", "Assignment"], ["exam", "Exam"], ["quiz", "Quiz"], ["deadline", "Deadline"], ["other", "Other"]];
+const CLASS_TYPES: [DetectedMeeting["kind"], string][] = [["lecture", "Lecture"], ["recitation", "Recitation"], ["lab", "Lab"]];
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const shortDate = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 const megabytes = (bytes: number) => `${Math.max(0.1, Math.round(bytes / 104857.6) / 10)} MB`;
 
 // Card 45: shows where the student is in the syllabus upload, so every screen says what comes next.
@@ -35,6 +39,77 @@ function Steps({ phase }: { phase: string }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+// Card 46: one weekly class on the review screen. Left out, it shrinks to one line, so a long list of
+// sections stays easy to scan.
+function ClassReview({ meeting, index, onChange }: {
+  meeting: DetectedMeeting;
+  index: number;
+  onChange: (change: Partial<DetectedMeeting>) => void;
+}) {
+  const summary = [meeting.days.map((day) => WEEKDAYS[day].slice(0, 3)).join(" "),
+    meeting.time && formatEventTime(meeting.time), meeting.location].filter(Boolean).join(" · ");
+  return (
+    <fieldset>
+      <legend>{`Detected ${meeting.kind}`}</legend>
+      {meeting.include && (!meeting.starts || !meeting.ends) && (
+        <p className={s.notice}>Needs review: choose when this class starts and ends.</p>
+      )}
+      <label className={s.checkLabel}>
+        <input type="checkbox" checked={meeting.include} onChange={(e) => onChange({ include: e.target.checked })} />
+        <span>Include {meeting.title}<br /><span className={s.hint}>{summary}</span></span>
+      </label>
+      {meeting.include && (
+        <>
+          <label>
+            Class name
+            <input id={`class-title-${index}`} required value={meeting.title} onChange={(e) => onChange({ title: e.target.value })} />
+          </label>
+          <label>
+            Type
+            <select value={meeting.kind} onChange={(e) => onChange({ kind: e.target.value as DetectedMeeting["kind"] })}>
+              {CLASS_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+          <div role="group" aria-label="Days" className={s.dayToggles}>
+            {WEEKDAYS.map((day, number) => (
+              <button
+                key={day}
+                type="button"
+                aria-label={day}
+                aria-pressed={meeting.days.includes(number)}
+                onClick={() => onChange({ days: meeting.days.includes(number)
+                  ? meeting.days.filter((d) => d !== number) : [...meeting.days, number].sort((a, b) => a - b) })}
+              >
+                {day[0]}
+              </button>
+            ))}
+          </div>
+          <div className={s.formRow}>
+            <label>
+              <span>Time <span className={s.hint}>(optional)</span></span>
+              <input type="time" value={meeting.time} onChange={(e) => onChange({ time: e.target.value })} />
+            </label>
+            <label>
+              <span>Room <span className={s.hint}>(optional)</span></span>
+              <input maxLength={120} value={meeting.location} onChange={(e) => onChange({ location: e.target.value })} />
+            </label>
+          </div>
+          <div className={s.formRow}>
+            <label>
+              Starts
+              <input type="date" required value={meeting.starts} onChange={(e) => onChange({ starts: e.target.value })} />
+            </label>
+            <label>
+              Ends
+              <input type="date" required value={meeting.ends} onChange={(e) => onChange({ ends: e.target.value })} />
+            </label>
+          </div>
+        </>
+      )}
+    </fieldset>
   );
 }
 
@@ -148,7 +223,8 @@ export function ImportDialog({
     });
     setPhase("review");
     const index = job.events.length;
-    requestAnimationFrame(() => document.getElementById(`event-title-${index}`)?.focus());
+    // Two frames: when the clicked button goes away, the dialog takes the focus back after the first.
+    requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(`event-title-${index}`)?.focus()));
   }
   // The latest choice, so a slow check of an earlier file can't overwrite it.
   const picked = useRef<File>();
@@ -165,6 +241,12 @@ export function ImportDialog({
   }
   async function confirm() {
     if (!job) return;
+    const problem = job.meetings?.filter((m) => m.include).map((m) => [m.title, checkMeeting(m)]).find(([, why]) => why);
+    if (problem) {
+      setError(`${problem[0]}: ${problem[1]}`);
+      return;
+    }
+    setError("");
     setBusy(true);
     try {
       await repo.imports.confirm(job);
@@ -176,6 +258,11 @@ export function ImportDialog({
       setBusy(false);
     }
   }
+  const meetings = job?.meetings ?? [];
+  const foundEvents = job?.events.filter((e) => e.source === "imported").length ?? 0;
+  const foundCount = foundEvents + meetings.length;
+  // Nothing to show at all: no classes, no dated work, and nothing the student has added yet.
+  const nothingFound = kind === "syllabus" && !!job && !job.events.length && !meetings.length;
   const title =
     kind === "scan"
       ? "From paper to possibility"
@@ -193,7 +280,8 @@ export function ImportDialog({
       onClose={onClose}
     >
       {kind === "syllabus" && <Steps phase={phase} />}
-      {(error || importError) && (
+      {/* On the long review screen, the error sits by the button that caused it, further down. */}
+      {phase !== "review" && (error || importError) && (
         <p role="alert" className={s.error}>
           {error || importError}
         </p>
@@ -358,7 +446,31 @@ export function ImportDialog({
           </div>
         </div>
       )}
-      {phase === "review" && job && (
+      {/* Card 46: a real answer, not a failure, so it says so plainly instead of showing an empty form. */}
+      {phase === "review" && job && nothingFound && (
+        <div className={s.empty}>
+          <FileText size={36} />
+          <h3>{job.isSyllabus === false ? "This doesn’t look like a syllabus" : "No class times or due dates found"}</h3>
+          <p>
+            {job.isSyllabus === false
+              ? `${job.name} doesn’t look like a course syllabus.`
+              : `We read ${job.name}, but it doesn’t list weekly classes or dated work.`}{" "}
+            Nothing was added to your schedule.
+          </p>
+          <div className={`${s.actions} ${s.completionActions}`}>
+            <button className={s.primary} onClick={addEvent}>
+              <Plus size={16} /> Add events by hand
+            </button>
+            <button className={s.secondary} onClick={chooseAnother}>
+              Choose a different file
+            </button>
+            <button className={s.secondary} onClick={onClose}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+      {phase === "review" && job && !nothingFound && (
         <form
           className={s.form}
           onSubmit={(e) => {
@@ -372,16 +484,20 @@ export function ImportDialog({
               below.
             </p>
           )}
-          {/* Card 46: what was found, how, and what to do with it. */}
-          {kind === "syllabus" && job.events.some((e) => e.source === "imported") && (
+          {/* Card 46: what was found, and what to do with it. */}
+          {kind === "syllabus" && foundCount > 0 && (
             <p className={s.notice}>
               {(() => {
-                const found = job.events.filter((e) => e.source === "imported").length;
-                return `We found ${found} ${found === 1 ? "event" : "events"}. `;
+                const parts = [
+                  meetings.length ? `${meetings.length} weekly ${meetings.length === 1 ? "class" : "classes"}` : "",
+                  foundEvents ? `${foundEvents} ${foundEvents === 1 ? "event" : "events"}` : "",
+                ].filter(Boolean);
+                return `We found ${parts.join(" and ")}. `;
               })()}
               Check each one against your syllabus: fix anything that’s wrong, uncheck what you don’t want, and add
               anything that’s missing.
-              {job.events.some((e) => e.needsReview) && " Some details need your attention. Look for “Needs review” below."}
+              {(job.events.some((e) => e.needsReview) || meetings.some((m) => m.include && (!m.starts || !m.ends)))
+                && " Some details need your attention. Look for “Needs review” below."}
             </p>
           )}
           {/* A syllabus only adds events, so the note's title, date, and category don't apply. */}
@@ -454,11 +570,37 @@ export function ImportDialog({
               </select>
             </label>
           )}
-          {kind === "syllabus" && !job.events.length && (
-            <p className={s.notice}>
-              No dated events were found in this file. Add them yourself with “Add an event”, or choose another
-              copy of the syllabus.
-            </p>
+          {/* Card 46: weekly classes first, then dated work, each saying if the file had none. */}
+          {kind === "syllabus" && meetings.length > 0 && (
+            <>
+              <h3 className={s.reviewHeading}>Your classes <span className={s.hint}>repeat weekly</span></h3>
+              {!!job.noClassDates?.length && (
+                <p className={s.hint}>
+                  No class on {job.noClassDates.map(({ from, to }) => (from === to ? shortDate(from) : `${shortDate(from)}–${shortDate(to)}`)).join(", ")}, from your syllabus.
+                </p>
+              )}
+              {meetings.map((meeting, i) => (
+                <Fragment key={i}>
+                  {/* A class offered at several times: the student attends one, so none is assumed. */}
+                  {meeting.section && meetings.filter((m) => m.kind === meeting.kind && m.section).length > 1
+                    && !meetings.slice(0, i).some((m) => m.kind === meeting.kind && m.section) && (
+                    <p className={s.reviewSubheading}>Pick your {meeting.kind} section</p>
+                  )}
+                  <ClassReview
+                    meeting={meeting}
+                    index={i}
+                    onChange={(change) => setJob({ ...job, meetings: meetings.map((m, j) => (j === i ? { ...m, ...change } : m)) })}
+                  />
+                </Fragment>
+              ))}
+            </>
+          )}
+          {kind === "syllabus" && !meetings.length && foundEvents > 0 && (
+            <p className={s.hint}>We didn’t find weekly class times in this file.</p>
+          )}
+          {kind === "syllabus" && meetings.length > 0 && <h3 className={s.reviewHeading}>Due dates and exams</h3>}
+          {kind === "syllabus" && meetings.length > 0 && !foundEvents && (
+            <p className={s.hint}>We didn’t find any dated work in this file.</p>
           )}
           {/* Card 46: each event can be corrected or left out. Included events need a title and a
               date, so the browser asks for any that are missing before anything is added. */}
@@ -471,9 +613,9 @@ export function ImportDialog({
                 <legend>{event.source === "manual" ? "Added by you" : `Detected ${event.kind}`}</legend>
                 {event.needsReview && (
                   <p className={s.notice}>
-                    {event.date
-                      ? "Needs review: check this date. It isn’t written this way in your file."
-                      : "Needs review: choose the date."}
+                    {included
+                      ? "Needs review: choose the date."
+                      : "No date is posted for this, so it won’t be added unless you include it and choose one."}
                     {event.description && ` The syllabus says “${event.description}”.`}
                   </p>
                 )}
@@ -547,17 +689,27 @@ export function ImportDialog({
               <p className={s.hint} aria-live="polite">
                 {(() => {
                   const count = job.events.filter((e) => e.include !== false).length;
+                  const classes = meetings.filter((m) => m.include).length;
                   const course = state.courses.find((c) => c.id === job.metadata.courseId)?.code ?? "this course";
-                  return count
-                    ? `${count} of ${job.events.length} ${job.events.length === 1 ? "event" : "events"} will be added to ${course}.`
-                    : "Include at least one event to add it to your schedule.";
+                  const parts = [
+                    classes ? `${classes} weekly ${classes === 1 ? "class" : "classes"}` : "",
+                    count ? `${count} of ${job.events.length} ${job.events.length === 1 ? "event" : "events"}` : "",
+                  ].filter(Boolean);
+                  return parts.length
+                    ? `${parts.join(" and ")} will be added to ${course}.`
+                    : "Include at least one to add it to your schedule.";
                 })()}
               </p>
             </>
           )}
+          {error && (
+            <p role="alert" className={s.error}>
+              {error}
+            </p>
+          )}
           <button
             className={s.primary}
-            disabled={busy || (kind === "syllabus" && !job.events.some((e) => e.include !== false))}
+            disabled={busy || (kind === "syllabus" && !job.events.some((e) => e.include !== false) && !meetings.some((m) => m.include))}
           >
             {busy
               ? "Saving…"

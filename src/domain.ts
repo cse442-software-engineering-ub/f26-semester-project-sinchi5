@@ -87,6 +87,8 @@ export interface CourseEvent {
   location: string;
   description: string;
   source: "manual" | "imported";
+  // Ties together the saved meetings of one weekly class from a syllabus (card 47).
+  seriesId?: string | null;
 }
 export interface DetectedMetadata {
   title: string;

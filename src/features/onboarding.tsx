@@ -36,6 +36,8 @@ export function Onboarding() {
   const [courseName, setCourseName] = useState("");
   const [color, setColor] = useState("#869D7A");
   const [term, setTerm] = useState("Fall 2026");
+  const [classesStart, setClassesStart] = useState("");
+  const [classesEnd, setClassesEnd] = useState("");
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitted, setSubmitted] = useState(false);
   const fieldErrors = {
@@ -306,17 +308,25 @@ export function Onboarding() {
                   onSubmit={async (e) => {
                     e.preventDefault();
                     setError("");
+                    if (classesStart && classesEnd && classesEnd <= classesStart) {
+                      setError("Choose a class end date after the start date.");
+                      return;
+                    }
                     try {
                       await repo.courses.create({
                         code,
                         name: courseName,
                         color,
                         term,
+                        ...(classesStart ? { classesStart } : {}),
+                        ...(classesEnd ? { classesEnd } : {}),
                       });
                       await refresh();
                       setAdding(false);
                       setCode("");
                       setCourseName("");
+                      setClassesStart("");
+                      setClassesEnd("");
                     } catch (e) {
                       setError((e as Error).message);
                     }
@@ -357,6 +367,17 @@ export function Onboarding() {
                       onChange={(e) => setColor(e.target.value)}
                     />
                   </label>
+                  {/* Card 46: fills in a weekly class's dates when its syllabus doesn't give them. */}
+                  <div className={s.formRow}>
+                    <label>
+                      <span>Classes start <span className={s.hint}>(optional)</span></span>
+                      <input type="date" value={classesStart} onChange={(e) => setClassesStart(e.target.value)} />
+                    </label>
+                    <label>
+                      <span>Classes end <span className={s.hint}>(optional)</span></span>
+                      <input type="date" value={classesEnd} onChange={(e) => setClassesEnd(e.target.value)} />
+                    </label>
+                  </div>
                   <div className={s.actions}>
                     <button className={s.primary}>Add course</button>
                     <button

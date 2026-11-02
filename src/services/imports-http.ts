@@ -33,7 +33,7 @@ export function createHttpSyllabus(endpoint = `${import.meta.env.BASE_URL}api/in
       return (await send<{ job: SyllabusJob }>("import-extract", { id, year }, 330000)).job;
     },
     // Saves the reviewed events to the course (card 47). Sending it again adds nothing.
-    async confirm(id: string, courseId: string, events: Pick<CourseEvent, "title" | "kind" | "date" | "time" | "location">[]) {
+    async confirm(id: string, courseId: string, events: (Pick<CourseEvent, "title" | "kind" | "date" | "time" | "location"> & { series?: number })[]) {
       return (await send<{ created: number }>("import-confirm", { id, courseId, events })).created;
     },
     // The student's imported events, for the schedule (card 48).
