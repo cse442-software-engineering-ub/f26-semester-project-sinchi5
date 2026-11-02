@@ -135,16 +135,15 @@ export function createRepositories(
   };
   // Card 45: the server's reader (Gemini, card 127) reads every syllabus. When it can't, its message goes
   // to the student. The demo has no server, so it shows sample results.
-  async function readSyllabus(jobId: string, year: number, onAutomaticReading?: () => void) {
+  async function readSyllabus(jobId: string, year: number) {
     if (!serverSyllabus) {
-      return { reader: "sample" as const, notice: "This preview shows sample events. Sign in to read your own syllabus.",
+      return { notice: "This preview shows sample events. Sign in to read your own syllabus.",
         isSyllabus: true, meetings: [], noClassDates: [], events: [
           { title: "Assignment 1", kind: "assignment", date: offsetDate(7), time: "23:59", source: "Detected from syllabus. Review before saving." },
           { title: "Midterm exam", kind: "exam", date: offsetDate(21), time: "10:00", source: "Detected from syllabus." },
         ] };
     }
-    onAutomaticReading?.();
-    return { reader: "ai" as const, ...(await serverSyllabus.extract(jobId, year)) };
+    return serverSyllabus.extract(jobId, year);
   }
   let invitations = new Map<string, Collaborator[]>();
   const repo: Repositories = {
@@ -357,7 +356,7 @@ export function createRepositories(
         if (kind === "syllabus" && serverSyllabus) return { ...job, id: (await serverSyllabus.upload(file, courseId)).id };
         return { ...job, id: id() };
       },
-      async process(job, scenario = "success", onAutomaticReading) {
+      async process(job, scenario = "success") {
         // "Processing failed" in the prototype preview options shows the failure screen on purpose.
         if (scenario === "failure") return { ...job, state: "failed" };
         let events: DetectedEvent[] = [];
@@ -366,7 +365,7 @@ export function createRepositories(
           const { courseId } = job.metadata;
           const course = db.courses.find((c) => c.id === courseId);
           const year = Number(/\b(20\d\d)\b/.exec(course?.term ?? "")?.[1]) || new Date().getFullYear();
-          const result = await readSyllabus(job.id, year, onAutomaticReading);
+          const result = await readSyllabus(job.id, year);
           events = normalizeEvents(result.events).map(({ source, time, location, needsReview, ...event }) => ({
             ...event, id: "", courseId, time: time ?? "", location: location ?? "", description: source, source: "imported",
             // With no date posted it stays unchecked: the student sees it, and adds a date only if they want it.
@@ -380,7 +379,7 @@ export function createRepositories(
             // The syllabus's own dates come first; the course's are the fallback.
             starts: firstDate || (course?.classesStart ?? ""), ends: lastDate || (course?.classesEnd ?? ""),
           }));
-          read = { reader: result.reader, meetings, noClassDates: normalizeBreaks(result.noClassDates), isSyllabus: result.isSyllabus !== false,
+          read = { meetings, noClassDates: normalizeBreaks(result.noClassDates), isSyllabus: result.isSyllabus !== false,
             ...("notice" in result ? { notice: result.notice } : {}) };
         }
         const partial = scenario === "partial" || events.some((e) => e.needsReview);

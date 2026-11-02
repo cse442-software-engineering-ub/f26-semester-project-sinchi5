@@ -134,15 +134,12 @@ describe("repository contracts", () => {
       },
     } as never;
     const r = createRepositories(undefined, undefined, true, undefined, server);
-    const started: string[] = [];
     const file = new File(["CSE 442 Syllabus"], "cse442-syllabus.txt");
     const queued = await r.imports.start(file, "syllabus", "success", "cse442");
     expect([queued.id, queued.state, queued.metadata.courseId]).toEqual(["7", "queued", "cse442"]);
-    const job = await r.imports.process(queued, "success", () => started.push("reading"));
+    const job = await r.imports.process(queued);
     // The CSE 442 sample course is in Fall 2026, and even a text file goes to the reader.
     expect(calls).toEqual(["upload cse442-syllabus.txt cse442", "extract 7 2026"]);
-    expect(started).toEqual(["reading"]);
-    expect(job.reader).toBe("ai");
     // An exam with no posted date is listed unchecked, so the student sees it without having to act on it.
     expect(job.state).toBe("partial");
     expect(job.events).toEqual([
@@ -225,7 +222,7 @@ describe("repository contracts", () => {
     const r = createRepositories();
     const file = new File(["syllabus"], "syllabus.txt");
     const job = await r.imports.process(await r.imports.start(file, "syllabus"));
-    expect([job.reader, job.notice]).toEqual(["sample", "This preview shows sample events. Sign in to read your own syllabus."]);
+    expect(job.notice).toBe("This preview shows sample events. Sign in to read your own syllabus.");
     expect(job.events.map((e) => e.title)).toEqual(["Assignment 1", "Midterm exam"]);
   });
   it("names what a renamed or damaged file really is, before uploading (card 45)", async () => {

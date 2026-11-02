@@ -81,7 +81,7 @@ for (const [name, choose] of [["PDF", pdfFile("syllabus.pdf", SYLLABUS.split("\n
   });
 }
 
-test("when the reader can't read a file, the reason is shown", async ({ page }) => {
+test("when the reader can't read a file, the reason is shown and the student's own events can still be saved", async ({ page }) => {
   await signUpWithCourse(page);
   await openUpload(page);
   const dialog = page.getByRole("dialog");
@@ -89,6 +89,33 @@ test("when the reader can't read a file, the reason is shown", async ({ page }) 
   await dialog.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(dialog.getByRole("heading", { name: "That file needs another try" })).toBeVisible();
   await expect(dialog.getByRole("alert")).toHaveText("You can read 10 syllabi automatically each day. Try again tomorrow.");
+  await expect(dialog.getByRole("button", { name: "Try again" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Choose a different file" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Add events by hand" }).click();
+  const added = dialog.getByRole("group", { name: "Added by you" });
+  await added.getByLabel("Event title").fill("Midterm exam");
+  await added.getByLabel("Type").selectOption("exam");
+  await added.getByLabel("Due date").fill("2026-10-14");
+  await dialog.getByRole("button", { name: "Add to schedule" }).click();
+  await expect(dialog.getByRole("heading", { name: "A little more organized." })).toBeVisible();
+  await expect(dialog.getByText("Added 1 event to CSE 442.")).toBeVisible();
+});
+
+test("while a syllabus is read, the screen says it can take a while", async ({ page }) => {
+  await signUpWithCourse(page);
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/api/index.php?route=import-extract", async (route) => {
+    await held;
+    await route.fallback();
+  });
+  await openUpload(page);
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Choose upload file").setInputFiles(file("cse442-syllabus.txt", SYLLABUS));
+  await dialog.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(dialog.getByText("Reading your syllabus carefully. This can take a minute or two.")).toBeVisible();
+  release();
+  await expect(dialog.getByRole("button", { name: "Add to schedule" })).toBeVisible();
 });
 
 test("a renamed or damaged file is named for what it is before anything uploads", async ({ page }) => {

@@ -127,8 +127,7 @@ export interface UploadJob {
   noClassDates?: { from: string; to: string }[];
   // False when the reader says the file isn't a course syllabus at all (card 127).
   isSyllabus?: boolean;
-  // How a syllabus was read (card 45): by the server's reader, or a demo sample (notice says so).
-  reader?: "ai" | "sample";
+  // Shown on the review screen, such as when a demo shows sample results (card 45).
   notice?: string;
 }
 export interface NoteQuery {
@@ -194,8 +193,7 @@ export interface ImportRepository {
   // Registers the file as a queued job; a signed-in student's syllabus goes to the server (card 43).
   start(file: File, kind: UploadKind, scenario?: string, courseId?: string): Promise<UploadJob>;
   // Reads a queued job's file and proposes note details or schedule events (cards 44 and 45).
-  // onAutomaticReading is called as the reader starts, which can take a couple of minutes.
-  process(job: UploadJob, scenario?: string, onAutomaticReading?: () => void): Promise<UploadJob>;
+  process(job: UploadJob, scenario?: string): Promise<UploadJob>;
   confirm(job: UploadJob): Promise<void>;
 }
 export interface Repositories {
