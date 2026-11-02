@@ -14,14 +14,13 @@ import { useApp } from "../app/context";
 import { fileTypeProblem } from "../services/syllabus-file";
 import { checkMeeting } from "../services/syllabus";
 import { formatEventTime, Modal } from "../shared/ui";
-import type { DetectedEvent, DetectedMeeting, EventKind, UploadKind, UploadJob } from "../domain";
+import { CLASS_KINDS, type DetectedEvent, type DetectedMeeting, type EventKind, type UploadKind, type UploadJob } from "../domain";
 import s from "../app/App.module.css";
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const STEPS = ["Choose", "Read", "Check", "Done"];
 const PHASE_STEP: Record<string, number> = { pick: 0, queued: 1, processing: 1, failed: 1, review: 2, completed: 3 };
 // Card 46: the event types a syllabus can add, as the review screen names them.
 const EVENT_TYPES: [EventKind, string][] = [["assignment", "Assignment"], ["exam", "Exam"], ["quiz", "Quiz"], ["deadline", "Deadline"], ["other", "Other"]];
-const CLASS_TYPES: [DetectedMeeting["kind"], string][] = [["lecture", "Lecture"], ["recitation", "Recitation"], ["lab", "Lab"]];
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const shortDate = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 const megabytes = (bytes: number) => `${Math.max(0.1, Math.round(bytes / 104857.6) / 10)} MB`;
@@ -61,6 +60,7 @@ function ClassReview({ meeting, index, onChange }: {
         <input type="checkbox" checked={meeting.include} onChange={(e) => onChange({ include: e.target.checked })} />
         <span>Include {meeting.title}<br /><span className={s.hint}>{summary}</span></span>
       </label>
+      {meeting.source && <p className={s.hint}>From your syllabus: “{meeting.source}”</p>}
       {meeting.include && (
         <>
           <label>
@@ -70,7 +70,7 @@ function ClassReview({ meeting, index, onChange }: {
           <label>
             Type
             <select value={meeting.kind} onChange={(e) => onChange({ kind: e.target.value as DetectedMeeting["kind"] })}>
-              {CLASS_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              {CLASS_KINDS.map((value) => <option key={value} value={value}>{value[0].toUpperCase() + value.slice(1)}</option>)}
             </select>
           </label>
           <div role="group" aria-label="Days" className={s.dayToggles}>
@@ -496,7 +496,11 @@ export function ImportDialog({
               })()}
               Check each one against your syllabus: fix anything that’s wrong, uncheck what you don’t want, and add
               anything that’s missing.
-              {(job.events.some((e) => e.needsReview) || meetings.some((m) => m.include && (!m.starts || !m.ends)))
+              {(() => {
+                const undated = job.events.filter((e) => e.needsReview && e.include === false).length;
+                return undated ? ` ${undated} ${undated === 1 ? "has no posted date, so it starts" : "have no posted date, so they start"} unchecked.` : "";
+              })()}
+              {(job.events.some((e) => e.needsReview && e.include !== false) || meetings.some((m) => m.include && (!m.starts || !m.ends)))
                 && " Some details need your attention. Look for “Needs review” below."}
             </p>
           )}
@@ -619,6 +623,10 @@ export function ImportDialog({
                     {event.description && ` The syllabus says “${event.description}”.`}
                   </p>
                 )}
+                {/* The quote lets the student check a date against the file at a glance. */}
+                {!event.needsReview && event.source === "imported" && event.description && (
+                  <p className={s.hint}>From your syllabus: “{event.description}”</p>
+                )}
                 <label className={s.checkLabel}>
                   <input
                     type="checkbox"
@@ -671,6 +679,15 @@ export function ImportDialog({
                     />
                   </label>
                 </div>
+                <label>
+                  <span>Room <span className={s.hint}>(optional)</span></span>
+                  <input
+                    maxLength={120}
+                    disabled={!included}
+                    value={event.location}
+                    onChange={(e) => update({ location: e.target.value })}
+                  />
+                </label>
               </fieldset>
             );
           })}

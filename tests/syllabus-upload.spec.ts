@@ -76,7 +76,7 @@ for (const [name, choose] of [["PDF", pdfFile("syllabus.pdf", SYLLABUS.split("\n
     await dialog.getByRole("button", { name: "Continue", exact: true }).click();
     await expect(dialog.getByLabel("Event title")).toHaveCount(2);
     await expect(dialog.getByLabel("Event title").first()).toHaveValue("Reading response 1");
-    await expect(dialog.getByText("Some details need your attention.", { exact: false })).toBeVisible();
+    await expect(dialog.getByText("1 has no posted date, so it starts unchecked.", { exact: false })).toBeVisible();
     expect(routes.filter((r) => r !== "notes" && r !== "events")).toEqual(["syllabus-upload", "import-extract"]);
   });
 }
