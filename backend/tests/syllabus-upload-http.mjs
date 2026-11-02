@@ -62,7 +62,7 @@ try {
   const job = created.data.job;
   assert.match(job.id, /^[1-9][0-9]*$/);
   assert.deepEqual({ ...job, id: "", createdAt: "" }, { id: "", kind: "syllabus", courseId: "cse442",
-    name: "cse442-syllabus.txt", type: "txt", size: Buffer.byteLength(syllabus), state: "queued", events: [], createdAt: "" });
+    name: "cse442-syllabus.txt", type: "txt", size: Buffer.byteLength(syllabus), state: "queued", isSyllabus: true, meetings: [], noClassDates: [], events: [], createdAt: "" });
   const read = await owner.call(`import-job&id=${job.id}`);
   assert.equal(read.status, 200);
   assert.deepEqual(read.data.job, job);
