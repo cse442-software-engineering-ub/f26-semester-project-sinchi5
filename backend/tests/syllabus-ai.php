@@ -90,12 +90,14 @@ fails(fn () => readSyllabusWithAi($config, fakeApi($calls, $counted, [500, []], 
 $quota = [429, ['error' => ['message' => 'Quota exceeded']]];
 fails(fn () => readSyllabusWithAi($config, fakeApi($calls, $counted, $quota, $quota, $quota), 'pdf', $pdf, 2026),
     503, 'Automatic reading is busy right now. Please try again in a few minutes.');
+// A blocked, cut-off, or malformed reply from every model is never half-used.
 foreach (['MAX_TOKENS', 'SAFETY', 'RECITATION', 'OTHER'] as $finish) {
-    fails(fn () => readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($events, $finish)), 'pdf', $pdf, 2026), 422, SYLLABUS_AI_UNFINISHED);
+    $bad = $reply($events, $finish);
+    fails(fn () => readSyllabusWithAi($config, fakeApi($calls, $counted, $bad, $bad, $bad), 'pdf', $pdf, 2026), 422, SYLLABUS_AI_UNFINISHED);
 }
 foreach ([[200, ['promptFeedback' => ['blockReason' => 'SAFETY']]], [200, ['candidates' => [['finishReason' => 'STOP',
     'content' => ['parts' => [['text' => 'not json']]]]]]], $reply('a string')] as $bad) {
-    fails(fn () => readSyllabusWithAi($config, fakeApi($calls, $counted, $bad), 'pdf', $pdf, 2026), 422, SYLLABUS_AI_UNFINISHED);
+    fails(fn () => readSyllabusWithAi($config, fakeApi($calls, $counted, $bad, $bad, $bad), 'pdf', $pdf, 2026), 422, SYLLABUS_AI_UNFINISHED);
 }
 echo "PASS 2: too-long files cost nothing, and errors, rate limits, blocks, and cut-off replies are reported\n";
 
@@ -242,6 +244,12 @@ check($read['events'] === $events && $used($calls) === ['gemini-3.8-flash:countT
     'Out of quota, the next model should read the file: ' . json_encode($used($calls)));
 $read = readSyllabusWithAi($config, fakeApi($calls, $counted, [0, []], [503, []], $reply($events)), 'pdf', $pdf, 2026);
 check($read['events'] === $events && end($calls)[0] === 'models/gemini-3.5-flash:generateContent', 'A timeout and a server error should move on to the last model.');
+// A model Google has retired answers 404, and a blocked or cut-off reply can be another model's to read.
+$retired = [404, ['error' => ['message' => 'This model is no longer available.']]];
+check(readSyllabusWithAi($config, fakeApi($calls, $retired, $counted, $reply($events)), 'pdf', $pdf, 2026)['events'] === $events
+    && $used($calls) === ['gemini-3.8-flash:countTokens', 'gemini-3.6-flash:countTokens', 'gemini-3.6-flash:generateContent'], 'A retired model should hand over.');
+check(readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($events, 'SAFETY'), $reply($events)), 'pdf', $pdf, 2026)['events'] === $events
+    && end($calls)[0] === 'models/gemini-3.6-flash:generateContent', 'A blocked reply should hand over.');
 check(readSyllabusWithAi($config, fakeApi($calls, [503, []], $counted, $reply($events)), 'pdf', $pdf, 2026)['events'] === $events
     && $used($calls) === ['gemini-3.8-flash:countTokens', 'gemini-3.6-flash:countTokens', 'gemini-3.6-flash:generateContent'], 'A busy token count should move on too.');
 $send = fakeApi($calls, $counted, [400, ['error' => ['message' => 'Bad request']]]);
@@ -251,4 +259,20 @@ check(count($calls) === 2, 'A refused request must not be sent to another model.
 $send = fakeApi($calls, $counted, $quota, $quota);
 fails(fn () => readSyllabusWithAi($config + ['gemini_model' => 'gemini-3.6-flash'], $send, 'pdf', $pdf, 2026), 503, 'Automatic reading is busy right now. Please try again in a few minutes.');
 check($used($calls) === ['gemini-3.6-flash:countTokens', 'gemini-3.6-flash:generateContent', 'gemini-3.5-flash:generateContent'], 'The configured model should go first, once.');
-echo "PASS 10: a model that is out of quota, overloaded, or too slow hands over to the next, and a refused request stops\n";
+echo "PASS 10: a model that is out of quota, overloaded, retired, or too slow hands over to the next, and a refused request stops\n";
+
+// 11. Every request of one read shares one time budget, so retries and models can't outlast the browser.
+$clock = 1000;
+$timeouts = [];
+$budget = withinTimeBudget(function (string $path, array $body, int $seconds) use (&$timeouts): array {
+    $timeouts[] = $seconds;
+    return [503, []];
+}, function () use (&$clock): int { return $clock; });
+check($budget('models/x', [])[0] === 503 && $timeouts === [SYLLABUS_AI_REQUEST_SECONDS], 'A request should get the usual time at first.');
+$clock += SYLLABUS_AI_SECONDS - 10;
+$budget('models/x', []);
+check(end($timeouts) === 10, 'A late request should get only the time that is left.');
+$clock += 10;
+check($budget('models/x', []) === [0, []] && count($timeouts) === 2, 'Once the time is up, nothing more should be sent.');
+check(SYLLABUS_AI_SECONDS < 330, 'The browser must wait longer than a read can take (imports-http.ts).');
+echo "PASS 11: every request of a read shares one time budget, and nothing is sent once it is used up\n";
