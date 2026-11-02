@@ -40,7 +40,7 @@ const file = (name: string, content: Uint8Array | string) => new File([content a
 describe("syllabus file checks in the browser (card 45)", () => {
   it("lists a zip's files, and isn't fooled by other bytes", () => {
     expect(zipEntries(bytes("plain text"))).toBeNull();
-    expect([...zipEntries(zipOf({ "a.txt": "a", "word/document.xml": "<w:document/>" }))!.keys()]).toEqual(["a.txt", "word/document.xml"]);
+    expect([...zipEntries(zipOf({ "a.txt": "a", "word/document.xml": "<w:document/>" }))!]).toEqual(["a.txt", "word/document.xml"]);
   });
 
   it("accepts a real Word file and text in any encoding, and refuses macros and renamed files", async () => {
