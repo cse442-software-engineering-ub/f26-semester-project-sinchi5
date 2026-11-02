@@ -42,13 +42,15 @@ $tables = [
         'course_id' => ['varchar(64)', 'NO'], 'file_name' => ['varchar(255)', 'NO'], 'file_type' => ['varchar(4)', 'NO'],
         'file_size' => ['int unsigned', 'NO'], 'file_sha256' => ['char(64)', 'NO'], 'content' => ['longblob', 'YES'],
         'state' => ["enum('queued','processing','review','failed','completed')", 'NO'], 'events' => ['mediumtext', 'YES'],
+        'reader_key' => ['varchar(32)', 'YES'],
         'created_at' => ['datetime', 'NO'], 'updated_at' => ['datetime', 'NO'],
     ],
     'notely_events' => [
         'id' => ['bigint unsigned', 'NO'], 'owner_user_id' => ['bigint unsigned', 'NO'], 'course_id' => ['varchar(64)', 'NO'],
         'title' => ['varchar(255)', 'NO'],
-        'kind' => ["enum('lecture','assignment','quiz','exam','deadline','other')", 'NO'],
-        'event_date' => ['date', 'NO'], 'event_time' => ['time', 'YES'], 'source' => ["enum('manual','imported')", 'NO'],
+        'kind' => ["enum('lecture','assignment','quiz','exam','deadline','other','recitation','lab')", 'NO'],
+        'event_date' => ['date', 'NO'], 'event_time' => ['time', 'YES'], 'location' => ['varchar(120)', 'NO'],
+        'series_id' => ['varchar(40)', 'YES'], 'source' => ["enum('manual','imported')", 'NO'],
         'import_job_id' => ['bigint unsigned', 'YES'], 'created_at' => ['datetime', 'NO'],
     ],
 ];

@@ -40,9 +40,10 @@ try {
             throw new HttpError(415, 'Send requests as JSON.');
         }
         // Cap reads even when the client omits or lies about Content-Length.
-        // Syllabus files are the only large uploads (card 43).
+        // Syllabus files are the only large uploads (card 43), and a semester of reviewed classes is the
+        // only other request that won't fit in 8 KB (card 47).
         $upload = $route === 'syllabus-upload';
-        $limit = $upload ? SYLLABUS_MAX_BODY : 8192;
+        $limit = $upload ? SYLLABUS_MAX_BODY : ($route === 'import-confirm' ? IMPORT_CONFIRM_MAX_BODY : 8192);
         if ($upload) {
             // The body, its decoded JSON, and the file bytes are all in memory at once.
             ini_set('memory_limit', '256M');

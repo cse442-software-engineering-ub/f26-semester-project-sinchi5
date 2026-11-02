@@ -12,8 +12,11 @@ if (PHP_SAPI !== 'cli' && !defined('NOTELY_INTERNAL')) {
 // Needs notes.php for recordId() and isoTime().
 const IMPORT_READ_ROUTES = ['import-job', 'events'];
 const IMPORT_ROUTES = [...IMPORT_READ_ROUTES, 'syllabus-upload', 'import-confirm', 'import-extract', 'event-delete'];
-const EVENT_KINDS = ['lecture', 'assignment', 'quiz', 'exam', 'deadline', 'other'];
+const EVENT_KINDS = ['lecture', 'recitation', 'lab', 'assignment', 'quiz', 'exam', 'deadline', 'other'];
 const MAX_IMPORTED_EVENTS = 200;
+// Each weekly class is saved as one row per meeting, so a semester adds far more rows than due dates do.
+const MAX_SAVED_EVENTS = 600;
+const IMPORT_CONFIRM_MAX_BODY = 1024 * 1024;
 const SYLLABUS_MAX_BYTES = 20 * 1024 * 1024;
 // A 20 MB file is 27962028 characters of base64, plus room for the JSON fields around it.
 const SYLLABUS_MAX_BASE64 = 27962028;
@@ -135,11 +138,12 @@ function courseId(mixed $value, string $message): string
     return $value;
 }
 
-// Returns [title, kind, date, time or null] for each reviewed event, or throws the message to show.
+// Returns [title, kind, date, time or null, location, series or null] for each reviewed event, or
+// throws the message to show. Rows that share a series number are the meetings of one weekly class.
 function reviewedEvents(mixed $events): array
 {
-    if (!is_array($events) || !array_is_list($events) || count($events) < 1 || count($events) > MAX_IMPORTED_EVENTS) {
-        throw new HttpError(422, 'Choose 1 to 200 events to add.');
+    if (!is_array($events) || !array_is_list($events) || count($events) < 1 || count($events) > MAX_SAVED_EVENTS) {
+        throw new HttpError(422, 'Choose 1 to ' . MAX_SAVED_EVENTS . ' events to add.');
     }
     return array_map(static function (mixed $event): array {
         $event = $event instanceof stdClass ? (array) $event : (is_array($event) ? $event : []);
@@ -163,7 +167,15 @@ function reviewedEvents(mixed $events): array
         if (!is_string($time) || ($time !== '' && !preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/D', $time))) {
             throw new HttpError(422, 'Use a 24-hour time like 10:00.');
         }
-        return [$title, $kind, $date, $time === '' ? null : $time . ':00'];
+        $location = $event['location'] ?? '';
+        if (!is_string($location) || !preg_match('//u', $location) || characterCount($location) > 120 || preg_match(INVISIBLE_PATTERN, $location)) {
+            throw new HttpError(422, 'Keep each location to 120 visible characters.');
+        }
+        $series = $event['series'] ?? null;
+        if ($series !== null && (!is_int($series) || $series < 0 || $series > 999)) {
+            throw new HttpError(422, 'Choose a valid class series.');
+        }
+        return [$title, $kind, $date, $time === '' ? null : $time . ':00', trimEdges($location), $series];
     }, $events);
 }
 
@@ -176,10 +188,11 @@ function eventJson(array $row): array
         'kind' => $row['kind'],
         'date' => $row['event_date'],
         'time' => $row['event_time'] === null ? '' : substr($row['event_time'], 0, 5),
-        'location' => '',
+        'location' => $row['location'],
         'description' => '',
         'source' => $row['source'],
         'importJobId' => $row['import_job_id'] === null ? null : (string) $row['import_job_id'],
+        'seriesId' => $row['series_id'],
     ];
 }
 
@@ -244,17 +257,38 @@ function importAction(PDO $db, array $config, array $session, string $route, arr
         $job = ownedImport($db, $user, recordId($input['id'] ?? null, 'Choose a valid upload.'), true);
         $course = courseId($input['courseId'] ?? $job['courseId'], 'Choose a course for this syllabus.');
         $created = 0;
+        $skipped = 0;
         if ($job['state'] !== 'completed') {
-            foreach ($events as $event) {
-                query($db, "INSERT INTO notely_events (owner_user_id, course_id, title, kind, event_date, event_time, source, import_job_id)
-                    VALUES (?, ?, ?, ?, ?, ?, 'imported', ?)", [$user['id'], $course, ...$event, $job['id']]);
+            // Uploading a syllabus again must not double the schedule, so an event the course already has is skipped.
+            $saved = [];
+            foreach (query($db, 'SELECT title, event_date, event_time, series_id FROM notely_events WHERE owner_user_id = ? AND course_id = ?', [$user['id'], $course]) as $row) {
+                $saved["{$row['title']}\n{$row['event_date']}\n{$row['event_time']}"] = (string) $row['series_id'];
             }
-            $created = count($events);
+            // New meetings of a class that's already here, such as from a later end date, join its series, so
+            // deleting the class still removes all of it.
+            $joined = [];
+            foreach ($events as [$title, , $date, $time, , $series]) {
+                if ($series !== null && ($saved["$title\n$date\n$time"] ?? '') !== '') {
+                    $joined[$series] ??= $saved["$title\n$date\n$time"];
+                }
+            }
+            foreach ($events as [$title, $kind, $date, $time, $location, $series]) {
+                $key = "$title\n$date\n$time";
+                if (isset($saved[$key])) {
+                    $skipped++;
+                    continue;
+                }
+                $saved[$key] = '';
+                query($db, "INSERT INTO notely_events (owner_user_id, course_id, title, kind, event_date, event_time, location, series_id, source, import_job_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'imported', ?)",
+                    [$user['id'], $course, $title, $kind, $date, $time, $location, $series === null ? null : ($joined[$series] ?? "{$job['id']}-$series"), $job['id']]);
+                $created++;
+            }
             // The file is no longer needed once its events are in the schedule.
             query($db, "UPDATE notely_import_jobs SET state = 'completed', content = NULL WHERE id = ?", [$job['id']]);
         }
         $db->commit();
-        return ['created' => $created];
+        return ['created' => $created, 'skipped' => $skipped];
     }
     $user = requireUser($db, $session);
     if ($route === 'import-extract') {
@@ -267,14 +301,19 @@ function importAction(PDO $db, array $config, array $session, string $route, arr
         $course = $_GET['courseId'] ?? '';
         $filter = $course === '' ? '' : ' AND course_id = ?';
         $values = $course === '' ? [$user['id']] : [$user['id'], courseId($course, 'Choose a valid course.')];
-        $rows = query($db, 'SELECT id, course_id, title, kind, event_date, event_time, source, import_job_id FROM notely_events
+        $rows = query($db, 'SELECT id, course_id, title, kind, event_date, event_time, location, series_id, source, import_job_id FROM notely_events
             WHERE owner_user_id = ?' . $filter . ' ORDER BY event_date, event_time, id', $values)->fetchAll();
         return ['events' => array_map('eventJson', $rows)];
     }
     if ($route === 'event-delete') {
         $id = recordId($input['id'] ?? null, 'Choose a valid event.');
+        // "series": true removes every meeting of a weekly class; an event outside a series is just itself.
+        $series = ($input['series'] ?? false) === true
+            ? query($db, 'SELECT series_id FROM notely_events WHERE id = ? AND owner_user_id = ?', [$id, $user['id']])->fetchColumn() : null;
         // Another student's event gets the same answer as a missing one, so IDs can't be probed.
-        $deleted = query($db, 'DELETE FROM notely_events WHERE id = ? AND owner_user_id = ?', [$id, $user['id']])->rowCount();
+        $deleted = (is_string($series)
+            ? query($db, 'DELETE FROM notely_events WHERE series_id = ? AND owner_user_id = ?', [$series, $user['id']])
+            : query($db, 'DELETE FROM notely_events WHERE id = ? AND owner_user_id = ?', [$id, $user['id']]))->rowCount();
         if ($deleted === 0) {
             throw new HttpError(404, 'This event could not be found.');
         }

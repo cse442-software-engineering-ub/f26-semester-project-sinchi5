@@ -1,5 +1,5 @@
 // Card 172: real HTTP tests for deleting a saved syllabus event. Requires PHP/PDO MySQL, a disposable
-// local database with migrations 001-008, and backend/dev-router.php on port 8080.
+// local database with migrations 001-009, and backend/dev-router.php on port 8080.
 // Only after confirming that the API uses an isolated DEV/TEST database:
 // NOTELY_TEST_ISOLATED=1 npm run test:event-delete
 // Optional: NOTELY_TEST_URL and NOTELY_TEST_ORIGIN (the configured PHP origin).
@@ -52,7 +52,7 @@ async function seed(person, events) {
   });
   assert.equal(upload.status, 201);
   const confirmed = await person.call("import-confirm", { id: upload.data.job.id, events });
-  assert.deepEqual([confirmed.status, confirmed.data], [200, { created: events.length }]);
+  assert.deepEqual([confirmed.status, confirmed.data], [200, { created: events.length, skipped: 0 }]);
 }
 async function titles(person) {
   const result = await person.call("events");
@@ -118,6 +118,20 @@ try {
   assert.deepEqual(await titles(a), ["Final exam"]);
   assert.deepEqual(await titles(b), ["Other quiz"]);
   pass(5, "a repeated delete is 404 and removes nothing more");
+
+  // Card 47: a weekly class can lose one meeting, or all of them, and another class is untouched.
+  const meeting = (title, day, series) => ({ title, kind: "lecture", date: `2026-11-0${day}`, time: "10:00", series });
+  await seed(a, [meeting("Lecture one", 2, 0), meeting("Lecture two", 4, 0), meeting("Lecture three", 6, 0), meeting("Lab one", 3, 1)]);
+  await seed(b, [meeting("Other lecture", 2, 0)]);
+  const single = await a.call("event-delete", { id: await idOf(a, "Lecture one") });
+  assert.deepEqual([single.status, await titles(a)], [200, ["Lab one", "Lecture two", "Lecture three", "Final exam"]]);
+  expectError(await b.call("event-delete", { id: await idOf(a, "Lecture two"), series: true }), 404, notFound);
+  assert.deepEqual(await titles(b), ["Other lecture", "Other quiz"]);
+  const all = await a.call("event-delete", { id: await idOf(a, "Lecture two"), series: true });
+  assert.deepEqual([all.status, await titles(a)], [200, ["Lab one", "Final exam"]]);
+  assert.equal((await a.call("event-delete", { id: await idOf(a, "Final exam"), series: true })).status, 200);
+  assert.deepEqual([await titles(a), await titles(b)], [["Lab one"], ["Other lecture", "Other quiz"]]);
+  pass(6, "one meeting or a whole series is deleted, and an event outside a series deletes only itself");
 
   console.log(`PASS: card 172 event-delete, ${passed} checks`);
 } finally {
