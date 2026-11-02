@@ -164,7 +164,7 @@ The API looks for configuration in this order:
 | `cookie_path` | `NOTELY_COOKIE_PATH` | Session cookie path, for example `/` locally or the class directory on the server. |
 | `secure_cookies` | `NOTELY_ALLOW_LOCAL_HTTP=1` disables it | HTTPS-only cookies. HTTP is accepted only for `localhost`, `127.0.0.1`, or `[::1]` origins. |
 | `gemini_api_key` | `NOTELY_GEMINI_API_KEY` | A Google AI Studio key (aistudio.google.com/apikey). Notely reads every syllabus with it; without it, uploads get a clear message and students can add events by hand. Keep it only in the private configuration. Local origins never use it unless `NOTELY_AI_LIVE=1` is set for that run. |
-| `gemini_model` | none | The first model tried for syllabus reading. Default `gemini-3.8-flash`, which the free tier limits to 20 reads a day for the whole key. When a model is out of quota, overloaded, or takes over 90 seconds, `gemini-3.6-flash` and then `gemini-3.5-flash` read the file instead. On the free tier, Google may use the uploads to improve its products. |
+| `gemini_model` | none | The first model tried for syllabus reading. Default `gemini-3.8-flash`. When a model is out of quota, overloaded, retired, or takes over 90 seconds, `gemini-3.6-flash` and then `gemini-3.5-flash-lite` read the file instead. The free tier gives the first two only 20 reads a day each for the whole key. On the free tier, Google may use the uploads to improve its products. |
 | `ai_user_daily_limit` | none | Automatic reads per student per UTC day. Default 10. |
 | `ai_daily_limit` | none | Automatic reads for all students per UTC day. Default 50. |
 | `ai_max_input_tokens` | none | Files over this many input tokens are refused before any read. Default 60000. |
