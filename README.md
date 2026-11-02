@@ -55,7 +55,7 @@ Accounts and signed-in users' notes (with their history, comments, and collabora
 
 **Imports**
 - Upload documents (PDF, DOCX, TXT, Markdown, images), scan photos, or upload a syllabus. Files are validated (type, empty file, 20 MB limit), then shown on a review screen before anything is saved.
-- Syllabus imports find weekly classes, assignments, and exams and add them to the calendar after review. Gemini reads every syllabus on the server ([backend/lib/syllabus-ai.php](backend/lib/syllabus-ai.php)), and the browser cleans what it finds and turns each weekly class into its dates ([src/services/syllabus.ts](src/services/syllabus.ts)). A renamed or damaged file is caught in the browser before anything uploads ([src/services/syllabus-file.ts](src/services/syllabus-file.ts)).
+- Syllabus imports find weekly classes, assignments, and exams and add them to the calendar after review. Each weekly class repeats on its posted days, from the syllabus's first and last class (or the course's optional "Classes start" and "Classes end"), skipping no-class dates the syllabus lists. When several sections are listed, the student picks theirs. A file with nothing to add, or one that isn't a syllabus, gets its own screen. Gemini reads every syllabus on the server ([backend/lib/syllabus-ai.php](backend/lib/syllabus-ai.php)), and the browser cleans what it finds and turns each weekly class into its dates ([src/services/syllabus.ts](src/services/syllabus.ts)). A renamed or damaged file is caught in the browser before anything uploads ([src/services/syllabus-file.ts](src/services/syllabus-file.ts)).
 - Extraction is simulated. A **Prototype preview options** control in the dialog exercises success, partial, and failure outcomes.
 
 **Settings**

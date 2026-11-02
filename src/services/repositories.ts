@@ -15,7 +15,7 @@ import type {
   DetectedMeeting,
 } from "../domain";
 import type { SyllabusApi } from "./imports-http";
-import { normalizeBreaks, normalizeEvents, normalizeMeetings } from "./syllabus";
+import { meetingDates, normalizeBreaks, normalizeEvents, normalizeMeetings } from "./syllabus";
 import { fileTypeProblem } from "./syllabus-file";
 import { createMockCollaborators } from "./collaborators.mock";
 import { createMockComments } from "./comments.mock";
@@ -138,7 +138,9 @@ export function createRepositories(
   async function readSyllabus(jobId: string, year: number) {
     if (!serverSyllabus) {
       return { notice: "This preview shows sample events. Sign in to read your own syllabus.",
-        isSyllabus: true, meetings: [], noClassDates: [], events: [
+        isSyllabus: true, noClassDates: [], meetings: [
+          { title: "Lecture", kind: "lecture", section: "", days: [1, 3], time: "10:00", location: "Room 101", firstDate: offsetDate(1), lastDate: offsetDate(30), source: "Detected from syllabus." },
+        ], events: [
           { title: "Assignment 1", kind: "assignment", date: offsetDate(7), time: "23:59", source: "Detected from syllabus. Review before saving." },
           { title: "Midterm exam", kind: "exam", date: offsetDate(21), time: "10:00", source: "Detected from syllabus." },
         ] };
@@ -392,12 +394,22 @@ export function createRepositories(
           // Events the student left out are skipped, and review-only fields aren't saved (card 46).
           const included = job.events.filter((e) => e.include !== false);
           const { courseId } = job.metadata;
+          const code = db.courses.find((c) => c.id === courseId)?.code ?? "";
+          // Each weekly class becomes one event per meeting, tied together by its series number.
+          const classes = (job.meetings ?? []).filter((m) => m.include).flatMap((m, series) =>
+            meetingDates(m, job.noClassDates).map((date) => ({
+              title: m.title.startsWith(code) ? m.title : `${code} ${m.title}`.trim(),
+              kind: m.kind, date, time: m.time, location: m.location, series,
+            })));
           // A signed-in student's events are saved on the server with the job (cards 47 and 48).
           if (serverSyllabus)
-            await serverSyllabus.confirm(job.id, courseId, included.map(({ title, kind, date, time, location }) => ({ title, kind, date, time, location })));
-          else
+            await serverSyllabus.confirm(job.id, courseId, [...included.map(({ title, kind, date, time, location }) => ({ title, kind, date, time, location })), ...classes]);
+          else {
             for (const { include: _include, needsReview: _needsReview, ...event } of included)
               await repo.schedule.save({ ...event, courseId });
+            for (const { series, ...meeting } of classes)
+              await repo.schedule.save({ ...meeting, id: "", courseId, description: "", source: "imported", seriesId: `${job.id}-${series}` });
+          }
         } else
           await repo.notes.create({
             ...job.metadata,

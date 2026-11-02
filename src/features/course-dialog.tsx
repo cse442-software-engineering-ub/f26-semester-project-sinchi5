@@ -43,6 +43,12 @@ export function AddCourseDialog({
 
           const data = new FormData(e.currentTarget);
           setError("");
+          const classesStart = String(data.get("classesStart") ?? "");
+          const classesEnd = String(data.get("classesEnd") ?? "");
+          if (classesStart && classesEnd && classesEnd <= classesStart) {
+            setError("Choose a class end date after the start date.");
+            return;
+          }
 
           try {
             const course = await repo.courses.create({
@@ -50,6 +56,8 @@ export function AddCourseDialog({
             name: String(data.get("name")),
             term: String(data.get("term")),
             color: String(data.get("color")),
+            ...(classesStart ? { classesStart } : {}),
+            ...(classesEnd ? { classesEnd } : {}),
             });
 
             await refresh();
@@ -89,6 +97,18 @@ export function AddCourseDialog({
           Color
           <input name="color" type="color" defaultValue="#869D7A" />
         </label>
+
+        {/* Card 46: fills in a weekly class's dates when its syllabus doesn't give them. */}
+        <div className={s.formRow}>
+          <label>
+            <span>Classes start <span className={s.hint}>(optional)</span></span>
+            <input name="classesStart" type="date" />
+          </label>
+          <label>
+            <span>Classes end <span className={s.hint}>(optional)</span></span>
+            <input name="classesEnd" type="date" />
+          </label>
+        </div>
 
         <label>
             Syllabus (optional)

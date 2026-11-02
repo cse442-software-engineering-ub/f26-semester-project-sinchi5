@@ -2874,6 +2874,39 @@
   font-weight: 500;
   text-decoration: underline;
 }
+.reviewHeading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 8px 0 0;
+  font-size: 0.95rem;
+}
+.reviewSubheading {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.dayToggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dayToggles button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.dayToggles button[aria-pressed="true"] {
+  border: 2px solid var(--primary);
+  background: var(--sage);
+  font-weight: 600;
+}
 .checkLabel {
   display: flex !important;
   align-items: flex-start;
