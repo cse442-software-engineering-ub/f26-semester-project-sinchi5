@@ -11,7 +11,7 @@ import {
   Plus,
 } from "lucide-react";
 import { useApp } from "../app/context";
-import { fileTypeProblem } from "../services/syllabus-text";
+import { fileTypeProblem } from "../services/syllabus-file";
 import { Modal } from "../shared/ui";
 import type { DetectedEvent, EventKind, UploadKind, UploadJob } from "../domain";
 import s from "../app/App.module.css";
@@ -21,9 +21,7 @@ const PHASE_STEP: Record<string, number> = { pick: 0, queued: 1, processing: 1, 
 // Card 46: the event types a syllabus can add, as the review screen names them.
 const EVENT_TYPES: [EventKind, string][] = [["assignment", "Assignment"], ["exam", "Exam"], ["quiz", "Quiz"], ["deadline", "Deadline"], ["other", "Other"]];
 const READ_BY: Record<NonNullable<UploadJob["reader"]>, string> = {
-  rules: "with the free reader in your browser",
   ai: "with automatic reading",
-  "rules-only": "with the free reader",
   sample: "in this preview",
 };
 const megabytes = (bytes: number) => `${Math.max(0.1, Math.round(bytes / 104857.6) / 10)} MB`;
@@ -108,7 +106,6 @@ export function ImportDialog({
       const [done] = await Promise.all([
         repo.imports.process(
           queued,
-          sourceFile,
           result,
           () => open.current && setChecking(true),
         ),
@@ -393,7 +390,7 @@ export function ImportDialog({
             <p className={s.notice}>
               {(() => {
                 const found = job.events.filter((e) => e.source === "imported").length;
-                return `We found ${found} ${found === 1 ? "event" : "events"} ${READ_BY[job.reader ?? "rules"]}. `;
+                return `We found ${found} ${found === 1 ? "event" : "events"} ${READ_BY[job.reader ?? "ai"]}. `;
               })()}
               Check each one against your syllabus: fix anything that’s wrong, uncheck what you don’t want, and add
               anything that’s missing.

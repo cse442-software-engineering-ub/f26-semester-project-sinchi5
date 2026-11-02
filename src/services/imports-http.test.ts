@@ -38,14 +38,14 @@ it("uploads the file as base64 with its name and course, using the session's CSR
 it("asks the server to read a job for the course year and passes on its messages (card 45)", async () => {
   const api = fakeApi((call) => {
     if (call.route === "session") return { json: { csrfToken: "token" } };
-    if (call.body?.id === "13") return { status: 429, json: { error: "You can read 5 syllabi automatically each day. Try again tomorrow." } };
+    if (call.body?.id === "13") return { status: 429, json: { error: "You can read 10 syllabi automatically each day. Try again tomorrow." } };
     return { json: { job: { ...job, state: "review", events: [{ title: "Quiz 1" }] } } };
   });
   const syllabus = createHttpSyllabus("/api/index.php", api.fetcher);
   expect((await syllabus.extract("12", 2026)).events).toEqual([{ title: "Quiz 1" }]);
   expect(api.calls[1]).toMatchObject({ route: "import-extract", body: { id: "12", year: 2026 } });
   const limited = syllabus.extract("13", 2026);
-  await expect(limited).rejects.toThrow("You can read 5 syllabi automatically each day.");
+  await expect(limited).rejects.toThrow("You can read 10 syllabi automatically each day.");
   await expect(limited).rejects.toBeInstanceOf(NoteServiceError);
   const offline = createHttpSyllabus("/api/index.php", (async () => { throw new TypeError("offline"); }) as unknown as typeof fetch);
   await expect(offline.extract("12", 2026)).rejects.toThrow("Could not reach Notely. Check your connection and try again.");
