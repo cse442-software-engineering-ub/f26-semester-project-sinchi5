@@ -12,10 +12,11 @@ import type {
   Collaborator,
   NoteRepository,
   DetectedEvent,
+  DetectedMeeting,
 } from "../domain";
 import type { SyllabusApi } from "./imports-http";
-import { checkDates, extractEvents, mergeEvents, normalizeEvents, rulesVerdict, type ProposedEvent } from "./syllabus";
-import { fileTypeProblem, syllabusText } from "./syllabus-text";
+import { normalizeBreaks, normalizeEvents, normalizeMeetings } from "./syllabus";
+import { fileTypeProblem } from "./syllabus-file";
 import { createMockCollaborators } from "./collaborators.mock";
 import { createMockComments } from "./comments.mock";
 import {
@@ -132,32 +133,18 @@ export function createRepositories(
     if (!n) throw new Error("This note could not be found.");
     return n;
   };
-  // Card 45: the free rules read every syllabus first. The AI reader on the server is asked only when
-  // they can't stand alone (rulesVerdict), and its dates are checked against the file. When it can't
-  // help, the rules' events are still shown with the reason, and the student can fix or add events.
-  async function readSyllabus(jobId: string, file: File, year: number, onAutomaticReading?: () => void):
-    Promise<{ proposed: ProposedEvent[]; reader: NonNullable<UploadJob["reader"]>; notice?: string }> {
-    const text = await syllabusText(file);
-    const rules = extractEvents(text, year);
-    const verdict = rulesVerdict(text, rules);
-    const checkThem = "Check these events against your syllabus, and add any that are missing.";
-    if (!verdict) return { proposed: rules, reader: "rules" };
+  // Card 45: the server's reader (Gemini, card 127) reads every syllabus. When it can't, its message goes
+  // to the student. The demo has no server, so it shows sample results.
+  async function readSyllabus(jobId: string, year: number, onAutomaticReading?: () => void) {
     if (!serverSyllabus) {
-      // The demo has no server, so a file without text shows sample results.
-      if (verdict !== "no-text") return { proposed: rules, reader: "rules-only", notice: checkThem };
-      return { reader: "sample", notice: "This preview shows sample events. Sign in to read your own syllabus.", proposed: normalizeEvents([
-        { title: "Assignment 1", kind: "assignment", date: offsetDate(7), time: "23:59", source: "Detected from syllabus. Review before saving." },
-        { title: "Midterm exam", kind: "exam", date: offsetDate(21), time: "10:00", source: "Detected from syllabus." },
-      ]) };
+      return { reader: "sample" as const, notice: "This preview shows sample events. Sign in to read your own syllabus.",
+        isSyllabus: true, meetings: [], noClassDates: [], events: [
+          { title: "Assignment 1", kind: "assignment", date: offsetDate(7), time: "23:59", source: "Detected from syllabus. Review before saving." },
+          { title: "Midterm exam", kind: "exam", date: offsetDate(21), time: "10:00", source: "Detected from syllabus." },
+        ] };
     }
     onAutomaticReading?.();
-    try {
-      const ai = normalizeEvents((await serverSyllabus.extract(jobId, year)).events);
-      return { proposed: mergeEvents(checkDates(ai, text), rules), reader: "ai" };
-    } catch (error) {
-      // A daily limit, a busy service, or no key: what the rules found is still worth reviewing.
-      return { proposed: rules, reader: "rules-only", notice: `${(error as Error).message} ${checkThem}` };
-    }
+    return { reader: "ai" as const, ...(await serverSyllabus.extract(jobId, year)) };
   }
   let invitations = new Map<string, Collaborator[]>();
   const repo: Repositories = {
@@ -370,21 +357,31 @@ export function createRepositories(
         if (kind === "syllabus" && serverSyllabus) return { ...job, id: (await serverSyllabus.upload(file, courseId)).id };
         return { ...job, id: id() };
       },
-      async process(job, file, scenario = "success", onAutomaticReading) {
+      async process(job, scenario = "success", onAutomaticReading) {
         // "Processing failed" in the prototype preview options shows the failure screen on purpose.
         if (scenario === "failure") return { ...job, state: "failed" };
         let events: DetectedEvent[] = [];
-        let read: Pick<UploadJob, "reader" | "notice"> = {};
+        let read: Partial<UploadJob> = {};
         if (job.kind === "syllabus") {
           const { courseId } = job.metadata;
-          const term = db.courses.find((c) => c.id === courseId)?.term ?? "";
-          const year = Number(/\b(20\d\d)\b/.exec(term)?.[1]) || new Date().getFullYear();
-          const result = await readSyllabus(job.id, file, year, onAutomaticReading);
-          read = { reader: result.reader, ...(result.notice ? { notice: result.notice } : {}) };
-          events = result.proposed.map(({ source, time, needsReview, ...event }) => ({
-            ...event, id: "", courseId, time: time ?? "", location: "", description: source, source: "imported",
-            ...(needsReview ? { needsReview } : {}),
+          const course = db.courses.find((c) => c.id === courseId);
+          const year = Number(/\b(20\d\d)\b/.exec(course?.term ?? "")?.[1]) || new Date().getFullYear();
+          const result = await readSyllabus(job.id, year, onAutomaticReading);
+          events = normalizeEvents(result.events).map(({ source, time, location, needsReview, ...event }) => ({
+            ...event, id: "", courseId, time: time ?? "", location: location ?? "", description: source, source: "imported",
+            // With no date posted it stays unchecked: the student sees it, and adds a date only if they want it.
+            ...(needsReview ? { needsReview, include: false } : {}),
           }));
+          const found = normalizeMeetings(result.meetings);
+          // A class offered at several times is one the student attends only once, so they pick theirs.
+          const chooses = (kind: string) => found.filter((m) => m.kind === kind && m.section).length > 1;
+          const meetings = found.map(({ firstDate, lastDate, ...m }): DetectedMeeting => ({
+            ...m, title: [m.title, m.section].filter(Boolean).join(" "), include: !(m.section && chooses(m.kind)),
+            // The syllabus's own dates come first; the course's are the fallback.
+            starts: firstDate || (course?.classesStart ?? ""), ends: lastDate || (course?.classesEnd ?? ""),
+          }));
+          read = { reader: result.reader, meetings, noClassDates: normalizeBreaks(result.noClassDates), isSyllabus: result.isSyllabus !== false,
+            ...("notice" in result ? { notice: result.notice } : {}) };
         }
         const partial = scenario === "partial" || events.some((e) => e.needsReview);
         return { ...job, state: partial ? "partial" : "review", events, ...read };
@@ -398,7 +395,7 @@ export function createRepositories(
           const { courseId } = job.metadata;
           // A signed-in student's events are saved on the server with the job (cards 47 and 48).
           if (serverSyllabus)
-            await serverSyllabus.confirm(job.id, courseId, included.map(({ title, kind, date, time }) => ({ title, kind, date, time })));
+            await serverSyllabus.confirm(job.id, courseId, included.map(({ title, kind, date, time, location }) => ({ title, kind, date, time, location })));
           else
             for (const { include: _include, needsReview: _needsReview, ...event } of included)
               await repo.schedule.save({ ...event, courseId });

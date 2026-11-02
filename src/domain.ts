@@ -2,7 +2,7 @@ export const BRAND = "Notely";
 export type CollaboratorPermission = "view" | "edit";
 export type Visibility = "private" | "shared";
 export type EventKind =
-  "lecture" | "assignment" | "quiz" | "exam" | "deadline" | "other";
+  "lecture" | "recitation" | "lab" | "assignment" | "quiz" | "exam" | "deadline" | "other";
 export interface User {
   id: string;
   name: string;
@@ -18,6 +18,9 @@ export interface Course {
   name: string;
   color: string;
   term: string;
+  // First and last day of classes, when the student gave them (card 46). A syllabus's own dates come first.
+  classesStart?: string;
+  classesEnd?: string;
 }
 export interface Category {
   id: string;
@@ -98,6 +101,20 @@ export interface DetectedEvent extends CourseEvent {
   needsReview?: boolean;
   include?: boolean;
 }
+// A weekly class found in a syllabus (card 44). days are numbers, with 0 for Sunday. It becomes one saved
+// event per meeting between starts and ends, skipping the job's noClassDates.
+export interface DetectedMeeting {
+  title: string;
+  kind: "lecture" | "recitation" | "lab";
+  section: string;
+  days: number[];
+  time: string;
+  location: string;
+  starts: string;
+  ends: string;
+  source: string;
+  include: boolean;
+}
 export interface UploadJob {
   id: string;
   kind: UploadKind;
@@ -106,9 +123,12 @@ export interface UploadJob {
     "queued" | "processing" | "review" | "completed" | "partial" | "failed";
   metadata: DetectedMetadata;
   events: DetectedEvent[];
-  // How a syllabus was read (card 45): by the free rules, by the AI reader after the rules found too
-  // little, by the rules alone because the AI reader couldn't help (notice says why), or a demo sample.
-  reader?: "rules" | "ai" | "rules-only" | "sample";
+  meetings?: DetectedMeeting[];
+  noClassDates?: { from: string; to: string }[];
+  // False when the reader says the file isn't a course syllabus at all (card 127).
+  isSyllabus?: boolean;
+  // How a syllabus was read (card 45): by the server's reader, or a demo sample (notice says so).
+  reader?: "ai" | "sample";
   notice?: string;
 }
 export interface NoteQuery {
@@ -174,8 +194,8 @@ export interface ImportRepository {
   // Registers the file as a queued job; a signed-in student's syllabus goes to the server (card 43).
   start(file: File, kind: UploadKind, scenario?: string, courseId?: string): Promise<UploadJob>;
   // Reads a queued job's file and proposes note details or schedule events (cards 44 and 45).
-  // onAutomaticReading is called when the AI reader is asked, which can take up to a minute.
-  process(job: UploadJob, file: File, scenario?: string, onAutomaticReading?: () => void): Promise<UploadJob>;
+  // onAutomaticReading is called as the reader starts, which can take a couple of minutes.
+  process(job: UploadJob, scenario?: string, onAutomaticReading?: () => void): Promise<UploadJob>;
   confirm(job: UploadJob): Promise<void>;
 }
 export interface Repositories {
