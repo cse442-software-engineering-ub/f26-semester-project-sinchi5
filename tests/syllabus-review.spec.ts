@@ -92,7 +92,7 @@ test("leaving out every event, or finding none, leaves nothing to add", async ({
 test("a student can add an event the readers missed", async ({ page }) => {
   await signUpWithCourse(page);
   const dialog = await reviewSyllabus(page);
-  await expect(dialog.getByText("We found 3 events with automatic reading.", { exact: false })).toBeVisible();
+  await expect(dialog.getByText("We found 3 events.", { exact: false })).toBeVisible();
   await dialog.getByRole("button", { name: "Add an event" }).click();
   const added = dialog.getByRole("group", { name: "Added by you" });
   await expect(added.getByLabel("Event title")).toBeFocused();

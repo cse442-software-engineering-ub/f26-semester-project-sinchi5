@@ -20,10 +20,6 @@ const STEPS = ["Choose", "Read", "Check", "Done"];
 const PHASE_STEP: Record<string, number> = { pick: 0, queued: 1, processing: 1, failed: 1, review: 2, completed: 3 };
 // Card 46: the event types a syllabus can add, as the review screen names them.
 const EVENT_TYPES: [EventKind, string][] = [["assignment", "Assignment"], ["exam", "Exam"], ["quiz", "Quiz"], ["deadline", "Deadline"], ["other", "Other"]];
-const READ_BY: Record<NonNullable<UploadJob["reader"]>, string> = {
-  ai: "with automatic reading",
-  sample: "in this preview",
-};
 const megabytes = (bytes: number) => `${Math.max(0.1, Math.round(bytes / 104857.6) / 10)} MB`;
 
 // Card 45: shows where the student is in the syllabus upload, so every screen says what comes next.
@@ -64,8 +60,6 @@ export function ImportDialog({
   const [courseId, setCourseId] = useState(
     startingCourseId ?? state.courses[0]?.id ?? "",
   );
-  // Set while the AI reader double-checks a syllabus the free rules couldn't read well.
-  const [checking, setChecking] = useState(false);
   // A slow upload must not update the window after it closes. Setting it on every mount matters:
   // React's development mode mounts, unmounts, and mounts again.
   const open = useRef(true);
@@ -104,23 +98,17 @@ export function ImportDialog({
       setPhase("processing");
 
       const [done] = await Promise.all([
-        repo.imports.process(
-          queued,
-          result,
-          () => open.current && setChecking(true),
-        ),
+        repo.imports.process(queued, result),
         wait(900),
       ]);
 
       if (!open.current) return;
 
-      setChecking(false);
       setJob(done);
       setPhase(done.state === "failed" ? "failed" : "review");
     } catch (e) {
       if (!open.current) return;
 
-      setChecking(false);
       setImportError((e as Error).message);
       setPhase("failed");
     }
@@ -153,7 +141,8 @@ export function ImportDialog({
     setError("");
     setJob({
       ...job,
-      state: job.state === "failed" ? "review" : job.state,
+      // After a failed read the job never reached review, but the student's own events can still be saved.
+      state: job.state === "partial" ? "partial" : "review",
       events: [...job.events, { id: "", courseId: job.metadata.courseId, title: "", kind: "assignment", date: "", time: "",
         location: "", description: "", source: "manual" }],
     });
@@ -209,14 +198,14 @@ export function ImportDialog({
           {error || importError}
         </p>
       )}
-      {/* Why the AI reader couldn't help, when the rules' events are shown instead (card 45). */}
+      {/* A note about these results, such as a demo's sample events (card 45). */}
       {phase === "review" && job?.notice && <p className={s.notice}>{job.notice}</p>}
       {phase === "pick" && (
         <>
           {kind === "syllabus" && (
             <p className={s.notice}>
-              Choose the course, then its syllabus. Notely finds the due dates and shows them to you
-              first: nothing is added to your schedule until you check it.
+              Choose the course, then its syllabus. Notely finds your class times and due dates and shows
+              them to you first: nothing is added to your schedule until you check it.
             </p>
           )}
           {kind === "syllabus" &&
@@ -283,8 +272,8 @@ export function ImportDialog({
               <ul className={s.tips}>
                 <li>The PDF or Word file from your course website works best.</li>
                 <li>A photo works too: lay the page flat in good light, with every date readable.</li>
-                <li>Only the dates matter, so for a long syllabus the schedule pages are enough.</li>
-                <li>You’ll check every date before anything is added, and you can fix or add events.</li>
+                <li>For a very long syllabus, the pages with your class times and the course schedule are enough.</li>
+                <li>You’ll check everything before it’s added, and you can fix or add events.</li>
               </ul>
             </details>
           )}
@@ -339,9 +328,7 @@ export function ImportDialog({
               ? "Organizing your notes, one detail at a time."
               : phase === "queued"
                 ? "Uploading your file securely."
-                : checking
-                  ? "The quick reader wasn’t sure about every date, so automatic reading is double-checking the file. This can take up to a minute."
-                  : "Reading the dates in your syllabus. This usually takes a few seconds."}
+                : "Reading your syllabus carefully. This can take a minute or two."}
           </p>
         </div>
       )}
@@ -390,7 +377,7 @@ export function ImportDialog({
             <p className={s.notice}>
               {(() => {
                 const found = job.events.filter((e) => e.source === "imported").length;
-                return `We found ${found} ${found === 1 ? "event" : "events"} ${READ_BY[job.reader ?? "ai"]}. `;
+                return `We found ${found} ${found === 1 ? "event" : "events"}. `;
               })()}
               Check each one against your syllabus: fix anything that’s wrong, uncheck what you don’t want, and add
               anything that’s missing.

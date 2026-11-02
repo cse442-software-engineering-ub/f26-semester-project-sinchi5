@@ -28,9 +28,9 @@ export function createHttpSyllabus(endpoint = `${import.meta.env.BASE_URL}api/in
       // A 20 MB file can take a while on a slow connection.
       return (await send<{ job: SyllabusJob }>("syllabus-upload", { courseId, fileName: file.name, content }, 120000)).job;
     },
-    // Reads a job on the server, which can take a few minutes. This waits a little past the server's limit.
+    // Reads a job on the server. The reader may try three models, so this outlasts the server's own limit.
     async extract(id: string, year: number) {
-      return (await send<{ job: SyllabusJob }>("import-extract", { id, year }, 250000)).job;
+      return (await send<{ job: SyllabusJob }>("import-extract", { id, year }, 330000)).job;
     },
     // Saves the reviewed events to the course (card 47). Sending it again adds nothing.
     async confirm(id: string, courseId: string, events: Pick<CourseEvent, "title" | "kind" | "date" | "time" | "location">[]) {
