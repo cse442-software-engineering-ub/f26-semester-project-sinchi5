@@ -1,5 +1,6 @@
 // Card 45: the "Upload syllabus" window for a signed-in student, against the mocked API in
 // support/account-fixture.ts. No server is needed and the Gemini API is never called.
+import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { test, expect } from "./support/account-fixture";
 import { openUpload, pdfFile, photoFile, signUpWithCourse, SYLLABUS, textFile as file } from "./support/syllabus";
@@ -101,7 +102,7 @@ test("when the reader can't read a file, the reason is shown and the student's o
   await expect(dialog.getByText("Added 1 event to CSE 442.")).toBeVisible();
 });
 
-test("while a syllabus is read, the screen says it can take a while", async ({ page }) => {
+test("while a syllabus is read, playful lines keep the student company", async ({ page }) => {
   await signUpWithCourse(page);
   let release!: () => void;
   const held = new Promise<void>((resolve) => { release = resolve; });
@@ -112,8 +113,23 @@ test("while a syllabus is read, the screen says it can take a while", async ({ p
   await openUpload(page);
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Choose upload file").setInputFiles(file("cse442-syllabus.txt", SYLLABUS));
+  await page.clock.install();
   await dialog.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(dialog.getByText("Reading your syllabus carefully. This can take a minute or two.")).toBeVisible();
+  // Hidden from screen readers, which hear the message above once instead of every line.
+  const line = dialog.locator('p[aria-hidden="true"]');
+  const first = await line.textContent();
+  expect(first).toMatch(/…$/);
+  await page.clock.runFor(3500);
+  await expect(line).not.toHaveText(first!);
+  // A long read says it's still going instead of starting the jokes over.
+  await page.clock.runFor(60000);
+  await expect(line).toHaveText(/Still reading|Not stuck|strong opinions|notes on the notes|Still here/);
+  expect((await new AxeBuilder({ page }).include('[role="dialog"]').analyze()).violations).toEqual([]);
+  // With reduced motion on, nothing sweeps or tilts.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(await line.locator("span").evaluate((el) => getComputedStyle(el, "::before").animationName)).toBe("none");
+  expect(await dialog.locator('span[aria-hidden="true"]:has(i)').evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
   release();
   await expect(dialog.getByRole("button", { name: "Add to schedule" })).toBeVisible();
 });

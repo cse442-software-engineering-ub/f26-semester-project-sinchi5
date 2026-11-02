@@ -1095,6 +1095,136 @@
     transform: rotate(360deg);
   }
 }
+/* Card 45: while Gemini reads, a little page gets highlighted line by line, and a highlighter swipes across
+   each playful line. */
+.readingPage,
+.readingLine {
+  --reading-mark: #f6d85e;
+}
+:global([data-theme="dark"]) .readingPage,
+:global([data-theme="dark"]) .readingLine {
+  --reading-mark: #5b5326;
+}
+.readingPage {
+  display: grid;
+  gap: 7px;
+  width: 52px;
+  padding: 12px 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  animation: readingTilt 2.4s cubic-bezier(0.77, 0, 0.175, 1) infinite alternate;
+}
+.readingPage i {
+  position: relative;
+  display: block;
+  height: 5px;
+  overflow: hidden;
+  background: var(--line);
+  border-radius: 3px;
+}
+.readingPage i:last-child {
+  width: 62%;
+}
+.readingPage i::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--reading-mark);
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: readingSweep 3.2s linear infinite;
+}
+.readingPage i:nth-child(2)::after {
+  animation-delay: 0.5s;
+}
+.readingPage i:nth-child(3)::after {
+  animation-delay: 1s;
+}
+.readingPage i:nth-child(4)::after {
+  animation-delay: 1.5s;
+}
+.readingLine {
+  color: var(--text);
+}
+.readingLine span {
+  position: relative;
+  display: inline-block;
+  padding: 1px 6px;
+  isolation: isolate;
+  animation: readingRise 240ms var(--ease-out) both;
+}
+.readingLine span::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--reading-mark);
+  border-radius: 2px 6px 3px 8px;
+  transform: rotate(-1deg) scaleX(0);
+  transform-origin: left;
+  animation: readingSwipe 700ms var(--ease-out) 120ms both;
+}
+@keyframes readingTilt {
+  from {
+    transform: rotate(-4deg);
+  }
+  to {
+    transform: rotate(3deg);
+  }
+}
+@keyframes readingSweep {
+  18%,
+  80% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+}
+@keyframes readingRise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes readingSwipe {
+  to {
+    transform: rotate(-1deg) scaleX(1);
+  }
+}
+@keyframes readingPulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes readingFade {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .readingPage {
+    animation: none;
+  }
+  .readingPage i::after {
+    transform: none;
+    animation-name: readingPulse;
+  }
+  .readingLine span {
+    animation-name: readingFade;
+  }
+  .readingLine span::before {
+    transform: rotate(-1deg);
+    animation: none;
+  }
+}
 .successIcon {
   width: 64px;
   height: 64px;
