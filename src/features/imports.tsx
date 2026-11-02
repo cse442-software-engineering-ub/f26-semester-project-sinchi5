@@ -25,6 +25,50 @@ const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frida
 const shortDate = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 const megabytes = (bytes: number) => `${Math.max(0.1, Math.round(bytes / 104857.6) / 10)} MB`;
 
+// Card 45: Gemini reports no progress while it reads, so these keep the student company instead of a made-up
+// percentage. After one pass through them, the lines say the read is still going.
+const READING_LINES = [
+  "Asking your syllabus nicely…",
+  "Squinting at the fine print…",
+  "Counting all the Mondays…",
+  "Looking for midterms under the couch…",
+  "Sharpening a very tiny pencil…",
+  "Working out what “TBA” really means…",
+  "Highlighting everything, just in case…",
+  "Reading the footnotes for you…",
+  "Herding your due dates…",
+  "Politely skipping the office hours…",
+  "Making room for your breaks…",
+  "Whispering “MWF” three times…",
+  "Consulting the ancient scrolls…",
+  "Smoothing out page three…",
+  "Asking Comic Sans to calm down…",
+  "Telling your finals we’re onto them…",
+  "Tiptoeing past the plagiarism policy…",
+];
+const LONG_READ_LINES = [
+  "Still reading. This one has a lot to say…",
+  "Not stuck, just thorough…",
+  "Page twelve has some strong opinions…",
+  "Taking notes on the notes…",
+  "Still here. Still reading. Still delighted…",
+];
+
+function ReadingLine() {
+  const [start] = useState(() => Math.floor(Math.random() * READING_LINES.length));
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 3200);
+    return () => clearInterval(timer);
+  }, []);
+  const line = tick < READING_LINES.length
+    ? READING_LINES[(start + tick) % READING_LINES.length]
+    : LONG_READ_LINES[(tick - READING_LINES.length) % LONG_READ_LINES.length];
+  // Hidden from screen readers, which hear the status message once instead of every line. The key restarts
+  // the highlighter swipe on each new line.
+  return <p className={s.readingLine} aria-hidden="true"><span key={line}>{line}</span></p>;
+}
+
 // Card 45: shows where the student is in the syllabus upload, so every screen says what comes next.
 function Steps({ phase }: { phase: string }) {
   const current = PHASE_STEP[phase] ?? 0;
@@ -405,7 +449,11 @@ export function ImportDialog({
       )}
       {(phase === "queued" || phase === "processing") && (
         <div className={s.empty} role="status">
-          <LoaderCircle className={s.spinner} size={36} />
+          {kind === "syllabus" ? (
+            <span className={s.readingPage} aria-hidden="true"><i /><i /><i /><i /></span>
+          ) : (
+            <LoaderCircle className={s.spinner} size={36} />
+          )}
           <h3>
             {phase === "queued"
               ? "Getting your file ready…"
@@ -418,6 +466,7 @@ export function ImportDialog({
                 ? "Uploading your file securely."
                 : "Reading your syllabus carefully. This can take a minute or two."}
           </p>
+          {kind === "syllabus" && <ReadingLine />}
         </div>
       )}
       {phase === "failed" && (
