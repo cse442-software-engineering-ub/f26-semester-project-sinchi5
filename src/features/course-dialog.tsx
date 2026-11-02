@@ -117,11 +117,12 @@ export function AddCourseDialog({
             </label>
 
             {syllabus && (
-            <div>
-                <span>{syllabus.name}</span>
+            <div className={s.actions}>
+                <span style={{ overflowWrap: "anywhere" }}>{syllabus.name}</span>
 
                 <button
                 type="button"
+                className={s.secondary}
                 onClick={() => {
                     setSyllabus(undefined);
                     setSyllabusError("");
