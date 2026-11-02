@@ -1413,8 +1413,9 @@ export function CoursePage() {
       )}
       <section className={s.panel}>
         <h2>Coming up in this course</h2>
+        {/* A weekly class would fill this list with every meeting of the term (card 48). */}
         {state.events
-          .filter((e) => e.courseId === id)
+          .filter((e) => e.courseId === id && !e.seriesId)
           .map((e) => (
             <Link
               key={e.id}

@@ -118,11 +118,12 @@ export function normalizeBreaks(items: unknown): DateRange[] {
 }
 
 // Why a weekly class can't be added as it stands, or null when it can.
-export function checkMeeting(meeting: { days: number[]; starts: string; ends: string }): string | null {
+export function checkMeeting(meeting: { days: number[]; starts: string; ends: string }, noClass: DateRange[] = []): string | null {
   if (!meeting.days.length) return "Choose at least one day.";
   if (!realDate(meeting.starts) || !realDate(meeting.ends)) return "Choose when each class starts and ends.";
   if (meeting.ends <= meeting.starts) return "Choose an end date after the start date.";
   if ((Date.parse(meeting.ends) - Date.parse(meeting.starts)) / DAY_MS > MAX_CLASS_DAYS) return "Repeating events can run for at most one year.";
+  if (!meetingDates(meeting, noClass).length) return "This class has no meetings between its start and end dates.";
   return null;
 }
 

@@ -132,6 +132,7 @@ export function ImportDialog({
   const [error, setError] = useState("");
   const [scenario, setScenario] = useState("success");
   const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState({ created: 0, skipped: 0, first: "" });
   const [courseId, setCourseId] = useState(
     startingCourseId ?? state.courses[0]?.id ?? "",
   );
@@ -241,7 +242,7 @@ export function ImportDialog({
   }
   async function confirm() {
     if (!job) return;
-    const problem = job.meetings?.filter((m) => m.include).map((m) => [m.title, checkMeeting(m)]).find(([, why]) => why);
+    const problem = job.meetings?.filter((m) => m.include).map((m) => [m.title, checkMeeting(m, job.noClassDates)]).find(([, why]) => why);
     if (problem) {
       setError(`${problem[0]}: ${problem[1]}`);
       return;
@@ -249,7 +250,7 @@ export function ImportDialog({
     setError("");
     setBusy(true);
     try {
-      await repo.imports.confirm(job);
+      setSaved(await repo.imports.confirm(job));
       await refresh();
       setPhase("completed");
     } catch (e) {
@@ -731,18 +732,25 @@ export function ImportDialog({
               ? "Your reviewed events are in your schedule."
               : "Your note is waiting in your library."}
           </p>
-          {/* Card 48: exactly what was added and where, so the student knows what to look for. */}
+          {/* Card 48: exactly what was added and where, and what was already there. */}
           {kind === "syllabus" && job && (() => {
-            const added = job.events.filter((e) => e.include !== false).length;
+            const { created, skipped } = saved;
             const course = state.courses.find((c) => c.id === job.metadata.courseId)?.code ?? "your course";
-            return <p>{`Added ${added} ${added === 1 ? "event" : "events"} to ${course}.`}</p>;
+            const already = `${skipped} ${skipped === 1 ? "was" : "were"} already on your schedule.`;
+            return (
+              <p>
+                {created
+                  ? `Added ${created} ${created === 1 ? "event" : "events"} to ${course}.${skipped ? ` ${already}` : ""}`
+                  : `Nothing new to add to ${course}: all ${already}`}
+              </p>
+            );
           })()}
           {/* Card 48: open the schedule on the earliest added event, so it is in view. */}
           <div className={`${s.actions} ${s.completionActions}`}>
             {kind === "syllabus" && (
               <Link
                 className={s.primary}
-                to={`/schedule?date=${job?.events.filter((e) => e.include !== false).map((e) => e.date).sort()[0] ?? ""}`}
+                to={`/schedule?date=${saved.first}`}
                 onClick={onClose}
               >
                 View schedule <ArrowUpRight size={16} />

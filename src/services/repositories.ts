@@ -315,17 +315,18 @@ export function createRepositories(
         persist();
         return e;
       },
-      async remove(event) {
+      async remove(event, wholeSeries = false) {
         // Card 173: a syllabus event is deleted on the server first, so a failure keeps it (and any
         // edited copy saved here). One already gone from the server (404) only needs its copy removed.
         if (event.source === "imported" && serverSyllabus) {
           try {
-            await serverSyllabus.deleteEvent(event.id);
+            await serverSyllabus.deleteEvent(event.id, wholeSeries);
           } catch (e) {
             if ((e as { status?: number }).status !== 404) throw e;
           }
         }
-        db.events = db.events.filter((x) => x.id !== event.id);
+        const series = wholeSeries ? event.seriesId : undefined;
+        db.events = db.events.filter((x) => x.id !== event.id && !(series && x.seriesId === series));
         persist();
       },
       async lectureNotes(event) {
@@ -401,20 +402,23 @@ export function createRepositories(
               title: m.title.startsWith(code) ? m.title : `${code} ${m.title}`.trim(),
               kind: m.kind, date, time: m.time, location: m.location, series,
             })));
+          const first = [...included.map((e) => e.date), ...classes.map((c) => c.date)].sort()[0] ?? "";
           // A signed-in student's events are saved on the server with the job (cards 47 and 48).
-          if (serverSyllabus)
-            await serverSyllabus.confirm(job.id, courseId, [...included.map(({ title, kind, date, time, location }) => ({ title, kind, date, time, location })), ...classes]);
-          else {
-            for (const { include: _include, needsReview: _needsReview, ...event } of included)
-              await repo.schedule.save({ ...event, courseId });
-            for (const { series, ...meeting } of classes)
-              await repo.schedule.save({ ...meeting, id: "", courseId, description: "", source: "imported", seriesId: `${job.id}-${series}` });
+          if (serverSyllabus) {
+            const saved = await serverSyllabus.confirm(job.id, courseId, [...included.map(({ title, kind, date, time, location }) => ({ title, kind, date, time, location })), ...classes]);
+            return { ...saved, first };
           }
-        } else
-          await repo.notes.create({
-            ...job.metadata,
-            body: `Imported from ${job.name}.\n\nYour document is ready to organize. Add your notes here.`,
-          });
+          for (const { include: _include, needsReview: _needsReview, ...event } of included)
+            await repo.schedule.save({ ...event, courseId });
+          for (const { series, ...meeting } of classes)
+            await repo.schedule.save({ ...meeting, id: "", courseId, description: "", source: "imported", seriesId: `${job.id}-${series}` });
+          return { created: included.length + classes.length, skipped: 0, first };
+        }
+        await repo.notes.create({
+          ...job.metadata,
+          body: `Imported from ${job.name}.\n\nYour document is ready to organize. Add your notes here.`,
+        });
+        return { created: 0, skipped: 0, first: "" };
       },
     },
     async reset() {

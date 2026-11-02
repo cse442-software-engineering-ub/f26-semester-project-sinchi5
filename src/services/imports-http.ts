@@ -32,17 +32,18 @@ export function createHttpSyllabus(endpoint = `${import.meta.env.BASE_URL}api/in
     async extract(id: string, year: number) {
       return (await send<{ job: SyllabusJob }>("import-extract", { id, year }, 330000)).job;
     },
-    // Saves the reviewed events to the course (card 47). Sending it again adds nothing.
+    // Saves the reviewed events to the course (card 47). Sending it again adds nothing, and an event the
+    // course already has is skipped.
     async confirm(id: string, courseId: string, events: (Pick<CourseEvent, "title" | "kind" | "date" | "time" | "location"> & { series?: number })[]) {
-      return (await send<{ created: number }>("import-confirm", { id, courseId, events })).created;
+      return send<{ created: number; skipped: number }>("import-confirm", { id, courseId, events });
     },
     // The student's imported events, for the schedule (card 48).
     async events() {
       return (await send<{ events: CourseEvent[] }>("events")).events;
     },
-    // Deletes one of the student's syllabus events (card 172).
-    async deleteEvent(id: string) {
-      await send<{ event: { id: string } }>("event-delete", { id });
+    // Deletes one of the student's syllabus events (card 172), or every meeting of its weekly class (card 48).
+    async deleteEvent(id: string, wholeSeries = false) {
+      await send<{ event: { id: string } }>("event-delete", wholeSeries ? { id, series: true } : { id });
     },
   };
 }

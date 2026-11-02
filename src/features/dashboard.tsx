@@ -14,7 +14,7 @@ import { useApp } from "../app/context";
 import { PageHeading, NoteCard, EventRow, Empty } from "../shared/ui";
 import { dateKey } from "../services/fixtures";
 import { EventDialog } from "./schedule";
-import type { CourseEvent, UploadKind } from "../domain";
+import { isClass, type CourseEvent, type UploadKind } from "../domain";
 import s from "../app/App.module.css";
 export function Dashboard({
   onImport,
@@ -30,7 +30,7 @@ export function Dashboard({
   const today = dateKey();
   const day = state.events.filter((e) => e.date === today);
   const deadlines = state.events
-    .filter((e) => e.kind !== "lecture" && e.date >= today)
+    .filter((e) => !isClass(e.kind) && e.date >= today)
     .slice(0, 3);
   const hour = new Date().getHours();
   const greeting =

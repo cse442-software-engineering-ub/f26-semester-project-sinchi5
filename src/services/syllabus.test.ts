@@ -37,6 +37,10 @@ describe("turning a weekly class into its dates (card 44)", () => {
     expect(checkMeeting({ ...MWF, ends: "2026-08-01" })).toBe("Choose an end date after the start date.");
     expect(checkMeeting({ ...MWF, ends: "2027-08-25" })).toBeNull();
     expect(checkMeeting({ ...MWF, ends: "2027-08-26" })).toBe("Repeating events can run for at most one year.");
+    // Wednesdays only, between a Monday and a Tuesday; and a range that is all break.
+    const none = "This class has no meetings between its start and end dates.";
+    expect(checkMeeting({ days: [3], starts: "2026-08-24", ends: "2026-08-25" })).toBe(none);
+    expect(checkMeeting(MWF, [{ from: "2026-08-01", to: "2026-12-31" }])).toBe(none);
   });
 });
 
