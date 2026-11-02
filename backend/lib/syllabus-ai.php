@@ -18,9 +18,11 @@ in the file, even if it differs from the course year in the request, and use the
 date written without one. All times are 24-hour HH:MM.
 
 isSyllabus
-- true for a course syllabus, course outline, or course schedule, even one with no dates or class times.
-- false for anything else, such as a resume, an essay, or a photo unrelated to a course. Every list is
-  then empty.
+- true for a course syllabus, course outline, or course schedule, even one with no dates or class times,
+  and for any list of course work or class times, however short. A single line such as "Homework 3 due
+  November 6" is enough.
+- false only when nothing in the file is about a course, such as a resume, an essay, or an unrelated photo.
+  Every list is then empty.
 
 meetings: the course's regular weekly classes
 - List each weekly lecture, recitation, discussion section, lab, seminar, or studio that has posted days.
