@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Syllabus reader checks with a fake Gemini API: no network, no database, no API key.
+// Card 127: syllabus reader checks with a fake Gemini API: no network, no database, no API key.
 // Run with php backend/tests/syllabus-ai.php
 ini_set('memory_limit', '512M');
 ini_set('error_log', '/dev/null');
@@ -38,40 +38,42 @@ function fakeApi(array &$calls, array ...$replies): callable
     };
 }
 $counted = [200, ['totalTokens' => 1200]];
-$reply = fn (mixed $events, string $finish = 'STOP') => [200, ['usageMetadata' => ['promptTokenCount' => 1200, 'candidatesTokenCount' => 120],
+// A reply with the given events, and any other parts of a read.
+$reply = fn (mixed $events, string $finish = 'STOP', array $read = []) => [200, ['usageMetadata' => ['promptTokenCount' => 1200, 'candidatesTokenCount' => 120],
     'candidates' => [['finishReason' => $finish, 'content' => ['parts' => [
         ['text' => '{"events":[{"title":"Thought, not an answer"}]}', 'thought' => true],
-        ['text' => json_encode(['events' => $events])],
+        ['text' => json_encode(['events' => $events] + $read)],
     ]]]]]];
 $events = [
-    ['title' => 'Homework 1', 'kind' => 'assignment', 'date' => '2026-09-28', 'time' => '', 'source' => 'Homework 1 due September 28'],
-    ['title' => 'Midterm exam', 'kind' => 'exam', 'date' => '2026-10-14', 'time' => '10:00', 'source' => 'Midterm exam October 14, 10 AM'],
+    ['title' => 'Homework 1', 'kind' => 'assignment', 'date' => '2026-09-28', 'time' => '', 'location' => '', 'source' => 'Homework 1 due September 28'],
+    ['title' => 'Midterm exam', 'kind' => 'exam', 'date' => '2026-10-14', 'time' => '10:00', 'location' => 'Knox 110', 'source' => 'Midterm exam October 14, 10 AM, Knox 110'],
 ];
 $pdf = pdfOf('Homework 1 due September 28');
 $config = ['origin' => 'https://aptitude.cse.buffalo.edu', 'gemini_api_key' => 'test-key-never-sent'];
 $model = 'models/' . SYLLABUS_AI_MODEL;
 
-// 1. A PDF is counted for free first, then read once with the default model, low thinking, and a schema.
-check(readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($events)), 'pdf', $pdf, 2026) === $events,
-    'The events from the reply were not returned.');
+// 1. A PDF is counted for free first, then read once with the default model, medium thinking, and a schema.
+check(readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($events)), 'pdf', $pdf, 2026)
+    === ['isSyllabus' => true, 'meetings' => [], 'noClassDates' => [], 'events' => $events], 'The events from the reply were not returned.');
 [[$countPath, $countBody], [$readPath, $readBody]] = $calls;
 $parts = [['inlineData' => ['mimeType' => 'application/pdf', 'data' => base64_encode($pdf)]],
-    ['text' => 'Course year: 2026. List the dated events in this syllabus.']];
+    ['text' => "Course year: 2026. Read the whole file and report what belongs on the student's calendar."]];
 check($countPath === "$model:countTokens" && $countBody === ['contents' => [['role' => 'user', 'parts' => $parts]]],
     'Tokens must be counted before reading.');
 check($readPath === "$model:generateContent" && $readBody['contents'] === $countBody['contents'], 'The read must send what was counted.');
 check($readBody['systemInstruction'] === ['parts' => [['text' => SYLLABUS_AI_PROMPT]]], 'The instructions must be the system instruction.');
 check($readBody['generationConfig'] === ['responseMimeType' => 'application/json', 'responseSchema' => SYLLABUS_AI_SCHEMA,
-    'maxOutputTokens' => 16000, 'thinkingConfig' => ['thinkingLevel' => 'LOW']], 'The read must use JSON, the schema, and low thinking.');
+    'maxOutputTokens' => 65536, 'thinkingConfig' => ['thinkingLevel' => 'MEDIUM']], 'The read must use JSON, the schema, and medium thinking.');
 check(!isset($readBody['tools']), 'The model must have no tools.');
-readSyllabusWithAi($config + ['gemini_model' => 'gemini-3.8-flash'], fakeApi($calls, $counted, $reply([])), 'pdf', $pdf, 2026);
-check($calls[1][0] === 'models/gemini-3.8-flash:generateContent', 'The configured model was not used.');
+check(SYLLABUS_AI_MODEL === 'gemini-3.8-flash', 'The stronger model is the default.');
+readSyllabusWithAi($config + ['gemini_model' => 'gemini-3.6-flash'], fakeApi($calls, $counted, $reply([])), 'pdf', $pdf, 2026);
+check($calls[1][0] === 'models/gemini-3.6-flash:generateContent', 'The configured model was not used.');
 try {
     readSyllabusWithAi($config + ['gemini_model' => '../files?key=x'], fakeApi($calls), 'pdf', $pdf, 2026);
     throw new LogicException('A bad model name must be refused.');
 } catch (RuntimeException) {
 }
-echo "PASS 1: a PDF is token-counted, then read once with low thinking, the events schema, and the configured model\n";
+echo "PASS 1: a PDF is token-counted, then read once with medium thinking, the read schema, and the configured model\n";
 
 // 2. Nothing is paid for when the file is too long, and failures, blocks, or cut-off replies become clear messages.
 // Arrow functions copy outer variables, so the fake is made outside them to record into $calls.
@@ -83,16 +85,19 @@ fails(fn () => readSyllabusWithAi($config + ['ai_max_input_tokens' => 500], fake
     422, 'This syllabus is too long to read automatically. Upload just the schedule pages.');
 fails(fn () => readSyllabusWithAi($config, fakeApi($calls, [400, ['error' => ['message' => 'API key not valid.']]]), 'pdf', $pdf, 2026),
     503, SYLLABUS_AI_UNAVAILABLE);
-fails(fn () => readSyllabusWithAi($config, fakeApi($calls, $counted, [500, []]), 'pdf', $pdf, 2026), 503, SYLLABUS_AI_UNAVAILABLE);
-fails(fn () => readSyllabusWithAi($config, fakeApi($calls, $counted, [429, ['error' => ['message' => 'Quota exceeded']]]), 'pdf', $pdf, 2026),
+// Every model has to fail before the student hears about it.
+fails(fn () => readSyllabusWithAi($config, fakeApi($calls, $counted, [500, []], [500, []], [500, []]), 'pdf', $pdf, 2026), 503, SYLLABUS_AI_UNAVAILABLE);
+$quota = [429, ['error' => ['message' => 'Quota exceeded']]];
+fails(fn () => readSyllabusWithAi($config, fakeApi($calls, $counted, $quota, $quota, $quota), 'pdf', $pdf, 2026),
     503, 'Automatic reading is busy right now. Please try again in a few minutes.');
+// A blocked, cut-off, or malformed reply from every model is never half-used.
 foreach (['MAX_TOKENS', 'SAFETY', 'RECITATION', 'OTHER'] as $finish) {
-    fails(fn () => readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($events, $finish)), 'pdf', $pdf, 2026),
-        422, "We couldn't find events in this file.");
+    $bad = $reply($events, $finish);
+    fails(fn () => readSyllabusWithAi($config, fakeApi($calls, $counted, $bad, $bad, $bad), 'pdf', $pdf, 2026), 422, SYLLABUS_AI_UNFINISHED);
 }
 foreach ([[200, ['promptFeedback' => ['blockReason' => 'SAFETY']]], [200, ['candidates' => [['finishReason' => 'STOP',
     'content' => ['parts' => [['text' => 'not json']]]]]]], $reply('a string')] as $bad) {
-    fails(fn () => readSyllabusWithAi($config, fakeApi($calls, $counted, $bad), 'pdf', $pdf, 2026), 422, "We couldn't find events in this file.");
+    fails(fn () => readSyllabusWithAi($config, fakeApi($calls, $counted, $bad, $bad, $bad), 'pdf', $pdf, 2026), 422, SYLLABUS_AI_UNFINISHED);
 }
 echo "PASS 2: too-long files cost nothing, and errors, rate limits, blocks, and cut-off replies are reported\n";
 
@@ -107,14 +112,14 @@ $injected = [
     ['title' => 'Final exam', 'kind' => 'exam', 'date' => '2027-01-05', 'time' => '08:30', 'source' => ['nested']],
     ['title' => 7, 'kind' => 'exam', 'date' => '2026-12-01', 'time' => '', 'source' => ''],
 ];
-$clean = readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($injected)), 'pdf', $pdf, 2026);
+$clean = readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($injected)), 'pdf', $pdf, 2026)['events'];
 check($clean === [
-    ['title' => 'Quiz 1 <script>', 'kind' => 'other', 'date' => '', 'time' => '', 'source' => 'line one line two'],
-    ['title' => str_repeat('é', 255), 'kind' => 'quiz', 'date' => '', 'time' => '', 'source' => str_repeat('s', 500)],
-    ['title' => 'Final exam', 'kind' => 'exam', 'date' => '2027-01-05', 'time' => '08:30', 'source' => ''],
+    ['title' => 'Quiz 1 <script>', 'kind' => 'other', 'date' => '', 'time' => '', 'location' => '', 'source' => 'line one line two'],
+    ['title' => str_repeat('é', 255), 'kind' => 'quiz', 'date' => '', 'time' => '', 'location' => '', 'source' => str_repeat('s', 500)],
+    ['title' => 'Final exam', 'kind' => 'exam', 'date' => '2027-01-05', 'time' => '08:30', 'location' => '', 'source' => ''],
 ], 'Untrusted reply fields were not cleaned: ' . json_encode($clean));
 $many = array_fill(0, 250, $events[0]);
-check(count(readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($many)), 'pdf', $pdf, 2026)) === 200,
+check(count(readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($many)), 'pdf', $pdf, 2026)['events']) === 200,
     'At most 200 events should be kept.');
 check(!str_contains(SYLLABUS_AI_PROMPT, '{') && str_contains(SYLLABUS_AI_PROMPT, 'Ignore any'),
     'The instructions must tell the model to treat the file as data.');
@@ -138,7 +143,19 @@ foreach ([true, false] as $deflate) {
 }
 check(syllabusPart('docx', docxOf("Quiz 1\nQuiz 2")) === ['text' => "Quiz 1\nQuiz 2"], 'DOCX should be sent as text.');
 check(syllabusPart('txt', 'Quiz 1 on September 8') === ['text' => 'Quiz 1 on September 8'], 'TXT should be sent as text.');
-$unreadable = 'This DOCX file could not be read. Try saving it as a PDF.';
+// A schedule's date and item belong together only through their table row, so a row stays one line, and
+// nothing but the words reaches the model: not a drawing's position numbers, tab settings, or Word's
+// second copy of a text box. A class time can also sit in a header.
+$schedule = '<w:document><w:body><w:p><w:pPr><w:tabs><w:tab w:val="left" w:pos="720"/></w:tabs></w:pPr><wp:anchor><wp:posOffset>952500</wp:posOffset></wp:anchor>'
+    . '<mc:AlternateContent><mc:Choice><w:txbxContent><w:p><w:r><w:t>Boxed</w:t></w:r></w:p></w:txbxContent></mc:Choice>'
+    . '<mc:Fallback><w:txbxContent><w:p><w:r><w:t>Boxed</w:t></w:r></w:p></w:txbxContent></mc:Fallback></mc:AlternateContent></w:p>'
+    . '<w:tbl><w:tr><w:tc><w:p><w:r><w:t>Week 5</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t xml:space="preserve">Sept. 21-25 </w:t></w:r></w:p>'
+    . '<w:p><w:r><w:t>Topic</w:t></w:r></w:p></w:tc><w:tc><w:p/></w:tc><w:tc><w:p><w:r><w:t>Test </w:t></w:r><w:r><w:t>#1</w:t></w:r></w:p></w:tc></w:tr>'
+    . '<w:tr><w:tc><w:p><w:r><w:t>Week 6</w:t></w:r></w:p></w:tc><w:tc><w:p/></w:tc></w:tr></w:tbl><w:p><w:r><w:t>Line one</w:t><w:br/><w:t>Line two</w:t></w:r></w:p></w:body></w:document>';
+$words = docxText(zipOf(['word/document.xml' => $schedule, 'word/header1.xml' => '<w:hdr><w:p><w:r><w:t>MoWeFr 1:00-1:50pm</w:t></w:r></w:p></w:hdr>',
+    'word/styles.xml' => '<w:styles><w:p><w:r><w:t>Not the words of the file</w:t></w:r></w:p></w:styles>']));
+check($words === "Boxed\nWeek 5 | Sept. 21-25 Topic | | Test #1\nWeek 6\nLine one\nLine two\nMoWeFr 1:00-1:50pm", "A Word file's words were not read in order: $words");
+$unreadable = DOCX_UNREADABLE;
 fails(fn () => docxText(zipOf(['word/other.xml' => $xml])), 422, $unreadable);
 fails(fn () => docxText("PK\x03\x04 not really a zip"), 422, $unreadable);
 fails(fn () => docxText(zipOf(['word/document.xml' => str_repeat('a', 21 * 1024 * 1024)])), 422, $unreadable);
@@ -152,15 +169,110 @@ echo "PASS 5: DOCX and text files are sent as text, image types are kept, and un
 // to use each item's own name and the row's date, and the reply must keep same-day items separate.
 $table = pdfOf('Week 3 | September 14, 2026 | Unit 2: Requirements | Homework 2 due; Quiz 1');
 $sameDay = [
-    ['title' => 'Homework 2', 'kind' => 'assignment', 'date' => '2026-09-14', 'time' => '', 'source' => 'Homework 2 due'],
-    ['title' => 'Quiz 1', 'kind' => 'quiz', 'date' => '2026-09-14', 'time' => '', 'source' => 'Quiz 1'],
+    ['title' => 'Homework 2', 'kind' => 'assignment', 'date' => '2026-09-14', 'time' => '', 'location' => '', 'source' => 'Homework 2 due'],
+    ['title' => 'Quiz 1', 'kind' => 'quiz', 'date' => '2026-09-14', 'time' => '', 'location' => '', 'source' => 'Quiz 1'],
 ];
-check(readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($sameDay)), 'pdf', $table, 2026) === $sameDay,
+check(readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($sameDay)), 'pdf', $table, 2026)['events'] === $sameDay,
     'Separate items on the same date must remain separate events.');
-$instructions = $calls[1][1]['systemInstruction']['parts'][0]['text'] ?? '';
+$instructions = preg_replace('/\s+/', ' ', $calls[1][1]['systemInstruction']['parts'][0]['text'] ?? '');
 foreach (['each separately named graded item', 'share a date, line, table row, or Due cell',
     'use the Date column', 'topic, and unit columns', "item's own name and number",
     'Remove', '"due"', 'never combine multiple item names', '"Homework 2" (assignment)', '"Quiz 1" (quiz)'] as $rule) {
     check(str_contains($instructions, $rule), "The Gemini request is missing the schedule rule: $rule");
 }
 echo "PASS 6: the request asks for one item per graded item, even on a shared day, line, or table row, titled by its own name, not the column beside it\n";
+
+// 7. Weekly classes: the reply's days, sections, rooms, and class dates survive, and everything is checked
+// like the rest of the reply.
+$meetings = [
+    ['title' => 'Lecture', 'kind' => 'lecture', 'section' => '', 'days' => ['MON', 'WED', 'FRI'], 'time' => '13:00', 'location' => 'Knox 109',
+        'firstDate' => '2026-08-24', 'lastDate' => '2026-12-07', 'source' => 'MoWeFr 1:00-1:50pm Knox 109'],
+    ['title' => 'Lab', 'kind' => 'lab', 'section' => 'A1', 'days' => ['TUE'], 'time' => '', 'location' => '', 'firstDate' => '', 'lastDate' => '', 'source' => 'Lab A1 Tuesdays'],
+    // Days out of order, repeated, or unknown; a bad kind, time, and dates; no title; and a line break in the room.
+    ['title' => '', 'kind' => 'party', 'section' => "A\u{202E}2", 'days' => ['THU', 'TUE', 'TUE', 'SOON', 7], 'time' => '9:30', 'location' => "NSC\n201",
+        'firstDate' => '2026-02-30', 'lastDate' => '1999-01-01', 'source' => ['nested']],
+    // Not a weekly class: no days at all.
+    ['title' => 'Lab', 'kind' => 'lab', 'section' => '', 'days' => [], 'time' => '10:00', 'location' => '', 'firstDate' => '', 'lastDate' => '', 'source' => 'Labs are scheduled on HUB'],
+    'not a meeting',
+];
+$breaks = [['from' => '2026-09-07', 'to' => '2026-09-07'], ['from' => '2026-11-23', 'to' => '2026-11-27'], ['from' => '2026-10-12', 'to' => '2026-10-01'],
+    ['from' => '2026-13-01', 'to' => '2026-13-02'], 'not a break', ['from' => '2026-12-24']];
+$read = readSyllabusWithAi($config, fakeApi($calls, $counted, $reply([], 'STOP', ['isSyllabus' => true, 'meetings' => $meetings, 'noClassDates' => $breaks])), 'pdf', $pdf, 2026);
+check($read['meetings'] === [
+    ['title' => 'Lecture', 'kind' => 'lecture', 'section' => '', 'days' => [1, 3, 5], 'time' => '13:00', 'location' => 'Knox 109',
+        'firstDate' => '2026-08-24', 'lastDate' => '2026-12-07', 'source' => 'MoWeFr 1:00-1:50pm Knox 109'],
+    ['title' => 'Lab', 'kind' => 'lab', 'section' => 'A1', 'days' => [2], 'time' => '', 'location' => '', 'firstDate' => '', 'lastDate' => '', 'source' => 'Lab A1 Tuesdays'],
+    ['title' => 'Lecture', 'kind' => 'lecture', 'section' => 'A 2', 'days' => [2, 4], 'time' => '', 'location' => 'NSC 201', 'firstDate' => '', 'lastDate' => '', 'source' => ''],
+], 'Weekly classes were not cleaned: ' . json_encode($read['meetings']));
+check($read['noClassDates'] === [['from' => '2026-09-07', 'to' => '2026-09-07'], ['from' => '2026-11-23', 'to' => '2026-11-27'],
+    ['from' => '2026-10-12', 'to' => '2026-10-12'], ['from' => '2026-12-24', 'to' => '2026-12-24']], 'No-class dates were not cleaned: ' . json_encode($read['noClassDates']));
+$many = array_fill(0, 70, $meetings[0]);
+check(count(readSyllabusWithAi($config, fakeApi($calls, $counted, $reply([], 'STOP', ['meetings' => $many])), 'pdf', $pdf, 2026)['meetings']) === 60,
+    'At most 60 weekly classes should be kept.');
+foreach (['however short', 'MoWeFr', 'R is Thursday', 'NO CLASSES THIS WEEK', 'Lab Exam 1', 'two midterm exams and a final', 'resign deadlines', 'Office hours'] as $rule) {
+    check(str_contains(preg_replace('/\s+/', ' ', SYLLABUS_AI_PROMPT), $rule), "The prompt is missing the rule about: $rule");
+}
+echo "PASS 7: weekly classes keep their days, section, time, room, and class dates, and no-class ranges are checked\n";
+
+// 8. No events and not a syllabus are real answers, not failures. Anything claimed for a file that isn't a
+// syllabus is dropped, and a syllabus with nothing to add stays a syllabus.
+$empty = ['isSyllabus' => true, 'meetings' => [], 'noClassDates' => [], 'events' => []];
+check(readSyllabusWithAi($config, fakeApi($calls, $counted, $reply([], 'STOP', ['isSyllabus' => true, 'meetings' => [], 'noClassDates' => []])), 'pdf', $pdf, 2026) === $empty,
+    'A syllabus with no events should read as empty lists.');
+check(readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($events, 'STOP', ['isSyllabus' => false, 'meetings' => $meetings, 'noClassDates' => $breaks])), 'pdf', $pdf, 2026)
+    === ['isSyllabus' => false] + $empty, 'A file that is not a syllabus should report nothing else.');
+echo "PASS 8: a syllabus with no events and a file that isn't a syllabus come back as answers, with nothing else claimed\n";
+
+// 9. A server error is tried twice more, waiting a little between tries, and other replies aren't retried.
+$waits = [];
+$wait = function (int $seconds) use (&$waits): void { $waits[] = $seconds; };
+check(retryWhenBusy(fakeApi($calls, [503, []], [500, []], [200, ['ok' => true]]), $wait)('models/x', []) === [200, ['ok' => true]], 'A server error should be retried.');
+check(count($calls) === 3 && $waits === [2, 5], 'A server error should wait and retry twice.');
+check(retryWhenBusy(fakeApi($calls, [503, []], [503, []], [503, ['still' => 'busy']]), $wait)('models/x', []) === [503, ['still' => 'busy']] && count($calls) === 3, 'Retries must stop after the third try.');
+// Quota doesn't come back in seconds, and a timeout has already taken long enough.
+foreach ([200, 400, 404, 429, 0] as $status) {
+    $waits = [];
+    check(retryWhenBusy(fakeApi($calls, [$status, []]), $wait)('models/x', [])[0] === $status && count($calls) === 1 && !$waits, "HTTP $status must not be retried.");
+}
+echo "PASS 9: a server error is retried twice with short waits, and any other reply is used as it is\n";
+
+// 10. A model that is out of quota, overloaded, or too slow hands over to the next one, and the student gets
+// the same read. A refused request stops there, since another model would be refused too.
+$used = fn (array $calls) => array_map(fn (array $call) => substr($call[0], 7), $calls);
+$read = readSyllabusWithAi($config, fakeApi($calls, $counted, $quota, $reply($events)), 'pdf', $pdf, 2026);
+check($read['events'] === $events && $used($calls) === ['gemini-3.8-flash:countTokens', 'gemini-3.8-flash:generateContent', 'gemini-3.6-flash:generateContent'],
+    'Out of quota, the next model should read the file: ' . json_encode($used($calls)));
+$read = readSyllabusWithAi($config, fakeApi($calls, $counted, [0, []], [503, []], $reply($events)), 'pdf', $pdf, 2026);
+check($read['events'] === $events && end($calls)[0] === 'models/gemini-3.5-flash-lite:generateContent', 'A timeout and a server error should move on to the last model.');
+// A model Google has retired answers 404, and a blocked or cut-off reply can be another model's to read.
+$retired = [404, ['error' => ['message' => 'This model is no longer available.']]];
+check(readSyllabusWithAi($config, fakeApi($calls, $retired, $counted, $reply($events)), 'pdf', $pdf, 2026)['events'] === $events
+    && $used($calls) === ['gemini-3.8-flash:countTokens', 'gemini-3.6-flash:countTokens', 'gemini-3.6-flash:generateContent'], 'A retired model should hand over.');
+check(readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($events, 'SAFETY'), $reply($events)), 'pdf', $pdf, 2026)['events'] === $events
+    && end($calls)[0] === 'models/gemini-3.6-flash:generateContent', 'A blocked reply should hand over.');
+check(readSyllabusWithAi($config, fakeApi($calls, [503, []], $counted, $reply($events)), 'pdf', $pdf, 2026)['events'] === $events
+    && $used($calls) === ['gemini-3.8-flash:countTokens', 'gemini-3.6-flash:countTokens', 'gemini-3.6-flash:generateContent'], 'A busy token count should move on too.');
+$send = fakeApi($calls, $counted, [400, ['error' => ['message' => 'Bad request']]]);
+fails(fn () => readSyllabusWithAi($config, $send, 'pdf', $pdf, 2026), 503, SYLLABUS_AI_UNAVAILABLE);
+check(count($calls) === 2, 'A refused request must not be sent to another model.');
+// A configured model goes first and isn't tried twice.
+$send = fakeApi($calls, $counted, $quota, $quota);
+fails(fn () => readSyllabusWithAi($config + ['gemini_model' => 'gemini-3.6-flash'], $send, 'pdf', $pdf, 2026), 503, 'Automatic reading is busy right now. Please try again in a few minutes.');
+check($used($calls) === ['gemini-3.6-flash:countTokens', 'gemini-3.6-flash:generateContent', 'gemini-3.5-flash-lite:generateContent'], 'The configured model should go first, once.');
+echo "PASS 10: a model that is out of quota, overloaded, retired, or too slow hands over to the next, and a refused request stops\n";
+
+// 11. Every request of one read shares one time budget, so retries and models can't outlast the browser.
+$clock = 1000;
+$timeouts = [];
+$budget = withinTimeBudget(function (string $path, array $body, int $seconds) use (&$timeouts): array {
+    $timeouts[] = $seconds;
+    return [503, []];
+}, function () use (&$clock): int { return $clock; });
+check($budget('models/x', [])[0] === 503 && $timeouts === [SYLLABUS_AI_REQUEST_SECONDS], 'A request should get the usual time at first.');
+$clock += SYLLABUS_AI_SECONDS - 10;
+$budget('models/x', []);
+check(end($timeouts) === 10, 'A late request should get only the time that is left.');
+$clock += 10;
+check($budget('models/x', []) === [0, []] && count($timeouts) === 2, 'Once the time is up, nothing more should be sent.');
+check(SYLLABUS_AI_SECONDS < 330, 'The browser must wait longer than a read can take (imports-http.ts).');
+echo "PASS 11: every request of a read shares one time budget, and nothing is sent once it is used up\n";

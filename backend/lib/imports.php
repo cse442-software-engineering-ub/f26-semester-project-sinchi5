@@ -7,7 +7,7 @@ if (PHP_SAPI !== 'cli' && !defined('NOTELY_INTERNAL')) {
 
 // Card 43: a syllabus upload becomes an import job that only its owner can read.
 // Card 47: the student's reviewed events from a job are saved to their schedule.
-// import-extract reads a job with the Gemini API (syllabus-ai.php) when the browser's free rules can't.
+// Card 127: import-extract reads a job with the Gemini API (syllabus-ai.php).
 // Card 172: event-delete removes one of the student's own saved events.
 // Needs notes.php for recordId() and isoTime().
 const IMPORT_READ_ROUTES = ['import-job', 'events'];
@@ -105,6 +105,9 @@ function zipDirectory(string $bytes): ?array
 
 function importJson(array $row): array
 {
+    $read = $row['events'] === null ? [] : json_decode($row['events'], true, 8, JSON_THROW_ON_ERROR);
+    // Older jobs saved only a list of events.
+    $read = array_is_list($read) ? ['events' => $read] : $read;
     return [
         'id' => (string) $row['id'],
         'kind' => $row['kind'],
@@ -113,7 +116,10 @@ function importJson(array $row): array
         'type' => $row['file_type'],
         'size' => (int) $row['file_size'],
         'state' => $row['state'],
-        'events' => $row['events'] === null ? [] : json_decode($row['events'], true, 8, JSON_THROW_ON_ERROR),
+        'isSyllabus' => $read['isSyllabus'] ?? true,
+        'meetings' => $read['meetings'] ?? [],
+        'noClassDates' => $read['noClassDates'] ?? [],
+        'events' => $read['events'] ?? [],
         'createdAt' => isoTime($row['created_at']),
     ];
 }
@@ -196,8 +202,8 @@ function eventJson(array $row): array
     ];
 }
 
-// Proposes events for a job the browser's free rules couldn't read well. Every API read is capped per
-// student and for the whole app each day, and $send replaces the live API in tests so they never use it.
+// Reads a job's file into weekly classes and dated events to review. Every API read is capped per student
+// and for the whole app each day, and $send replaces the live API in tests so they never use it.
 function extractImport(PDO $db, array $config, array $user, array $input, ?callable $send = null): array
 {
     $id = recordId($input['id'] ?? null, 'Choose a valid upload.');
@@ -210,12 +216,14 @@ function extractImport(PDO $db, array $config, array $user, array $input, ?calla
         return ['job' => $job];
     }
     // A class uploads the same syllabus many times, so a file that was read once is free after that.
-    // Only this term's reads are reused: a syllabus without years reused next year needs new dates.
-    $events = query($db, 'SELECT other.events FROM notely_import_jobs mine
+    // Only this term's reads by this reader are reused: dates without years depend on the course year, and
+    // an older reader's reply has a different shape.
+    $readerKey = SYLLABUS_READER_VERSION . ':' . $year;
+    $read = query($db, 'SELECT other.events FROM notely_import_jobs mine
         JOIN notely_import_jobs other ON other.file_sha256 = mine.file_sha256 AND other.events IS NOT NULL
-            AND other.updated_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 180 DAY)
-        WHERE mine.id = ? LIMIT 1', [$id])->fetchColumn();
-    if ($events === false) {
+            AND other.reader_key = ? AND other.updated_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 180 DAY)
+        WHERE mine.id = ? LIMIT 1', [$readerKey, $id])->fetchColumn();
+    if ($read === false) {
         // Claiming the job first means a double click can't pay for two reads of one file. A claim left
         // by a request the server killed mid-read expires after 5 minutes; the new time makes taking it
         // over count as a change, since the state stays 'processing'.
@@ -226,7 +234,7 @@ function extractImport(PDO $db, array $config, array $user, array $input, ?calla
         }
         try {
             $send ??= liveGemini($config);
-            $perStudent = (int) ($config['ai_user_daily_limit'] ?? 5);
+            $perStudent = (int) ($config['ai_user_daily_limit'] ?? 10);
             rateLimit($db, $config, 'syllabus-ai', (string) $user['id'], $perStudent, 86400,
                 "You can read $perStudent syllabi automatically each day. Try again tomorrow.");
             rateLimit($db, $config, 'syllabus-ai', 'everyone', (int) ($config['ai_daily_limit'] ?? 50), 86400,
@@ -235,15 +243,15 @@ function extractImport(PDO $db, array $config, array $user, array $input, ?calla
             if (!is_string($content)) {
                 throw new HttpError(422, 'This upload expired. Please choose the file again.');
             }
-            set_time_limit(180);
-            $events = json_encode(readSyllabusWithAi($config, $send, $job['type'], $content, $year),
+            set_time_limit(320);
+            $read = json_encode(readSyllabusWithAi($config, $send, $job['type'], $content, $year),
                 JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         } catch (Throwable $error) {
             query($db, "UPDATE notely_import_jobs SET state = 'failed' WHERE id = ?", [$id]);
             throw $error;
         }
     }
-    query($db, "UPDATE notely_import_jobs SET state = 'review', events = ?, content = NULL WHERE id = ?", [$events, $id]);
+    query($db, "UPDATE notely_import_jobs SET state = 'review', events = ?, reader_key = ?, content = NULL WHERE id = ?", [$read, $readerKey, $id]);
     return ['job' => ownedImport($db, $user, $id)];
 }
 
