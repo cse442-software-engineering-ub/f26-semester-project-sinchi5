@@ -114,6 +114,17 @@ describe("deleting a schedule event (card 173)", () => {
     expect(await titles(createRepositories(storage, student, false, undefined, api))).toEqual(["Lab"]);
   });
 
+  it("keeps the rest of a class and its edits when the chosen meeting is already gone from the server (card 48)", async () => {
+    const meeting = (title: string, id: string, seriesId: string): CourseEvent => ({ ...event(title, `2026-11-${id}`, "10:00", "imported", id), seriesId });
+    const storage = memory();
+    const { api } = server(new NoteServiceError("This event could not be found.", 404), [meeting("Lecture 1", "11", "7-0"), meeting("Lecture 2", "12", "7-0")]);
+    const r = createRepositories(storage, student, false, undefined, api);
+    const [first, second] = await r.schedule.list();
+    await r.schedule.save({ ...second, title: "Lecture 2 moved" });
+    await r.schedule.remove(first, true);
+    expect(await titles(r)).toEqual(["Lecture 1", "Lecture 2 moved"]);
+  });
+
   it("removes a whole class in the demo workspace, and an event outside a series only removes itself (card 48)", async () => {
     const r = createRepositories();
     const before = (await r.schedule.list()).length;

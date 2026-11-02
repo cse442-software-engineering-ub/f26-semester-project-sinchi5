@@ -14,7 +14,7 @@ export interface OnboardingState {
   step: number;
 }
 // Weekly classes are on the schedule, but they aren't something due (card 48).
-export const isClass = (kind: EventKind) => kind === "lecture" || kind === "recitation" || kind === "lab";
+export const isClass = (kind: EventKind) => (CLASS_KINDS as readonly EventKind[]).includes(kind);
 export interface Course {
   id: string;
   code: string;

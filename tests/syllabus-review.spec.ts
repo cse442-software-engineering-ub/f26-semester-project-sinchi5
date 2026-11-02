@@ -192,7 +192,7 @@ test("weekly classes are listed first, with their days, time, room, and dates", 
   await dialog.getByRole("button", { name: "Add to schedule" }).click();
   await expect(dialog.getByRole("heading", { name: "A little more organized." })).toBeVisible();
   await dialog.getByRole("button", { name: "All done" }).click();
-  await expect(await eventOn(page, "2026-10-14", "Midterm exam")).toContainText("Knox 110");
+  await expect(await eventOn(page, "2026-10-14", "Midterm exam")).toContainText("exam · CSE 442 · Knox 110 · Imported");
 });
 
 test("several sections start unchecked, and only the one the student picks is added", async ({ page }) => {

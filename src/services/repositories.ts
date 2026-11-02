@@ -318,14 +318,17 @@ export function createRepositories(
       async remove(event, wholeSeries = false) {
         // Card 173: a syllabus event is deleted on the server first, so a failure keeps it (and any
         // edited copy saved here). One already gone from the server (404) only needs its copy removed.
+        let series = wholeSeries ? event.seriesId : undefined;
         if (event.source === "imported" && serverSyllabus) {
           try {
             await serverSyllabus.deleteEvent(event.id, wholeSeries);
           } catch (e) {
             if ((e as { status?: number }).status !== 404) throw e;
+            // The server couldn't look up a class from a meeting that's gone, so the rest of it is still
+            // there, and so are the student's edits to it.
+            series = undefined;
           }
         }
-        const series = wholeSeries ? event.seriesId : undefined;
         db.events = db.events.filter((x) => x.id !== event.id && !(series && x.seriesId === series));
         persist();
       },

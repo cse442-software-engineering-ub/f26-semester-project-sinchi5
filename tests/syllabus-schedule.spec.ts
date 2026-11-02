@@ -141,6 +141,31 @@ test("uploading a syllabus again adds only what's new, and says what was already
   await expect(page.getByRole("button", { name: /CSE 442 Lecture/ })).toHaveCount(1);
 });
 
+test("a repeated save whose first reply was lost says nothing misleading", async ({ page }) => {
+  await signUpWithCourse(page);
+  const dialog = await reviewSyllabus(page);
+  // The first save worked but its reply was lost, so sending it again finds a finished job with nothing to do.
+  await page.route("**/api/index.php?route=import-confirm", (route) => route.fulfill({ json: { created: 0, skipped: 0 } }));
+  await dialog.getByRole("button", { name: "Add to schedule" }).click();
+  await expect(dialog.getByRole("heading", { name: "A little more organized." })).toBeVisible();
+  await expect(dialog.getByText("Your reviewed events are in your schedule.")).toBeVisible();
+  await expect(dialog.getByText(/Added \d|Nothing new|all 0/)).toHaveCount(0);
+  await dialog.getByRole("link", { name: "View schedule" }).click();
+  await expect(page).toHaveURL(/\/schedule$/);
+});
+
+test("uploading a syllabus again when only one event is on it says that one was already there", async ({ page }) => {
+  await signUpWithCourse(page);
+  const one = "Homework 1 due September 28, 2026";
+  let dialog = await reviewSyllabus(page, one, "one.txt");
+  await dialog.getByRole("button", { name: "Add to schedule" }).click();
+  await expect(dialog.getByText("Added 1 event to CSE 442.")).toBeVisible();
+  await dialog.getByRole("button", { name: "All done" }).click();
+  dialog = await reviewSyllabus(page, one, "one.txt");
+  await dialog.getByRole("button", { name: "Add to schedule" }).click();
+  await expect(dialog.getByText("Nothing new to add to CSE 442: this event was already on your schedule.")).toBeVisible();
+});
+
 test("View schedule opens on the first class when classes come before due dates", async ({ page }) => {
   await signUpWithCourse(page);
   const dialog = await reviewSyllabus(page, readOf({ meetings: [LECTURE], events: [{ title: "Midterm exam", kind: "exam", date: "2026-10-14", time: "10:00", location: "", source: "Midterm exam" }] }), "weekly.txt");

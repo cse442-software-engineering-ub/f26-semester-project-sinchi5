@@ -753,12 +753,14 @@ export function ImportDialog({
           {kind === "syllabus" && job && (() => {
             const { created, skipped } = saved;
             const course = state.courses.find((c) => c.id === job.metadata.courseId)?.code ?? "your course";
+            // Neither happens when the save worked but its reply was lost, and the student sent it again.
+            if (!created && !skipped) return null;
             const already = `${skipped} ${skipped === 1 ? "was" : "were"} already on your schedule.`;
             return (
               <p>
                 {created
                   ? `Added ${created} ${created === 1 ? "event" : "events"} to ${course}.${skipped ? ` ${already}` : ""}`
-                  : `Nothing new to add to ${course}: all ${already}`}
+                  : `Nothing new to add to ${course}: ${skipped === 1 ? "this event was already on your schedule." : `all ${already}`}`}
               </p>
             );
           })()}
@@ -767,7 +769,7 @@ export function ImportDialog({
             {kind === "syllabus" && (
               <Link
                 className={s.primary}
-                to={`/schedule?date=${saved.first}`}
+                to={saved.first ? `/schedule?date=${saved.first}` : "/schedule"}
                 onClick={onClose}
               >
                 View schedule <ArrowUpRight size={16} />
