@@ -85,8 +85,10 @@ fails(fn () => readSyllabusWithAi($config + ['ai_max_input_tokens' => 500], fake
     422, 'This syllabus is too long to read automatically. Upload just the schedule pages.');
 fails(fn () => readSyllabusWithAi($config, fakeApi($calls, [400, ['error' => ['message' => 'API key not valid.']]]), 'pdf', $pdf, 2026),
     503, SYLLABUS_AI_UNAVAILABLE);
-fails(fn () => readSyllabusWithAi($config, fakeApi($calls, $counted, [500, []]), 'pdf', $pdf, 2026), 503, SYLLABUS_AI_UNAVAILABLE);
-fails(fn () => readSyllabusWithAi($config, fakeApi($calls, $counted, [429, ['error' => ['message' => 'Quota exceeded']]]), 'pdf', $pdf, 2026),
+// Every model has to fail before the student hears about it.
+fails(fn () => readSyllabusWithAi($config, fakeApi($calls, $counted, [500, []], [500, []], [500, []]), 'pdf', $pdf, 2026), 503, SYLLABUS_AI_UNAVAILABLE);
+$quota = [429, ['error' => ['message' => 'Quota exceeded']]];
+fails(fn () => readSyllabusWithAi($config, fakeApi($calls, $counted, $quota, $quota, $quota), 'pdf', $pdf, 2026),
     503, 'Automatic reading is busy right now. Please try again in a few minutes.');
 foreach (['MAX_TOKENS', 'SAFETY', 'RECITATION', 'OTHER'] as $finish) {
     fails(fn () => readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($events, $finish)), 'pdf', $pdf, 2026), 422, SYLLABUS_AI_UNFINISHED);
@@ -219,14 +221,34 @@ check(readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($events, 'STO
     === ['isSyllabus' => false] + $empty, 'A file that is not a syllabus should report nothing else.');
 echo "PASS 8: a syllabus with no events and a file that isn't a syllabus come back as answers, with nothing else claimed\n";
 
-// 9. A busy reply is tried twice more, waiting a little between tries, and other replies aren't retried.
+// 9. A server error is tried twice more, waiting a little between tries, and other replies aren't retried.
 $waits = [];
 $wait = function (int $seconds) use (&$waits): void { $waits[] = $seconds; };
-check(retryWhenBusy(fakeApi($calls, [503, []], [429, []], [200, ['ok' => true]]), $wait)('models/x', []) === [200, ['ok' => true]], 'A busy reply should be retried.');
-check(count($calls) === 3 && $waits === [2, 5], 'A busy reply should wait and retry twice.');
+check(retryWhenBusy(fakeApi($calls, [503, []], [500, []], [200, ['ok' => true]]), $wait)('models/x', []) === [200, ['ok' => true]], 'A server error should be retried.');
+check(count($calls) === 3 && $waits === [2, 5], 'A server error should wait and retry twice.');
 check(retryWhenBusy(fakeApi($calls, [503, []], [503, []], [503, ['still' => 'busy']]), $wait)('models/x', []) === [503, ['still' => 'busy']] && count($calls) === 3, 'Retries must stop after the third try.');
-foreach ([200, 400, 404] as $status) {
+// Quota doesn't come back in seconds, and a timeout has already taken long enough.
+foreach ([200, 400, 404, 429, 0] as $status) {
     $waits = [];
     check(retryWhenBusy(fakeApi($calls, [$status, []]), $wait)('models/x', [])[0] === $status && count($calls) === 1 && !$waits, "HTTP $status must not be retried.");
 }
-echo "PASS 9: a busy reply is retried twice with short waits, and any other reply is used as it is\n";
+echo "PASS 9: a server error is retried twice with short waits, and any other reply is used as it is\n";
+
+// 10. A model that is out of quota, overloaded, or too slow hands over to the next one, and the student gets
+// the same read. A refused request stops there, since another model would be refused too.
+$used = fn (array $calls) => array_map(fn (array $call) => substr($call[0], 7), $calls);
+$read = readSyllabusWithAi($config, fakeApi($calls, $counted, $quota, $reply($events)), 'pdf', $pdf, 2026);
+check($read['events'] === $events && $used($calls) === ['gemini-3.8-flash:countTokens', 'gemini-3.8-flash:generateContent', 'gemini-3.6-flash:generateContent'],
+    'Out of quota, the next model should read the file: ' . json_encode($used($calls)));
+$read = readSyllabusWithAi($config, fakeApi($calls, $counted, [0, []], [503, []], $reply($events)), 'pdf', $pdf, 2026);
+check($read['events'] === $events && end($calls)[0] === 'models/gemini-3.5-flash:generateContent', 'A timeout and a server error should move on to the last model.');
+check(readSyllabusWithAi($config, fakeApi($calls, [503, []], $counted, $reply($events)), 'pdf', $pdf, 2026)['events'] === $events
+    && $used($calls) === ['gemini-3.8-flash:countTokens', 'gemini-3.6-flash:countTokens', 'gemini-3.6-flash:generateContent'], 'A busy token count should move on too.');
+$send = fakeApi($calls, $counted, [400, ['error' => ['message' => 'Bad request']]]);
+fails(fn () => readSyllabusWithAi($config, $send, 'pdf', $pdf, 2026), 503, SYLLABUS_AI_UNAVAILABLE);
+check(count($calls) === 2, 'A refused request must not be sent to another model.');
+// A configured model goes first and isn't tried twice.
+$send = fakeApi($calls, $counted, $quota, $quota);
+fails(fn () => readSyllabusWithAi($config + ['gemini_model' => 'gemini-3.6-flash'], $send, 'pdf', $pdf, 2026), 503, 'Automatic reading is busy right now. Please try again in a few minutes.');
+check($used($calls) === ['gemini-3.6-flash:countTokens', 'gemini-3.6-flash:generateContent', 'gemini-3.5-flash:generateContent'], 'The configured model should go first, once.');
+echo "PASS 10: a model that is out of quota, overloaded, or too slow hands over to the next, and a refused request stops\n";
