@@ -1,8 +1,9 @@
 export const BRAND = "Notely";
 export type CollaboratorPermission = "view" | "edit";
 export type Visibility = "private" | "shared";
-export type EventKind =
-  "lecture" | "recitation" | "lab" | "assignment" | "quiz" | "exam" | "deadline" | "other";
+export const CLASS_KINDS = ["lecture", "recitation", "lab"] as const;
+export type ClassKind = (typeof CLASS_KINDS)[number];
+export type EventKind = ClassKind | "assignment" | "quiz" | "exam" | "deadline" | "other";
 export interface User {
   id: string;
   name: string;
@@ -105,7 +106,7 @@ export interface DetectedEvent extends CourseEvent {
 // event per meeting between starts and ends, skipping the job's noClassDates.
 export interface DetectedMeeting {
   title: string;
-  kind: "lecture" | "recitation" | "lab";
+  kind: ClassKind;
   section: string;
   days: number[];
   time: string;
