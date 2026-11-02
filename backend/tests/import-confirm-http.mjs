@@ -138,7 +138,17 @@ try {
   assert.deepEqual((await events(owner, "&courseId=cse445")).map((e) => e.title), ["Homework 1", "Homework 1 (revised)", "Midterm exam"]);
   const otherCourse = await newJob(owner);
   assert.deepEqual((await owner.call("import-confirm", { id: otherCourse.id, courseId: "cse446", events: reviewed })).data, { created: 2, skipped: 0 });
-  pass(7, "an event already in that course is skipped, and other courses are unaffected");
+  // A corrected syllabus with a later end date: the new meeting joins the class that's already saved.
+  const meeting = (date) => ({ title: "CSE 442 Lecture", kind: "lecture", date, time: "10:00", series: 0 });
+  const firstClass = await newJob(owner);
+  await owner.call("import-confirm", { id: firstClass.id, courseId: "cse447", events: [meeting("2026-08-24"), meeting("2026-08-26")] });
+  const laterEnd = await newJob(owner);
+  const extended = await owner.call("import-confirm", { id: laterEnd.id, courseId: "cse447", events: [meeting("2026-08-24"), meeting("2026-08-26"), meeting("2026-08-31"), { ...meeting("2026-09-01"), title: "CSE 442 Lab", kind: "lab", series: 1 }] });
+  assert.deepEqual(extended.data, { created: 2, skipped: 2 });
+  assert.deepEqual((await events(owner, "&courseId=cse447")).map((e) => [e.date, e.seriesId]), [
+    ["2026-08-24", `${firstClass.id}-0`], ["2026-08-26", `${firstClass.id}-0`], ["2026-08-31", `${firstClass.id}-0`], ["2026-09-01", `${laterEnd.id}-1`],
+  ]);
+  pass(7, "an event already in that course is skipped, new meetings join their class, and other courses are unaffected");
 } catch (error) {
   console.error(`FAIL: ${passed}/7 task tests passed; remaining tests did not complete.`);
   throw error;

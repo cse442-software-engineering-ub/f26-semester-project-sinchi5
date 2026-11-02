@@ -269,8 +269,16 @@ function importAction(PDO $db, array $config, array $session, string $route, arr
         if ($job['state'] !== 'completed') {
             // Uploading a syllabus again must not double the schedule, so an event the course already has is skipped.
             $saved = [];
-            foreach (query($db, 'SELECT title, event_date, event_time FROM notely_events WHERE owner_user_id = ? AND course_id = ?', [$user['id'], $course]) as $row) {
-                $saved["{$row['title']}\n{$row['event_date']}\n{$row['event_time']}"] = true;
+            foreach (query($db, 'SELECT title, event_date, event_time, series_id FROM notely_events WHERE owner_user_id = ? AND course_id = ?', [$user['id'], $course]) as $row) {
+                $saved["{$row['title']}\n{$row['event_date']}\n{$row['event_time']}"] = (string) $row['series_id'];
+            }
+            // New meetings of a class that's already here, such as from a later end date, join its series, so
+            // deleting the class still removes all of it.
+            $joined = [];
+            foreach ($events as [$title, , $date, $time, , $series]) {
+                if ($series !== null && ($saved["$title\n$date\n$time"] ?? '') !== '') {
+                    $joined[$series] ??= $saved["$title\n$date\n$time"];
+                }
             }
             foreach ($events as [$title, $kind, $date, $time, $location, $series]) {
                 $key = "$title\n$date\n$time";
@@ -278,10 +286,10 @@ function importAction(PDO $db, array $config, array $session, string $route, arr
                     $skipped++;
                     continue;
                 }
-                $saved[$key] = true;
+                $saved[$key] = '';
                 query($db, "INSERT INTO notely_events (owner_user_id, course_id, title, kind, event_date, event_time, location, series_id, source, import_job_id)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'imported', ?)",
-                    [$user['id'], $course, $title, $kind, $date, $time, $location, $series === null ? null : "{$job['id']}-$series", $job['id']]);
+                    [$user['id'], $course, $title, $kind, $date, $time, $location, $series === null ? null : ($joined[$series] ?? "{$job['id']}-$series"), $job['id']]);
                 $created++;
             }
             // The file is no longer needed once its events are in the schedule.
