@@ -65,9 +65,9 @@ check($readBody['systemInstruction'] === ['parts' => [['text' => SYLLABUS_AI_PRO
 check($readBody['generationConfig'] === ['responseMimeType' => 'application/json', 'responseSchema' => SYLLABUS_AI_SCHEMA,
     'maxOutputTokens' => 65536, 'thinkingConfig' => ['thinkingLevel' => 'MEDIUM']], 'The read must use JSON, the schema, and medium thinking.');
 check(!isset($readBody['tools']), 'The model must have no tools.');
-check(SYLLABUS_AI_MODEL === 'gemini-3.8-flash', 'The stronger model is the default.');
-readSyllabusWithAi($config + ['gemini_model' => 'gemini-3.6-flash'], fakeApi($calls, $counted, $reply([])), 'pdf', $pdf, 2026);
-check($calls[1][0] === 'models/gemini-3.6-flash:generateContent', 'The configured model was not used.');
+check(SYLLABUS_AI_MODEL === 'gemini-3.6-flash', 'gemini-3.6-flash is the default.');
+readSyllabusWithAi($config + ['gemini_model' => 'gemini-3.8-flash'], fakeApi($calls, $counted, $reply([])), 'pdf', $pdf, 2026);
+check($calls[1][0] === 'models/gemini-3.8-flash:generateContent', 'The configured model was not used.');
 try {
     readSyllabusWithAi($config + ['gemini_model' => '../files?key=x'], fakeApi($calls), 'pdf', $pdf, 2026);
     throw new LogicException('A bad model name must be refused.');
@@ -240,25 +240,25 @@ echo "PASS 9: a server error is retried twice with short waits, and any other re
 // the same read. A refused request stops there, since another model would be refused too.
 $used = fn (array $calls) => array_map(fn (array $call) => substr($call[0], 7), $calls);
 $read = readSyllabusWithAi($config, fakeApi($calls, $counted, $quota, $reply($events)), 'pdf', $pdf, 2026);
-check($read['events'] === $events && $used($calls) === ['gemini-3.8-flash:countTokens', 'gemini-3.8-flash:generateContent', 'gemini-3.6-flash:generateContent'],
+check($read['events'] === $events && $used($calls) === ['gemini-3.6-flash:countTokens', 'gemini-3.6-flash:generateContent', 'gemini-3.8-flash:generateContent'],
     'Out of quota, the next model should read the file: ' . json_encode($used($calls)));
 $read = readSyllabusWithAi($config, fakeApi($calls, $counted, [0, []], [503, []], $reply($events)), 'pdf', $pdf, 2026);
 check($read['events'] === $events && end($calls)[0] === 'models/gemini-3.5-flash-lite:generateContent', 'A timeout and a server error should move on to the last model.');
 // A model Google has retired answers 404, and a blocked or cut-off reply can be another model's to read.
 $retired = [404, ['error' => ['message' => 'This model is no longer available.']]];
 check(readSyllabusWithAi($config, fakeApi($calls, $retired, $counted, $reply($events)), 'pdf', $pdf, 2026)['events'] === $events
-    && $used($calls) === ['gemini-3.8-flash:countTokens', 'gemini-3.6-flash:countTokens', 'gemini-3.6-flash:generateContent'], 'A retired model should hand over.');
+    && $used($calls) === ['gemini-3.6-flash:countTokens', 'gemini-3.8-flash:countTokens', 'gemini-3.8-flash:generateContent'], 'A retired model should hand over.');
 check(readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($events, 'SAFETY'), $reply($events)), 'pdf', $pdf, 2026)['events'] === $events
-    && end($calls)[0] === 'models/gemini-3.6-flash:generateContent', 'A blocked reply should hand over.');
+    && end($calls)[0] === 'models/gemini-3.8-flash:generateContent', 'A blocked reply should hand over.');
 check(readSyllabusWithAi($config, fakeApi($calls, [503, []], $counted, $reply($events)), 'pdf', $pdf, 2026)['events'] === $events
-    && $used($calls) === ['gemini-3.8-flash:countTokens', 'gemini-3.6-flash:countTokens', 'gemini-3.6-flash:generateContent'], 'A busy token count should move on too.');
+    && $used($calls) === ['gemini-3.6-flash:countTokens', 'gemini-3.8-flash:countTokens', 'gemini-3.8-flash:generateContent'], 'A busy token count should move on too.');
 $send = fakeApi($calls, $counted, [400, ['error' => ['message' => 'Bad request']]]);
 fails(fn () => readSyllabusWithAi($config, $send, 'pdf', $pdf, 2026), 503, SYLLABUS_AI_UNAVAILABLE);
 check(count($calls) === 2, 'A refused request must not be sent to another model.');
-// A configured model goes first and isn't tried twice.
-$send = fakeApi($calls, $counted, $quota, $quota);
-fails(fn () => readSyllabusWithAi($config + ['gemini_model' => 'gemini-3.6-flash'], $send, 'pdf', $pdf, 2026), 503, 'Automatic reading is busy right now. Please try again in a few minutes.');
-check($used($calls) === ['gemini-3.6-flash:countTokens', 'gemini-3.6-flash:generateContent', 'gemini-3.5-flash-lite:generateContent'], 'The configured model should go first, once.');
+// A configured model goes first and isn't tried twice, and the default still backs it up.
+$send = fakeApi($calls, $counted, $quota, $quota, $quota);
+fails(fn () => readSyllabusWithAi($config + ['gemini_model' => 'gemini-3.8-flash'], $send, 'pdf', $pdf, 2026), 503, 'Automatic reading is busy right now. Please try again in a few minutes.');
+check($used($calls) === ['gemini-3.8-flash:countTokens', 'gemini-3.8-flash:generateContent', 'gemini-3.6-flash:generateContent', 'gemini-3.5-flash-lite:generateContent'], 'The configured model should go first, once, with the default behind it.');
 echo "PASS 10: a model that is out of quota, overloaded, retired, or too slow hands over to the next, and a refused request stops\n";
 
 // 11. Every request of one read shares one time budget, so retries and models can't outlast the browser.
