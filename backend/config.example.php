@@ -15,7 +15,7 @@ return [
     // here, in the private copy only. Without one, students can only add events by hand. Local origins
     // never call the API unless NOTELY_AI_LIVE=1 is set for that run.
     // 'gemini_api_key' => 'YOUR_GOOGLE_AI_STUDIO_KEY',
-    // 'gemini_model' => 'gemini-3.8-flash',       // tried first; free tier: 20 reads a day for the whole key
+    // 'gemini_model' => 'gemini-3.6-flash',       // tried first; free tier: 20 reads a day for the whole key
     // 'ai_user_daily_limit' => 10,                // automatic reads per student per day
     // 'ai_daily_limit' => 50,                     // automatic reads for all students per day
     // 'ai_max_input_tokens' => 60000,             // longer files are refused before they are read
