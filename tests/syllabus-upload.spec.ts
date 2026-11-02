@@ -128,8 +128,8 @@ test("while a syllabus is read, playful lines keep the student company", async (
   expect((await new AxeBuilder({ page }).include('[role="dialog"]').analyze()).violations).toEqual([]);
   // With reduced motion on, nothing sweeps or tilts.
   await page.emulateMedia({ reducedMotion: "reduce" });
-  expect(await line.locator("span").evaluate((el) => getComputedStyle(el, "::before").animationName)).toBe("none");
-  expect(await dialog.locator('span[aria-hidden="true"]:has(i)').evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
+  await expect.poll(() => line.locator("span").evaluate((el) => getComputedStyle(el, "::before").animationName)).toBe("none");
+  await expect.poll(() => dialog.locator('span[aria-hidden="true"]:has(i)').evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
   release();
   await expect(dialog.getByRole("button", { name: "Add to schedule" })).toBeVisible();
 });
