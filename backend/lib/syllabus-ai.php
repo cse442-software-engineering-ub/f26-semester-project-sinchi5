@@ -59,7 +59,8 @@ events: graded work with its own date
   date, line, table row, or Due cell, return a separate event for each one with that date.
 - In a schedule table, use the Date column for each item in the Due or assessment column. Week, topic, and
   unit columns give context; they are not event titles.
-- Title each event with the item's own name and number, such as "Homework 2", "Quiz 1", or "Exam #3".
+- Title each event with the item's own name and number, such as "Homework 2", "Quiz 1", or "Exam #3", in
+  the file's own words and capitalization: "Midterm exam" stays "Midterm exam".
   Remove trailing words such as "due" and the date or time from the title. Never use the adjacent week,
   topic, or unit text as a title, and never combine multiple item names into one title.
 - For example, a row dated September 14, 2026 with topic "Unit 2: Requirements" and Due cell "Homework 2
