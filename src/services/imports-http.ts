@@ -35,7 +35,8 @@ export function createHttpSyllabus(endpoint = `${import.meta.env.BASE_URL}api/in
     // Saves the reviewed events to the course (card 47). Sending it again adds nothing, and an event the
     // course already has is skipped.
     async confirm(id: string, courseId: string, events: (Pick<CourseEvent, "title" | "kind" | "date" | "time" | "location"> & { series?: number })[]) {
-      return send<{ created: number; skipped: number }>("import-confirm", { id, courseId, events });
+      // A semester of classes is hundreds of rows, far more than the usual request.
+      return send<{ created: number; skipped: number }>("import-confirm", { id, courseId, events }, 60000);
     },
     // The student's imported events, for the schedule (card 48).
     async events() {

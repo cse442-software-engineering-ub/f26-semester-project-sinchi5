@@ -1,10 +1,9 @@
 // Card 45: catches a renamed or damaged syllabus in the browser, before anything uploads, with a message
 // that says how to fix it. The server's reader (card 127) does the reading.
-type ZipEntry = { flags: number; method: number; compressed: number; local: number };
 
-// Lists a zip's files from its central directory, or returns null when the bytes aren't a zip.
+// Lists a zip's file names from its central directory, or returns null when the bytes aren't a zip.
 // The same check runs on the server (zipDirectory in backend/lib/imports.php).
-export function zipEntries(bytes: Uint8Array): Map<string, ZipEntry> | null {
+export function zipEntries(bytes: Uint8Array): Set<string> | null {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   // The end record sits in the last 64 KB, before an optional comment.
   let end = -1;
@@ -15,18 +14,13 @@ export function zipEntries(bytes: Uint8Array): Map<string, ZipEntry> | null {
   const count = view.getUint16(end + 10, true);
   // A real Word document has a few dozen files; thousands means something else.
   if (count > 5000) return null;
-  const entries = new Map<string, ZipEntry>();
+  const entries = new Set<string>();
   const names = new TextDecoder();
   let at = view.getUint32(end + 16, true);
   for (let i = 0; i < count; i++) {
     if (at + 46 > bytes.length || view.getUint32(at, true) !== 0x02014b50) return null;
     const nameLength = view.getUint16(at + 28, true);
-    entries.set(names.decode(bytes.subarray(at + 46, at + 46 + nameLength)), {
-      flags: view.getUint16(at + 8, true),
-      method: view.getUint16(at + 10, true),
-      compressed: view.getUint32(at + 20, true),
-      local: view.getUint32(at + 42, true),
-    });
+    entries.add(names.decode(bytes.subarray(at + 46, at + 46 + nameLength)));
     at += 46 + nameLength + view.getUint16(at + 30, true) + view.getUint16(at + 32, true);
   }
   return entries;

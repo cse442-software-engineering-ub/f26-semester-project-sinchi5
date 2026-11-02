@@ -1,9 +1,9 @@
 // Card 44: cleans what the server's reader (Gemini, card 127) found in a syllabus, and turns each weekly
 // class into its dates. Nothing here touches the schedule.
+import { CLASS_KINDS, type ClassKind } from "../domain";
+
 export type SyllabusEventKind = "assignment" | "exam" | "quiz" | "deadline" | "other";
 export const SYLLABUS_EVENT_KINDS: readonly SyllabusEventKind[] = ["assignment", "exam", "quiz", "deadline", "other"];
-export type ClassKind = "lecture" | "recitation" | "lab";
-export const CLASS_KINDS: readonly ClassKind[] = ["lecture", "recitation", "lab"];
 export const MAX_SYLLABUS_EVENTS = 200;
 const MAX_MEETINGS = 60;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -94,7 +94,7 @@ export function normalizeMeetings(items: unknown): ProposedMeeting[] {
       .filter((day): day is number => Number.isInteger(day) && (day as number) >= 0 && (day as number) <= 6)
       .sort((a, b) => a - b);
     if (!days.length) return [];
-    const kind = CLASS_KINDS.includes(raw.kind as ClassKind) ? (raw.kind as ClassKind) : "lecture";
+    const kind: ClassKind = CLASS_KINDS.includes(raw.kind as ClassKind) ? (raw.kind as ClassKind) : "lecture";
     return [{
       title: plainText(raw.title, 120) || kind[0].toUpperCase() + kind.slice(1),
       kind,

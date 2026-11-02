@@ -62,13 +62,15 @@ test("Task test 3: an event that is left out is not added", async ({ page }) => 
 test("an event without a clear date says why and needs a date before it is added", async ({ page }) => {
   await signUpWithCourse(page);
   const dialog = await reviewSyllabus(page, "Quiz next Friday\nHomework 2 due October 5, 2026");
-  await expect(dialog.getByText("Some details need your attention.", { exact: false })).toBeVisible();
+  await expect(dialog.getByText("1 has no posted date, so it starts unchecked.", { exact: false })).toBeVisible();
+  await expect(dialog.getByText("Some details need your attention.", { exact: false })).toHaveCount(0);
   // With no posted date it starts unchecked, so it's added only if the student chooses a date.
   await expect(dialog.getByText("No date is posted for this, so it won’t be added unless you include it and choose one. The syllabus says “Quiz next Friday”.")).toBeVisible();
   await expect(dialog.getByLabel("Include").first()).not.toBeChecked();
   await expect(dialog.getByText("1 of 2 events will be added to CSE 442.")).toBeVisible();
   await dialog.getByLabel("Include").first().check();
   await expect(dialog.getByText("Needs review: choose the date. The syllabus says “Quiz next Friday”.")).toBeVisible();
+  await expect(dialog.getByText("Some details need your attention.", { exact: false })).toBeVisible();
   const date = dialog.getByLabel("Due date").first();
   await dialog.getByRole("button", { name: "Add to schedule" }).click();
   expect(await missing(date)).toBe(true);
@@ -180,6 +182,17 @@ test("weekly classes are listed first, with their days, time, room, and dates", 
   await expect(lecture.getByLabel("Starts")).toHaveValue("2026-08-24");
   await expect(lecture.getByLabel("Ends")).toHaveValue("2026-09-04");
   await expect(dialog.getByText("1 weekly class and 1 of 1 event will be added to CSE 442.")).toBeVisible();
+  // The syllabus's own words sit beside what was read, so a misread is easy to spot.
+  await expect(lecture.getByText("From your syllabus: “Lectures meet Mondays and Wednesdays, 10:00-10:50 AM, Davis 101.”")).toBeVisible();
+  const exam = dialog.getByRole("group", { name: "Detected exam" });
+  await expect(exam.getByText("From your syllabus: “Midterm exam, in class”")).toBeVisible();
+  // An event's room can be checked and corrected too, and the correction is what's saved.
+  await expect(exam.getByLabel("Room")).toHaveValue("Davis 101");
+  await exam.getByLabel("Room").fill("Knox 110");
+  await dialog.getByRole("button", { name: "Add to schedule" }).click();
+  await expect(dialog.getByRole("heading", { name: "A little more organized." })).toBeVisible();
+  await dialog.getByRole("button", { name: "All done" }).click();
+  await expect(await eventOn(page, "2026-10-14", "Midterm exam")).toContainText("Knox 110");
 });
 
 test("several sections start unchecked, and only the one the student picks is added", async ({ page }) => {
