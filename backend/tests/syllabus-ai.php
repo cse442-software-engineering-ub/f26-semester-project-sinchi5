@@ -209,7 +209,7 @@ check($read['noClassDates'] === [['from' => '2026-09-07', 'to' => '2026-09-07'],
 $many = array_fill(0, 70, $meetings[0]);
 check(count(readSyllabusWithAi($config, fakeApi($calls, $counted, $reply([], 'STOP', ['meetings' => $many])), 'pdf', $pdf, 2026)['meetings']) === 60,
     'At most 60 weekly classes should be kept.');
-foreach (['MoWeFr', 'R is Thursday', 'NO CLASSES THIS WEEK', 'Lab Exam 1', 'two midterm exams and a final', 'resign deadlines', 'Office hours'] as $rule) {
+foreach (['however short', 'MoWeFr', 'R is Thursday', 'NO CLASSES THIS WEEK', 'Lab Exam 1', 'two midterm exams and a final', 'resign deadlines', 'Office hours'] as $rule) {
     check(str_contains(preg_replace('/\s+/', ' ', SYLLABUS_AI_PROMPT), $rule), "The prompt is missing the rule about: $rule");
 }
 echo "PASS 7: weekly classes keep their days, section, time, room, and class dates, and no-class ranges are checked\n";
