@@ -194,14 +194,14 @@ describe("repository contracts", () => {
         { title: "Homework 1", kind: "assignment", date: "2026-09-28", time: "", location: "", source: "" },
         { title: "Final project", kind: "deadline", date: "2026-12-04", time: "", location: "", source: "" },
       ] }),
-      confirm: async (...args: unknown[]) => { confirmed.push(args); return 1; },
+      confirm: async (...args: unknown[]) => { confirmed.push(args); return { created: 1, skipped: 0 }; },
       events: async () => [midterm],
     } as never;
     const r = createRepositories(undefined, undefined, false, undefined, server);
     const file = new File(["syllabus"], "cse442-syllabus.txt");
     const job = await r.imports.process(await r.imports.start(file, "syllabus", "success", "cse442"));
     job.events[1].include = false;
-    await r.imports.confirm(job);
+    expect(await r.imports.confirm(job)).toEqual({ created: 1, skipped: 0, first: "2026-09-28" });
     expect(confirmed).toEqual([["9", "cse442", [{ title: "Homework 1", kind: "assignment", date: "2026-09-28", time: "", location: "" }]]]);
     expect(await r.schedule.list("2026-10-01", "2026-10-31")).toEqual([midterm]);
     // A local edit of an imported event replaces the server copy instead of showing both.
@@ -222,7 +222,8 @@ describe("repository contracts", () => {
     const job = await r.imports.process(await r.imports.start(new File(["syllabus"], "s.txt"), "syllabus", "success", course.id));
     // The student picks lab A2 and leaves A1 out. Series numbers count only what's included.
     job.meetings![2].include = true;
-    await r.imports.confirm(job);
+    // The earliest date added is a class's, so the schedule opens there.
+    expect((await r.imports.confirm(job)).first).toBe("2026-08-24");
     const rows = confirmed[0][2] as { title: string; kind: string; date: string; time: string; location: string; series: number }[];
     expect(rows.map((row) => [row.title, row.kind, row.date, row.time, row.location, row.series])).toEqual([
       ["CSE 442 Lecture", "lecture", "2026-08-24", "10:00", "Davis 101", 0],
@@ -237,9 +238,10 @@ describe("repository contracts", () => {
     expect(job.meetings!.map((m) => [m.title, m.include])).toEqual([["Lecture", true]]);
     job.events.forEach((e) => { e.include = false; });
     const before = (await r.schedule.list()).length;
-    await r.imports.confirm(job);
+    const saved = await r.imports.confirm(job);
     const added = (await r.schedule.list()).filter((e) => e.seriesId);
     expect(added.length).toBeGreaterThan(0);
+    expect(saved.created).toBe(added.length);
     expect((await r.schedule.list()).length).toBe(before + added.length);
     expect(new Set(added.map((e) => e.seriesId)).size).toBe(1);
     expect(added.every((e) => e.title === "CSE 442 Lecture" && e.kind === "lecture" && e.source === "imported")).toBe(true);

@@ -225,7 +225,8 @@ export function EventRow({
       <span className={s.eventText}>
         <strong>{event.title}</strong>
         <small>
-          {event.kind} · {event.location || course?.code || "Personal"}
+          {event.kind} · {course?.code || (event.location ? "" : "Personal")}
+          {course?.code && event.location ? " · " : ""}{event.location}
           {event.source === "imported" ? " · Imported" : ""}
         </small>
       </span>

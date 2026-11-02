@@ -1,5 +1,6 @@
 // Card 46: correcting detected events before adding them, against the mocked API in
 // support/account-fixture.ts. No server is needed and the Gemini API is never called.
+import AxeBuilder from "@axe-core/playwright";
 import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "./support/account-fixture";
 import { LECTURE, openUpload, readOf, reviewSyllabus, section, signUpWithCourse, SYLLABUS, textFile } from "./support/syllabus";
@@ -191,7 +192,7 @@ test("weekly classes are listed first, with their days, time, room, and dates", 
   await dialog.getByRole("button", { name: "Add to schedule" }).click();
   await expect(dialog.getByRole("heading", { name: "A little more organized." })).toBeVisible();
   await dialog.getByRole("button", { name: "All done" }).click();
-  await expect(await eventOn(page, "2026-10-14", "Midterm exam")).toContainText("Knox 110");
+  await expect(await eventOn(page, "2026-10-14", "Midterm exam")).toContainText("exam · CSE 442 · Knox 110 · Imported");
 });
 
 test("several sections start unchecked, and only the one the student picks is added", async ({ page }) => {
@@ -226,7 +227,7 @@ test("a weekly class goes on each of its days with its room, and skips days with
   await dialog.getByRole("button", { name: "All done" }).click();
   for (const date of ["2026-08-24", "2026-08-31", "2026-09-02"]) {
     await expect(await eventOn(page, date, "CSE 442 Lecture")).toContainText("10:00 AM");
-    await expect(await eventOn(page, date, "CSE 442 Lecture")).toContainText("lecture · Davis 101 · Imported");
+    await expect(await eventOn(page, date, "CSE 442 Lecture")).toContainText("lecture · CSE 442 · Davis 101 · Imported");
   }
   // Tuesday, a skipped Wednesday, a Friday, and the day after the last class.
   for (const date of ["2026-08-25", "2026-08-26", "2026-08-28", "2026-09-07"]) await expect(await eventOn(page, date, "CSE 442 Lecture")).toHaveCount(0);
@@ -268,7 +269,7 @@ test("a weekly class can be corrected, and bad days or dates are refused before 
   await dialog.getByRole("button", { name: "All done" }).click();
   const friday = await eventOn(page, "2026-08-28", "CSE 442 Studio");
   await expect(friday).toContainText("2:00 PM");
-  await expect(friday).toContainText("lab · Knox 5");
+  await expect(friday).toContainText("lab · CSE 442 · Knox 5");
   await expect(await eventOn(page, "2026-08-24", "CSE 442 Studio")).toHaveCount(0);
 });
 
@@ -350,4 +351,25 @@ test("when a file can't be read at all, events can be typed in by hand", async (
   await added.getByLabel("Due date").fill("2026-10-14");
   await dialog.getByRole("button", { name: "Add to schedule" }).click();
   await expect(dialog.getByRole("heading", { name: "A little more organized." })).toBeVisible();
+});
+
+test("the review and no-events screens have no accessibility problems and work by keyboard", async ({ page }) => {
+  await signUpWithCourse(page);
+  const dialog = await reviewSyllabus(page, readOf({ noClassDates: [{ from: "2026-08-26", to: "2026-08-26" }], meetings: [LECTURE, section("R1", [2], "13:00", "Knox 14"), section("R2", [4], "15:00", "Knox 20")],
+    events: [{ title: "Final exam", kind: "exam", date: "", time: "", location: "", source: "Final exam: TBA" }] }), "weekly.txt");
+  const results = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
+  expect(results.violations.map((v) => v.id)).toEqual([]);
+  // Each day is a large enough target and can be pressed from the keyboard.
+  const friday = dialog.getByRole("button", { name: "Friday" });
+  const box = (await friday.boundingBox())!;
+  expect(Math.min(box.width, box.height)).toBeGreaterThanOrEqual(44);
+  await friday.focus();
+  await page.keyboard.press("Space");
+  await expect(friday).toHaveAttribute("aria-pressed", "true");
+  await dialog.getByRole("button", { name: "Close" }).click();
+
+  const empty = await upload(page, "CSE 250 Data Structures", "cse250.txt");
+  await expect(empty.getByRole("heading", { name: "No class times or due dates found" })).toBeVisible();
+  const emptyResults = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
+  expect(emptyResults.violations.map((v) => v.id)).toEqual([]);
 });

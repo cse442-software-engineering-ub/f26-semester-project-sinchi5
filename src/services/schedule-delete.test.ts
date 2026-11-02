@@ -27,17 +27,17 @@ const event = (title: string, date: string, time: string, source: CourseEvent["s
   id, courseId: "", title, kind: "other", date, time, location: "", description: "", source,
 });
 // Stands in for the PHP API's events and event-delete routes (cards 48 and 172).
-function server(failWith?: Error) {
-  const events = [event("Quiz 1", "2026-11-12", "", "imported", "41"), event("Project draft", "2026-11-19", "", "imported", "42")];
+function server(failWith?: Error, events = [event("Quiz 1", "2026-11-12", "", "imported", "41"), event("Project draft", "2026-11-19", "", "imported", "42")]) {
   const deletes: string[] = [];
   return {
     deletes,
     api: {
       events: async () => events.map((e) => ({ ...e })),
-      deleteEvent: async (id: string) => {
-        deletes.push(id);
+      deleteEvent: async (id: string, wholeSeries = false) => {
+        deletes.push(wholeSeries ? `${id} series` : id);
         if (failWith) throw failWith;
-        events.splice(events.findIndex((e) => e.id === id), 1);
+        const found = events.find((e) => e.id === id)!;
+        for (const e of wholeSeries ? events.filter((x) => x.seriesId === found.seriesId) : [found]) events.splice(events.indexOf(e), 1);
       },
     } as never,
   };
@@ -96,6 +96,45 @@ describe("deleting a schedule event (card 173)", () => {
     await expect(r.schedule.remove(study)).rejects.toThrow(storageMessage);
     expect(await titles(r)).toEqual(["Study group"]);
     expect(await titles(createRepositories(storage, student, false))).toEqual(["Study group"]);
+  });
+
+  it("deletes one meeting of a weekly class or all of them, with their edited copies, and nothing else (card 48)", async () => {
+    const meeting = (title: string, id: string, seriesId: string): CourseEvent => ({ ...event(title, `2026-11-${id}`, "10:00", "imported", id), seriesId });
+    const storage = memory();
+    const { api, deletes } = server(undefined, [meeting("Lecture 1", "11", "7-0"), meeting("Lecture 2", "12", "7-0"), meeting("Lecture 3", "13", "7-0"), meeting("Lab", "14", "7-1")]);
+    const r = createRepositories(storage, student, false, undefined, api);
+    const [first, second, third] = await r.schedule.list();
+    await r.schedule.remove(first);
+    expect(await titles(r)).toEqual(["Lecture 2", "Lecture 3", "Lab"]);
+    // An edit made in this browser goes with the rest of its class.
+    await r.schedule.save({ ...third, title: "Lecture 3 moved" });
+    await r.schedule.remove(second, true);
+    expect(deletes).toEqual(["11", "12 series"]);
+    expect(await titles(r)).toEqual(["Lab"]);
+    expect(await titles(createRepositories(storage, student, false, undefined, api))).toEqual(["Lab"]);
+  });
+
+  it("keeps the rest of a class and its edits when the chosen meeting is already gone from the server (card 48)", async () => {
+    const meeting = (title: string, id: string, seriesId: string): CourseEvent => ({ ...event(title, `2026-11-${id}`, "10:00", "imported", id), seriesId });
+    const storage = memory();
+    const { api } = server(new NoteServiceError("This event could not be found.", 404), [meeting("Lecture 1", "11", "7-0"), meeting("Lecture 2", "12", "7-0")]);
+    const r = createRepositories(storage, student, false, undefined, api);
+    const [first, second] = await r.schedule.list();
+    await r.schedule.save({ ...second, title: "Lecture 2 moved" });
+    await r.schedule.remove(first, true);
+    expect(await titles(r)).toEqual(["Lecture 1", "Lecture 2 moved"]);
+  });
+
+  it("removes a whole class in the demo workspace, and an event outside a series only removes itself (card 48)", async () => {
+    const r = createRepositories();
+    const before = (await r.schedule.list()).length;
+    const [one] = [await r.schedule.save({ ...event("Lecture 1", "2026-11-02", "10:00", "imported"), seriesId: "9-0" }),
+      await r.schedule.save({ ...event("Lecture 2", "2026-11-04", "10:00", "imported"), seriesId: "9-0" })];
+    const alone = await r.schedule.save(event("Study group", "2026-11-05", "18:00"));
+    await r.schedule.remove(alone, true);
+    expect((await r.schedule.list()).length).toBe(before + 2);
+    await r.schedule.remove(one, true);
+    expect((await r.schedule.list()).length).toBe(before);
   });
 
   it("removes a demo workspace event without calling the server", async () => {

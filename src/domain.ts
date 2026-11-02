@@ -13,6 +13,8 @@ export interface OnboardingState {
   completed: boolean;
   step: number;
 }
+// Weekly classes are on the schedule, but they aren't something due (card 48).
+export const isClass = (kind: EventKind) => (CLASS_KINDS as readonly EventKind[]).includes(kind);
 export interface Course {
   id: string;
   code: string;
@@ -188,7 +190,8 @@ export interface ScheduleRepository {
   list(from?: string, to?: string): Promise<CourseEvent[]>;
   save(event: CourseEvent): Promise<CourseEvent>;
   // Card 173: removes the event from the schedule (a syllabus event also from the server).
-  remove(event: CourseEvent): Promise<void>;
+  // With wholeSeries, every meeting of the event's weekly class goes too (card 48).
+  remove(event: CourseEvent, wholeSeries?: boolean): Promise<void>;
   lectureNotes(event: CourseEvent): Promise<Note[]>;
 }
 export interface ImportRepository {
@@ -197,7 +200,8 @@ export interface ImportRepository {
   start(file: File, kind: UploadKind, scenario?: string, courseId?: string): Promise<UploadJob>;
   // Reads a queued job's file and proposes note details or schedule events (cards 44 and 45).
   process(job: UploadJob, scenario?: string): Promise<UploadJob>;
-  confirm(job: UploadJob): Promise<void>;
+  // first is the earliest date added, for opening the schedule on it (card 48).
+  confirm(job: UploadJob): Promise<{ created: number; skipped: number; first: string }>;
 }
 export interface Repositories {
   auth: AuthRepository;
