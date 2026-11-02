@@ -769,7 +769,7 @@ export function ImportDialog({
             {kind === "syllabus" && (
               <Link
                 className={s.primary}
-                to={saved.first ? `/schedule?date=${saved.first}` : "/schedule"}
+                to={`/schedule?date=${saved.first}`}
                 onClick={onClose}
               >
                 View schedule <ArrowUpRight size={16} />

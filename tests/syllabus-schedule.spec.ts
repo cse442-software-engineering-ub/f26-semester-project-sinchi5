@@ -151,7 +151,7 @@ test("a repeated save whose first reply was lost says nothing misleading", async
   await expect(dialog.getByText("Your reviewed events are in your schedule.")).toBeVisible();
   await expect(dialog.getByText(/Added \d|Nothing new|all 0/)).toHaveCount(0);
   await dialog.getByRole("link", { name: "View schedule" }).click();
-  await expect(page).toHaveURL(/\/schedule$/);
+  await expect(page).toHaveURL(/\/schedule\?date=2026-09-28$/);
 });
 
 test("uploading a syllabus again when only one event is on it says that one was already there", async ({ page }) => {
