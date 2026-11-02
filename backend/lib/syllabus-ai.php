@@ -86,6 +86,11 @@ const SYLLABUS_AI_MODEL = 'gemini-3.8-flash';
 // gemini-3.8-flash only 20 reads a day for the whole key. On the team's real syllabi, gemini-3.6-flash found
 // the same dates, times, and rooms in a fraction of the time.
 const SYLLABUS_AI_FALLBACKS = ['gemini-3.6-flash', 'gemini-3.5-flash'];
+// A read gets this long in all, whatever mix of retries and models that takes. The browser waits a little
+// longer, so it always hears the answer.
+const SYLLABUS_AI_SECONDS = 280;
+// After this long on one request, the next model is likely to answer sooner.
+const SYLLABUS_AI_REQUEST_SECONDS = 90;
 // Bump this when the prompt or the reply's shape changes, so reads saved by an older reader aren't reused.
 const SYLLABUS_READER_VERSION = 2;
 const SYLLABUS_KINDS = ['assignment', 'exam', 'quiz', 'deadline', 'other'];
@@ -253,15 +258,14 @@ function liveGemini(array $config): callable
     if (!function_exists('curl_init')) {
         throw new RuntimeException('The PHP curl extension is missing.');
     }
-    return retryWhenBusy(static function (string $path, array $body) use ($key): array {
+    return retryWhenBusy(withinTimeBudget(static function (string $path, array $body, int $seconds) use ($key): array {
         $curl = curl_init('https://generativelanguage.googleapis.com/v1beta/' . $path);
         curl_setopt_array($curl, [
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
             CURLOPT_CONNECTTIMEOUT => 10,
-            // After this long the next model is likely to answer sooner.
-            CURLOPT_TIMEOUT => 90,
+            CURLOPT_TIMEOUT => $seconds,
             // The key goes in a header, never the URL, so it can't end up in a log.
             CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'x-goog-api-key: ' . $key],
             CURLOPT_POSTFIELDS => json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE),
@@ -272,7 +276,17 @@ function liveGemini(array $config): callable
             return [0, []];
         }
         return [(int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE), json_decode($raw, true) ?: []];
-    }, 'sleep');
+    }, 'time'), 'sleep');
+}
+
+// Every request of one read shares SYLLABUS_AI_SECONDS. When it runs out, requests answer as "no reply".
+function withinTimeBudget(callable $send, callable $now): callable
+{
+    $stop = $now() + SYLLABUS_AI_SECONDS;
+    return static function (string $path, array $body) use ($send, $now, $stop): array {
+        $left = $stop - $now();
+        return $left > 0 ? $send($path, $body, min(SYLLABUS_AI_REQUEST_SECONDS, $left)) : [0, []];
+    };
 }
 
 // Gemini's "high demand" replies usually pass within seconds, so one is tried twice more before moving on.
@@ -290,10 +304,11 @@ function retryWhenBusy(callable $send, callable $wait): callable
     };
 }
 
-// True when another model might do better: no reply at all, out of quota, or a server error.
+// True when another model might do better: no reply at all, a model that's been retired, out of quota, or a
+// server error. Anything else, such as a bad key, would be refused by every model.
 function geminiBusy(int $status): bool
 {
-    return $status === 0 || $status === 429 || $status >= 500;
+    return in_array($status, [0, 404, 429], true) || $status >= 500;
 }
 
 // Logs why Gemini refused a request (never the key) and returns the message for the student.
@@ -319,7 +334,7 @@ function readSyllabusWithAi(array $config, callable $send, string $type, string 
         ['text' => "Course year: $year. Read the whole file and report what belongs on the student's calendar."],
     ]]];
     $counted = false;
-    $reply = null;
+    $failure = new HttpError(503, SYLLABUS_AI_UNAVAILABLE);
     foreach ($models as $model) {
         // Counting tokens is free, so a huge file is refused before it costs anything.
         if (!$counted) {
@@ -348,22 +363,29 @@ function readSyllabusWithAi(array $config, callable $send, string $type, string 
                 'thinkingConfig' => ['thinkingLevel' => 'MEDIUM'],
             ],
         ]);
-        if ($status === 200) {
-            $reply = $answer;
-            break;
-        }
-        $failure = geminiError($status, $answer);
-        if (!geminiBusy($status)) {
+        if ($status !== 200) {
+            $failure = geminiError($status, $answer);
+            if (geminiBusy($status)) {
+                continue;
+            }
             throw $failure;
         }
+        // Token counts only, so the server log shows what each read used.
+        $usage = $answer['usageMetadata'] ?? [];
+        error_log(sprintf('Notely syllabus reader used %d input, %d output, and %d thinking tokens with %s.',
+            $usage['promptTokenCount'] ?? 0, $usage['candidatesTokenCount'] ?? 0, $usage['thoughtsTokenCount'] ?? 0, $model));
+        $read = geminiRead($answer);
+        if ($read !== null) {
+            return cleanSyllabusRead($read, $year);
+        }
+        $failure = new HttpError(422, SYLLABUS_AI_UNFINISHED);
     }
-    if ($reply === null) {
-        throw $failure;
-    }
-    // Token counts only, so the server log shows what each read used.
-    $usage = $reply['usageMetadata'] ?? [];
-    error_log(sprintf('Notely syllabus reader used %d input, %d output, and %d thinking tokens with %s.',
-        $usage['promptTokenCount'] ?? 0, $usage['candidatesTokenCount'] ?? 0, $usage['thoughtsTokenCount'] ?? 0, $model));
+    throw $failure;
+}
+
+// The reply's read. A blocked, cut-off, or malformed reply is never half-used, so it comes back as null.
+function geminiRead(array $reply): ?array
+{
     $candidate = $reply['candidates'][0] ?? [];
     $text = '';
     foreach ($candidate['content']['parts'] ?? [] as $part) {
@@ -371,12 +393,8 @@ function readSyllabusWithAi(array $config, callable $send, string $type, string 
             $text .= $part['text'];
         }
     }
-    // A blocked, cut-off, or malformed reply is never half-used.
     $read = ($candidate['finishReason'] ?? '') === 'STOP' ? json_decode($text, true) : null;
-    if (!is_array($read) || !is_array($read['events'] ?? null)) {
-        throw new HttpError(422, SYLLABUS_AI_UNFINISHED);
-    }
-    return cleanSyllabusRead($read, $year);
+    return is_array($read) && is_array($read['events'] ?? null) ? $read : null;
 }
 
 // Nothing in a reply is trusted: unknown fields are dropped, text is plain and short, kinds and days come
