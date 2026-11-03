@@ -1,3 +1,5 @@
+import { ChecklistEditor } from "./checklist-editor";
+import { checklistDraft, checklistPayload, type ChecklistDraft } from "../services/checklists";
 import { useEffect, useRef, useState } from "react";
 import {
   useParams,
@@ -30,6 +32,8 @@ import type {
   Comment,
   CommentScenario,
   Collaborator,
+  HighlightColor ,
+  NoteHighlight ,
 } from "../domain";
 import s from "../app/App.module.css";
 import { Collaborators } from "./collaborators";
@@ -439,6 +443,11 @@ function sameNoteFields(a: Note, b: Note) {
   );
 }
 export function NoteWorkspace() {
+  const { id } = useParams();
+  // Task #78 / Story #19 AT1: isolate drafts and pending responses when switching notes.
+  return <NoteEditor key={id} />;
+}
+function NoteEditor() {
   const { id = "" } = useParams();
   // The quick-create editor still autosaves its first title; reopened notes use Save/Cancel.
   const isNewNote = useLocation().state?.newNote === true;
@@ -465,6 +474,13 @@ export function NoteWorkspace() {
   const [preview, setPreview] = useState<NoteVersion>();
   const [restore, setRestore] = useState(false);
   const [draftBody, setDraftBody] = useState("");
+  const [draftHighlights, setDraftHighlights] = useState<NoteHighlight[]>([]);
+  const [highlightMessage, setHighlightMessage] = useState("");
+  const [showHighlightColors, setShowHighlightColors] = useState(false);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const highlightLayerRef = useRef<HTMLDivElement>(null);
+  const selectionRef = useRef({ start: 0, end: 0 });
+  const [checklist, setChecklist] = useState<ChecklistDraft[]>([]);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const pendingSave = useRef<Promise<Note>>();
@@ -482,6 +498,9 @@ export function NoteWorkspace() {
     dirtyRef.current = false;
     setDirty(false);
     setDraftBody("");
+    setDraftHighlights([]);
+    setHighlightMessage("");
+    setShowHighlightColors(false);
     setTitleDraft("");
     setStatus("All changes saved");
     generation.current++;
@@ -495,6 +514,8 @@ export function NoteWorkspace() {
         if (active) {
           setNote(n);
           setDraftBody(n.body);
+          setDraftHighlights(n.highlights ?? []);
+          setChecklist(checklistDraft(n.checklist));
           setTitleDraft(n.title);
           noteRef.current = n;
           savedNote.current = n;
@@ -505,6 +526,7 @@ export function NoteWorkspace() {
       .catch((e) => active && setError(e.message));
     return () => {
       active = false;
+      generation.current++;
     };
   }, [id, repo]);
   useEffect(() => {
@@ -540,6 +562,7 @@ export function NoteWorkspace() {
           await refresh();
         }
       } catch (e) {
+        if (current !== generation.current) return;
         const lastSaved = savedNote.current;
         if (lastSaved && note.category !== lastSaved.category) {
           // The category did not save, so show the last saved one again and say why.
@@ -587,6 +610,158 @@ export function NoteWorkspace() {
     setDirty(true);
     setStatus("Saving…");
   }
+
+  function applyHighlight(color: HighlightColor) {
+    const { start, end } = selectionRef.current;
+
+    if (start === end) {
+      setHighlightMessage("Select some text to highlight.");
+      setShowHighlightColors(false);
+      return;
+    }
+
+    const next = draftHighlights.filter(
+      (highlight) => highlight.end <= start || highlight.start >= end,
+    );
+
+    next.push({ start, end, color });
+    next.sort((a, b) => a.start - b.start);
+
+    setDraftHighlights(next);
+    setHighlightMessage("");
+    setShowHighlightColors(false);
+  }
+
+  function removeHighlight() {
+    const { start, end } = selectionRef.current;
+
+    if (start === end) {
+      setHighlightMessage("Select some text to highlight.");
+      return;
+    }
+
+    setDraftHighlights((current) =>
+      current.filter(
+        (highlight) => highlight.end <= start || highlight.start >= end,
+      ),
+    );
+
+    setHighlightMessage("");
+  }
+  function renderHighlightedBody() {
+    const highlights = [...draftHighlights].sort((a, b) => a.start - b.start);
+    const parts = [];
+    let position = 0;
+
+    for (const highlight of highlights) {
+      if (highlight.start > position) {
+        parts.push(draftBody.slice(position, highlight.start));
+      }
+
+      const className =
+        highlight.color === "yellow"
+          ? s.highlightYellow
+          : highlight.color === "green"
+            ? s.highlightGreen
+            : s.highlightPink;
+
+      parts.push(
+        <mark key={`${highlight.start}-${highlight.end}`} className={className}>
+          {draftBody.slice(highlight.start, highlight.end)}
+        </mark>,
+      );
+
+      position = highlight.end;
+    }
+
+    if (position < draftBody.length) {
+      parts.push(draftBody.slice(position));
+    }
+
+    return parts;
+  }
+  function adjustHighlightsForBodyChange(
+    previousBody: string,
+    nextBody: string,
+    highlights: NoteHighlight[],
+  ) {
+    let start = 0;
+
+    while (
+      start < previousBody.length &&
+      start < nextBody.length &&
+      previousBody[start] === nextBody[start]
+    ) {
+      start++;
+    }
+
+    let previousEnd = previousBody.length;
+    let nextEnd = nextBody.length;
+
+    while (
+      previousEnd > start &&
+      nextEnd > start &&
+      previousBody[previousEnd - 1] === nextBody[nextEnd - 1]
+    ) {
+      previousEnd--;
+      nextEnd--;
+    }
+
+    const delta = nextEnd - previousEnd;
+    const adjusted: NoteHighlight[] = [];
+
+    for (const highlight of highlights) {
+      // Highlight is completely before the edited text.
+      if (highlight.end <= start) {
+        adjusted.push(highlight);
+        continue;
+      }
+
+      // Highlight is completely after the edited text.
+      if (highlight.start >= previousEnd) {
+        adjusted.push({
+          ...highlight,
+          start: highlight.start + delta,
+          end: highlight.end + delta,
+        });
+        continue;
+      }
+
+      // Edit happened inside an existing highlight.
+      if (highlight.start < start && highlight.end > previousEnd) {
+        adjusted.push({
+          ...highlight,
+          end: highlight.end + delta,
+        });
+        continue;
+      }
+
+      // Keep the part before the edited text.
+      if (highlight.start < start) {
+        adjusted.push({
+          ...highlight,
+          end: start,
+        });
+        continue;
+      }
+
+      // Keep the part after the edited text.
+      if (highlight.end > previousEnd) {
+        adjusted.push({
+          ...highlight,
+          start: nextEnd,
+          end: highlight.end + delta,
+        });
+      }
+    }
+
+    return adjusted.filter(
+      (highlight) =>
+        highlight.start >= 0 &&
+        highlight.end > highlight.start &&
+        highlight.end <= nextBody.length,
+    );
+  }
   async function saveNote() {
     if (!noteRef.current || !canEdit || savingRef.current) return;
     const title = titleDraft.trim();
@@ -599,7 +774,7 @@ export function NoteWorkspace() {
     setSaving(true);
     setError("");
     setStatus("Saving…");
-    generation.current++;
+    const current = ++generation.current;
     try {
       // Finish metadata autosave before submitting both drafts, so an older
       // write cannot overwrite the explicitly saved title or body.
@@ -608,16 +783,24 @@ export function NoteWorkspace() {
         ...noteRef.current!,
         title,
         body: draftBody,
+        highlights: draftHighlights,
+        checklist: checklistPayload(checklist),
       });
+      // Task #78 / Story #19 AT1-3: ignore responses after leaving this editor.
+      // Disabled controls during Save protect the submitted draft from newer edits.
+      if (current !== generation.current) return;
       noteRef.current = saved;
       savedNote.current = saved;
       setNote(saved);
       setTitleDraft(saved.title);
       setDraftBody(saved.body);
+      setDraftHighlights(saved.highlights ?? []);
+      setChecklist(checklistDraft(saved.checklist));
       dirtyRef.current = false;
       setDirty(false);
       setStatus("All changes saved");
     } catch (e) {
+      if (current !== generation.current) return;
       setError("Changes could not be saved. Please try again. " + (e as Error).message);
       setStatus("Not saved");
       return;
@@ -637,6 +820,8 @@ export function NoteWorkspace() {
     if (!note || savingRef.current) return;
     setTitleDraft(note.title);
     setDraftBody(note.body);
+    setDraftHighlights(note.highlights ?? []);
+    setChecklist(checklistDraft(note.checklist));
     setError("");
     setStatus(dirtyRef.current ? "Saving…" : "All changes saved");
   }
@@ -698,7 +883,12 @@ export function NoteWorkspace() {
     !state.user ||
     isOwner ||
     currentCollaborator?.permission === "edit";
-  const hasDraftChanges = titleDraft !== note.title || draftBody !== note.body;
+  const hasDraftChanges =
+  titleDraft !== note.title ||
+  draftBody !== note.body ||
+  JSON.stringify(draftHighlights) !== JSON.stringify(note.highlights ?? []) ||
+  JSON.stringify(checklist.map(({ text, done }) => ({ text, done }))) !==
+    JSON.stringify(note.checklist ?? []);
   return (
     <>
       <div className={s.editorTop}>
@@ -810,14 +1000,108 @@ export function NoteWorkspace() {
               }
             />
           </label>
-          <textarea
-            className={s.noteBody}
-            aria-label="Note body"
-            placeholder="Start anywhere. This space is yours…"
-            value={draftBody}
-            disabled={!canEdit || saving}
-            onChange={(e) => setDraftBody(e.target.value)}
-          />
+
+          <div className={s.highlightToolbar}>
+            <button
+              type="button"
+              className={s.secondary}
+              disabled={!canEdit || saving}
+              onClick={() => {
+                const { start, end } = selectionRef.current;
+
+                if (start === end) {
+                  setHighlightMessage("Select some text to highlight.");
+                  setShowHighlightColors(false);
+                  return;
+                }
+
+                setHighlightMessage("");
+                setShowHighlightColors((show) => !show);
+              }}
+            >
+              Highlight
+            </button>
+
+            {showHighlightColors && (
+              <div className={s.highlightChoices}>
+                <button
+                  type="button"
+                  onClick={() => applyHighlight("yellow")}
+                >
+                  Yellow
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => applyHighlight("green")}
+                >
+                  Green
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => applyHighlight("pink")}
+                >
+                  Pink
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              className={s.secondary}
+              disabled={!canEdit || saving}
+              onClick={removeHighlight}
+            >
+              Remove highlight
+            </button>
+          </div>
+
+          {highlightMessage && (
+            <p role="status" className={s.muted}>
+              {highlightMessage}
+            </p>
+          )}
+          <div className={s.highlightEditor}>
+            <div
+              ref={highlightLayerRef}
+              className={s.highlightLayer}
+              aria-hidden="true"
+            >
+              {renderHighlightedBody()}
+            </div>
+
+            <textarea
+              ref={bodyRef}
+              className={`${s.noteBody} ${s.highlightTextarea}`}
+              aria-label="Note body"
+              placeholder="Start anywhere. This space is yours…"
+              value={draftBody}
+              disabled={!canEdit || saving}
+              onSelect={(e) => {
+                selectionRef.current = {
+                  start: e.currentTarget.selectionStart,
+                  end: e.currentTarget.selectionEnd,
+                };
+              }}
+              onScroll={(e) => {
+                if (highlightLayerRef.current) {
+                  highlightLayerRef.current.scrollTop = e.currentTarget.scrollTop;
+                  highlightLayerRef.current.scrollLeft = e.currentTarget.scrollLeft;
+                }
+              }}
+              onChange={(e) => {
+                const nextBody = e.target.value;
+
+                setDraftHighlights((current) =>
+                  adjustHighlightsForBodyChange(draftBody, nextBody, current),
+                );
+
+                setDraftBody(nextBody);
+              }}
+            />
+          </div>
+          <ChecklistEditor items={checklist} onChange={setChecklist} disabled={!canEdit || saving} />
           <div className={s.actions}>
             <button
               type="button"
@@ -1042,6 +1326,8 @@ export function NoteWorkspace() {
                 setDirty(false);
                 setNote(restored);
                 setDraftBody(restored.body);
+                setDraftHighlights(restored.highlights ?? []);
+                setChecklist(checklistDraft(restored.checklist));
                 setTitleDraft(restored.title);
                 noteRef.current = restored;
                 savedNote.current = restored;
@@ -1127,8 +1413,9 @@ export function CoursePage() {
       )}
       <section className={s.panel}>
         <h2>Coming up in this course</h2>
+        {/* A weekly class would fill this list with every meeting of the term (card 48). */}
         {state.events
-          .filter((e) => e.courseId === id)
+          .filter((e) => e.courseId === id && !e.seriesId)
           .map((e) => (
             <Link
               key={e.id}

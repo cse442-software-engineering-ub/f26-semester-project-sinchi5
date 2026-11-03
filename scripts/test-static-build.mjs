@@ -57,6 +57,8 @@ try {
         if (action === "login") signedIn = true;
         // Signed-in accounts load their notes from the server (task #120).
         if (action === "notes") return route.fulfill({ json: { notes: [] } });
+        // ...and their imported syllabus events, for the schedule (card 48).
+        if (action === "events") return route.fulfill({ json: { events: [] } });
         await route.fulfill({ json: {
           user: signedIn ? { id: "42", name: "Route Tester", email: "routes@example.edu" } : null,
           onboarding: { completed: signedIn, step: signedIn ? 3 : 0 },

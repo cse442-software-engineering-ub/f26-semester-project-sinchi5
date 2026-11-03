@@ -20,7 +20,6 @@ import {
   UploadCloud,
   Camera,
   FileText,
-  ChevronDown,
   ArrowUpRight,
   X,
   LogOut,
@@ -33,6 +32,7 @@ import { Settings } from "../features/settings";
 import { Onboarding } from "../features/onboarding";
 import { ImportDialog } from "../features/imports";
 import { BRAND, type UploadKind } from "../domain";
+import { AddCourseDialog } from "../features/course-dialog";
 import s from "./App.module.css";
 const nav = [
   { to: "/", label: "Today", icon: Sun },
@@ -46,6 +46,7 @@ export default function App() {
   const [importKind, setImportKind] = useState<UploadKind>();
   const [event, setEvent] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [addingCourse, setAddingCourse] = useState(false);
   useEffect(() => {
     document.title = `${BRAND} · ${location.pathname.startsWith("/notes") ? "Your notes" : location.pathname.startsWith("/schedule") ? "Your schedule" : "Your study space"}`;
     window.scrollTo(0, 0);
@@ -115,13 +116,13 @@ export default function App() {
           {BRAND}
           <i>✦</i>
         </Link>
+        {/* Keep workspace details non-interactive: there is no menu to open. */}
         <div className={s.workspace}>
           <span className={s.avatar}>{state.user.name[0].toUpperCase()}</span>
           <span>
             <strong>My workspace</strong>
             <small>A little room to think</small>
           </span>
-          <ChevronDown size={15} />
         </div>
         <nav aria-label="Main navigation">
           {nav.map(({ to, label, icon: Icon }) => (
@@ -142,9 +143,13 @@ export default function App() {
         <div className={s.sideSection}>
           <div className={s.sideLabel}>
             YOUR COURSES{" "}
-            <Link to="/settings" aria-label="Manage courses">
+            <button
+              type="button"
+              aria-label="Add a course"
+              onClick={() => setAddingCourse(true)}
+            >
               <Plus size={15} />
-            </Link>
+            </button>
           </div>
           {state.courses.map((c) => (
             <NavLink
@@ -191,7 +196,6 @@ export default function App() {
           <LogOut size={18} /> {signingOut ? "Logging out…" : "Log out"}
         </button>
         <div className={s.sideFooter}>
-          <span className={s.avatar}>{state.user.name[0].toUpperCase()}</span>
           <span>
             <strong>{state.user.name}</strong>
             <small>Curious mind, always.</small>
@@ -280,6 +284,7 @@ export default function App() {
                 <Dashboard
                   onImport={setImportKind}
                   onCreate={() => void create()}
+                  onAddCourse={() => setAddingCourse(true)}
                 />
               }
             />
@@ -323,6 +328,10 @@ export default function App() {
           <span>{signingOut ? "Logging out…" : "Log out"}</span>
         </button>
       </nav>
+      {addingCourse && (
+        <AddCourseDialog onClose={() => setAddingCourse(false)} />
+      )}
+
       {importKind && (
         <ImportDialog
           kind={importKind}

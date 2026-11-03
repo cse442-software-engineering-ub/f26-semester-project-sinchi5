@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Server-side notes, including card 55 search. Run only against DEV/TEST with migrations 002, 003, and 004 applied.
+// Server-side notes, including cards 55 and 79. Apply migrations 001 through 007 locally.
 require_once __DIR__ . '/../lib/bootstrap.php';
 require_once __DIR__ . '/../lib/accounts.php';
 require_once __DIR__ . '/../lib/notes.php';
@@ -22,8 +22,8 @@ function expectStatus(PDO $db, callable $action, int $status): void
 }
 
 $config = configuration();
-check(in_array(parse_url($config['origin'], PHP_URL_HOST), ['localhost', '127.0.0.1', 'aptitude.cse.buffalo.edu'], true),
-    'Run server note tests only on DEV or TEST.');
+check(in_array(parse_url($config['origin'], PHP_URL_HOST), ['localhost', '127.0.0.1'], true)
+    && getenv('NOTELY_TEST_ISOLATED') === '1', 'Run only on an isolated local database with NOTELY_TEST_ISOLATED=1.');
 $db = database($config);
 $users = [];
 $emails = [];
@@ -54,6 +54,18 @@ try {
     $note = noteAction($db, $a, 'note-create', ['title' => 'Shared study guide', 'body' => 'Chapter 1',
         'courseId' => 'cse442', 'lectureDate' => '2026-10-05', 'category' => 'School', 'visibility' => 'private', 'tags' => ['exam']])['note'];
     $id = $note['id'];
+    // Task #79 / Story #19: migrated NULL rows read as empty tasks. Checklist-only
+    // edits advance updatedAt without creating text history or losing note metadata.
+    query($db, "UPDATE notely_notes SET checklist = NULL, updated_at = '2000-01-01 00:00:00' WHERE id = ?", [$id]);
+    check(read($db, $a, 'note', $id)['note']['checklist'] === [], 'Legacy NULL checklist was not empty.');
+    $tasks = [['text' => 'Review chapter', 'done' => true]];
+    $taskSaved = noteAction($db, $a, 'note-save', ['id' => $id, 'checklist' => $tasks])['note'];
+    check($taskSaved['checklist'] === $tasks && $taskSaved['updatedAt'] > '2000-01-01T00:00:00Z', 'Checklist save did not update edit date.');
+    check(read($db, $a, 'note-versions', $id)['versions'] === [], 'Checklist edit created a text version.');
+    foreach (['title', 'body', 'courseId', 'lectureDate', 'category', 'visibility', 'tags', 'pinned', 'createdAt', 'ownerId'] as $key) {
+        check($taskSaved[$key] === $note[$key], "Checklist edit changed $key.");
+    }
+    echo "PASS: Task #79 legacy NULL compatibility, checklist-only timestamp and metadata preservation\n";
     check($note['ownerId'] === (string) $users[0] && $note['courseId'] === 'cse442' && $note['lectureDate'] === '2026-10-05'
         && $note['tags'] === ['exam'] && $note['pinned'] === false, 'Create did not store metadata.');
     $titles = fn (array $session) => array_column(noteAction($db, $session, 'notes', [])['notes'], 'title');
@@ -104,6 +116,21 @@ try {
     check($pinned['pinned'] === true && $pinned['updatedAt'] === $saved['updatedAt'], 'Pinning changed the edit date.');
     $restored = noteAction($db, $a, 'note-restore', ['id' => $id, 'versionId' => $versions[0]['id']])['note'];
     check($restored['body'] === 'Chapter 1' && count(read($db, $a, 'note-versions', $id)['versions']) === 2, 'Restore lost history.');
+
+    // Card 56: the title-only and body-only saves keep the previous text too; an unchanged title keeps nothing.
+    noteAction($db, $a, 'note-title', ['id' => $id, 'title' => 'Renamed guide']);
+    $versions = read($db, $a, 'note-versions', $id)['versions'];
+    check(count($versions) === 3 && $versions[0]['title'] === 'Shared study guide' && $versions[0]['body'] === 'Chapter 1',
+        'A title change kept no version.');
+    noteAction($db, $a, 'note-content', ['id' => $id, 'body' => 'Chapter 3']);
+    $versions = read($db, $a, 'note-versions', $id)['versions'];
+    check(count($versions) === 4 && $versions[0]['title'] === 'Renamed guide' && $versions[0]['body'] === 'Chapter 1',
+        'A body change kept no version.');
+    noteAction($db, $a, 'note-title', ['id' => $id, 'title' => 'Renamed guide']);
+    check(count(read($db, $a, 'note-versions', $id)['versions']) === 4, 'An unchanged title kept a version.');
+    noteAction($db, $a, 'note-title', ['id' => $id, 'title' => 'Shared study guide']);
+    noteAction($db, $a, 'note-content', ['id' => $id, 'body' => 'Chapter 1']);
+    echo "PASS: card 56 title and body saves keep the previous version\n";
 
     // Sharing: only the owner invites and sets permissions; collaborators see the note.
     expectStatus($db, fn () => noteAction($db, $a, 'note-invite', ['id' => $id, 'email' => 'nobody-' . bin2hex(random_bytes(4)) . '@example.edu']), 404);

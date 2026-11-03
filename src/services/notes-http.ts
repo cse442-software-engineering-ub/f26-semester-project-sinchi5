@@ -1,4 +1,5 @@
 import type { Collaborator, Comment, Course, Note, NoteRepository, NoteVersion } from "../domain";
+import { checklistPayload } from "./checklists";
 import { filterNotes } from "./repositories";
 import { dateKey } from "./fixtures";
 
@@ -9,14 +10,11 @@ export class NoteServiceError extends Error {
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const NOTE_CATEGORIES = ["School", "Work", "Meetings", "Personal"];
 
-// Server-backed notes for signed-in accounts (task #120). The demo keeps notes in the browser.
-export function createHttpNotes(
-  _courses: () => Promise<Course[]>,
-  endpoint = `${import.meta.env.BASE_URL}api/index.php`,
-  fetcher: typeof fetch = fetch,
-): NoteRepository {
+// Sends JSON requests to the PHP API. POSTs carry the session's CSRF token, fetched on first use.
+// `offline` and `unavailable` are the messages for a failed connection and an error without one.
+export function createApiClient(endpoint: string, fetcher: typeof fetch, offline: string, unavailable: string) {
   let csrf = "";
-  async function send<T>(route: string, data?: object, retry = true): Promise<T> {
+  return async function send<T>(route: string, data?: object, timeout = 15000, retry = true): Promise<T> {
     if (data && !csrf) csrf = (await send<{ csrfToken: string }>("session")).csrfToken;
     let response: Response;
     try {
@@ -24,26 +22,40 @@ export function createHttpNotes(
         method: data ? "POST" : "GET",
         credentials: "same-origin",
         cache: "no-store",
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(timeout),
         headers: data ? { "Content-Type": "application/json", "X-CSRF-Token": csrf } : {},
         ...(data ? { body: JSON.stringify(data) } : {}),
       });
     } catch {
-      throw new NoteServiceError("Could not reach your notes. Check your connection and try again.", 0);
+      throw new NoteServiceError(offline, 0);
     }
     const body = await response.json().catch(() => null);
     // A new sign-in changes the session's CSRF token; fetch it again once.
     if (response.status === 403 && data && retry && /session changed/i.test(body?.error || "")) {
       csrf = "";
-      return send(route, data, false);
+      return send(route, data, timeout, false);
     }
-    if (!response.ok) throw new NoteServiceError(body?.error || "Your notes are unavailable. Please try again later.", response.status);
+    // A reply that isn't a JSON object (such as a PHP warning page sent with 200) is a failure too.
+    if (!response.ok || !body || typeof body !== "object") throw new NoteServiceError(body?.error || unavailable, response.status);
     return body as T;
-  }
+  };
+}
+
+// Server-backed notes for signed-in accounts (task #120). The demo keeps notes in the browser.
+export function createHttpNotes(
+  _courses: () => Promise<Course[]>,
+  endpoint = `${import.meta.env.BASE_URL}api/index.php`,
+  fetcher: typeof fetch = fetch,
+): NoteRepository {
+  const send = createApiClient(endpoint, fetcher, "Could not reach your notes. Check your connection and try again.",
+    "Your notes are unavailable. Please try again later.");
   const query = (route: string, noteId: string) => `${route}&id=${encodeURIComponent(noteId)}`;
   const content = (note: Partial<Note>) => ({
     title: note.title, body: note.body, courseId: note.courseId, lectureDate: note.lectureDate,
     category: note.category, visibility: note.visibility, tags: note.tags,
+    // Task #78 / Story #19 AT1-3: omit legacy fields, but send [] to explicitly clear tasks.
+    ...(note.highlights === undefined ? {} : { highlights: note.highlights }),
+    ...(note.checklist === undefined ? {} : { checklist: checklistPayload(note.checklist) }),
   });
   return {
     async list(q) {
@@ -57,7 +69,7 @@ export function createHttpNotes(
       return (await send<{ note: Note }>(query("note", noteId))).note;
     },
     async create(data) {
-      const note = { title: "Untitled note", body: "", courseId: "", lectureDate: dateKey(), category: "School",
+      const note = { title: "Untitled note", body: "", highlights: [], courseId: "", lectureDate: dateKey(), category: "School",
         visibility: "private" as const, tags: [], ...data };
       return (await send<{ note: Note }>("note-create", content(note))).note;
     },

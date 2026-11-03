@@ -10,8 +10,29 @@ const NOTE_READ_ROUTES = ['note', 'notes', 'note-versions', 'note-comments', 'no
 const NOTE_ROUTES = [...NOTE_READ_ROUTES, 'note-create', 'note-title', 'note-content', 'note-save', 'note-pin',
     'note-restore', 'note-delete', 'note-comment', 'note-invite', 'note-permission'];
 const NOTE_CATEGORIES = ['School', 'Work', 'Meetings', 'Personal'];
-const NOTE_COLUMNS = 'n.id, n.owner_user_id, n.title, n.body, n.course_id, n.lecture_date, n.category,
-    n.visibility, n.tags, n.pinned, n.created_at, n.updated_at';
+const NOTE_COLUMNS = 'n.id, n.owner_user_id, n.title, n.body, n.highlights, n.course_id, n.lecture_date, n.category,
+    n.visibility, n.tags, n.pinned, n.created_at, n.updated_at, n.checklist';
+
+// Task #79 / Story #19: retain ordered tasks and exact boolean completion states.
+// HTTP JSON objects arrive as stdClass; PHP callers may supply associative items.
+// The existing 8 KB request cap bounds item count/text size without new arbitrary limits.
+function noteChecklist(mixed $value): string
+{
+    if (!is_array($value) || array_values($value) !== $value) {
+        throw new HttpError(422, 'Send the checklist as an array of text and done items.');
+    }
+    $items = [];
+    foreach ($value as $item) {
+        if ($item instanceof stdClass) $item = (array) $item;
+        if (!is_array($item) || !is_string($item['text'] ?? null)
+            || !preg_match('//u', $item['text']) || !is_bool($item['done'] ?? null)) {
+            throw new HttpError(422, 'Each checklist item needs UTF-8 text and a boolean done value.');
+        }
+        // Task Test 2: discard blank tasks, preserving meaningful text and relative order.
+        if (trimEdges($item['text']) !== '') $items[] = ['text' => $item['text'], 'done' => $item['done']];
+    }
+    return json_encode($items, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+}
 
 function recordId(mixed $value, string $message): string
 {
@@ -48,6 +69,65 @@ function noteBody(array $input): string
         throw new HttpError(422, 'The note body contains characters we could not read.');
     }
     return $body;
+}
+
+// Task #86 / Story #31: save highlight ranges and allow only supported colors.
+function noteHighlights(mixed $value, string $body): string
+{
+    if (!is_array($value) || array_values($value) !== $value) {
+        throw new HttpError(422, 'Send highlights as a list.');
+    }
+
+    $bodyLength = characterCount($body);
+    $highlights = [];
+
+    foreach ($value as $highlight) {
+        if ($highlight instanceof stdClass) {
+            $highlight = (array) $highlight;
+        }
+
+        if (!is_array($highlight)) {
+            throw new HttpError(422, 'Send highlights as a list.');
+        }
+
+        $start = $highlight['start'] ?? null;
+        $end = $highlight['end'] ?? null;
+        $color = $highlight['color'] ?? null;
+
+        if (
+            !is_int($start) ||
+            !is_int($end) ||
+            $start < 0 ||
+            $end <= $start ||
+            $end > $bodyLength
+        ) {
+            throw new HttpError(
+                422,
+                'Highlights must be inside the note.'
+            );
+        }
+
+        if (
+            !is_string($color) ||
+            !in_array($color, ['yellow', 'green', 'pink'], true)
+        ) {
+            throw new HttpError(
+                422,
+                'Choose yellow, green, or pink.'
+            );
+        }
+
+        $highlights[] = [
+            'start' => $start,
+            'end' => $end,
+            'color' => $color,
+        ];
+    }
+
+    return json_encode(
+        $highlights,
+        JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+    );
 }
 
 // Returns [course_id, lecture_date, category, visibility, tags JSON] in column order.
@@ -184,6 +264,10 @@ function noteJson(array $row): array
         'ownerId' => (string) $row['owner_user_id'],
         'title' => $row['title'],
         'body' => $row['body'],
+        // Task #86 / Story #31: expose saved highlight ranges as an array.
+        'highlights' => json_decode($row['highlights'] ?? '[]', true, 16, JSON_THROW_ON_ERROR),
+        // Task #79: NULL on pre-existing notes means no tasks; expose an array, never JSON text.
+        'checklist' => json_decode($row['checklist'] ?? '[]', true, 16, JSON_THROW_ON_ERROR),
         'courseId' => $row['course_id'],
         'lectureDate' => $row['lecture_date'] ?? '',
         'category' => $row['category'],
@@ -272,8 +356,9 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
     if ($route === 'note-create') {
         $title = noteTitle($input);
         $body = array_key_exists('body', $input) ? noteBody($input) : '';
-        query($db, 'INSERT INTO notely_notes (owner_user_id, title, body, course_id, lecture_date, category, visibility, tags)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [$user['id'], $title, $body, ...noteFields($input)]);
+        $checklist = noteChecklist(array_key_exists('checklist', $input) ? $input['checklist'] : []);
+        query($db, 'INSERT INTO notely_notes (owner_user_id, title, body, course_id, lecture_date, category, visibility, tags, checklist)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [$user['id'], $title, $body, ...noteFields($input), $checklist]);
         $id = (string) $db->lastInsertId();
         http_response_code(201);
         return ['note' => loadNote($db, $id)];
@@ -303,20 +388,54 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
     }
 
     if ($route === 'note-title' || $route === 'note-content') {
-        $value = $route === 'note-content' ? noteBody($input) : noteTitle($input);
+        $value = $route === 'note-content'
+            ? noteBody($input)
+            : noteTitle($input);
+
         requireEditor($db, $id, $user);
-        query($db, 'UPDATE notely_notes SET ' . ($route === 'note-content' ? 'body' : 'title') . ' = ? WHERE id = ?', [$value, $id]);
-        return ['note' => ['id' => $id, $route === 'note-content' ? 'body' : 'title' => $value]];
+
+        $current = loadNote($db, $id);
+
+        $title = $route === 'note-title'
+            ? $value
+            : $current['title'];
+
+        $body = $route === 'note-content'
+            ? $value
+            : $current['body'];
+
+        keepVersion($db, $id, $user, $title, $body);
+
+        query(
+            $db,
+            'UPDATE notely_notes SET '
+            . ($route === 'note-content' ? 'body' : 'title')
+            . ' = ? WHERE id = ?',
+            [$value, $id]
+        );
+
+        return [
+            'note' => [
+                'id' => $id,
+                $route === 'note-content' ? 'body' : 'title' => $value,
+            ],
+        ];
     }
     if ($route === 'note-save') {
-        $title = noteTitle($input);
-        $body = noteBody($input);
         requireEditor($db, $id, $user);
-        // Fields left out of the request keep their current values.
-        $fields = noteFields($input + loadNote($db, $id));
+        // Task #79 / Story #19: merge after locking so checklist-only saves and legacy
+        // title/body saves preserve every omitted field, including existing tasks.
+        $merged = $input + loadNote($db, $id);
+        $title = noteTitle($merged);
+        $body = noteBody($merged);
+        $fields = noteFields($merged);
+        $highlights = noteHighlights($merged['highlights'], $body);
+        $checklist = noteChecklist($merged['checklist']);
+        // History remains title/body-only; checklist saves update the edit date like metadata.
+        // Restoring text therefore leaves the current Story #19 task states untouched.
         keepVersion($db, $id, $user, $title, $body);
-        query($db, 'UPDATE notely_notes SET title = ?, body = ?, course_id = ?, lecture_date = ?, category = ?,
-            visibility = ?, tags = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [$title, $body, ...$fields, $id]);
+        query($db, 'UPDATE notely_notes SET title = ?, body = ?, highlights = ?, course_id = ?, lecture_date = ?, category = ?,
+            visibility = ?, tags = ?, checklist = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [$title, $body, $highlights, ...$fields, $checklist, $id]);
         return ['note' => loadNote($db, $id)];
     }
     if ($route === 'note-pin') {

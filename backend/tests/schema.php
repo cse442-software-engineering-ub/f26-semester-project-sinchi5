@@ -19,10 +19,11 @@ $tables = [
     ],
     'notely_notes' => [
         'id' => ['bigint unsigned', 'NO'], 'owner_user_id' => ['bigint unsigned', 'NO'],
-        'title' => ['varchar(255)', 'NO'], 'body' => ['text', 'NO'],
+        'title' => ['varchar(255)', 'NO'], 'body' => ['text', 'NO'], 'highlights' => ['text', 'YES'],
         'course_id' => ['varchar(64)', 'NO'], 'lecture_date' => ['date', 'YES'], 'category' => ['varchar(20)', 'NO'],
         'visibility' => ["enum('private','shared')", 'NO'], 'tags' => ['varchar(4000)', 'NO'], 'pinned' => ['tinyint', 'NO'],
         'created_at' => ['datetime', 'NO'], 'updated_at' => ['datetime', 'NO'],
+        'checklist' => ['text', 'YES'],
     ],
     'notely_note_editors' => [
         'note_id' => ['bigint unsigned', 'NO'], 'user_id' => ['bigint unsigned', 'NO'],
@@ -35,6 +36,22 @@ $tables = [
     'notely_note_comments' => [
         'id' => ['bigint unsigned', 'NO'], 'note_id' => ['bigint unsigned', 'NO'], 'author_user_id' => ['bigint unsigned', 'NO'],
         'body' => ['text', 'NO'], 'created_at' => ['datetime', 'NO'],
+    ],
+    'notely_import_jobs' => [
+        'id' => ['bigint unsigned', 'NO'], 'owner_user_id' => ['bigint unsigned', 'NO'], 'kind' => ["enum('syllabus')", 'NO'],
+        'course_id' => ['varchar(64)', 'NO'], 'file_name' => ['varchar(255)', 'NO'], 'file_type' => ['varchar(4)', 'NO'],
+        'file_size' => ['int unsigned', 'NO'], 'file_sha256' => ['char(64)', 'NO'], 'content' => ['longblob', 'YES'],
+        'state' => ["enum('queued','processing','review','failed','completed')", 'NO'], 'events' => ['mediumtext', 'YES'],
+        'reader_key' => ['varchar(32)', 'YES'],
+        'created_at' => ['datetime', 'NO'], 'updated_at' => ['datetime', 'NO'],
+    ],
+    'notely_events' => [
+        'id' => ['bigint unsigned', 'NO'], 'owner_user_id' => ['bigint unsigned', 'NO'], 'course_id' => ['varchar(64)', 'NO'],
+        'title' => ['varchar(255)', 'NO'],
+        'kind' => ["enum('lecture','assignment','quiz','exam','deadline','other','recitation','lab')", 'NO'],
+        'event_date' => ['date', 'NO'], 'event_time' => ['time', 'YES'], 'location' => ['varchar(120)', 'NO'],
+        'series_id' => ['varchar(40)', 'YES'], 'source' => ["enum('manual','imported')", 'NO'],
+        'import_job_id' => ['bigint unsigned', 'YES'], 'created_at' => ['datetime', 'NO'],
     ],
 ];
 foreach ($tables as $table => $columns) {
@@ -55,9 +72,14 @@ if ((int) $index !== 1) { throw new RuntimeException('Missing unique email index
 $fk = query($db, "SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'notely_sessions_user_fk'")->fetchColumn();
 if ($fk !== 'CASCADE') { throw new RuntimeException('Missing session cascade'); }
 foreach (['notely_notes_owner_fk', 'notely_note_editors_note_fk', 'notely_note_editors_user_fk',
-    'notely_note_versions_note_fk', 'notely_note_comments_note_fk', 'notely_note_comments_author_fk'] as $constraint) {
+    'notely_note_versions_note_fk', 'notely_note_comments_note_fk', 'notely_note_comments_author_fk',
+    'notely_import_jobs_owner_fk', 'notely_events_owner_fk'] as $constraint) {
     $rule = query($db, 'SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS
         WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = ?', [$constraint])->fetchColumn();
     if ($rule !== 'CASCADE') { throw new RuntimeException('Missing note cascade: ' . $constraint); }
 }
+// Saved events outlive the upload they came from.
+$rule = query($db, "SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'notely_events_job_fk'")->fetchColumn();
+if ($rule !== 'SET NULL') { throw new RuntimeException('Missing event job SET NULL rule'); }
 echo "PASS: schema, unique email, and account/note cascades\n";

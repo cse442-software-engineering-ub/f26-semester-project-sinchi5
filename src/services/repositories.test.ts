@@ -11,6 +11,7 @@ function memory() {
     },
   };
 }
+
 describe("repository contracts", () => {
   it("combines keyword, course, visibility, category and date filters", () => {
     const notes = seedNotes();
@@ -103,17 +104,13 @@ describe("repository contracts", () => {
     expect(
       r.imports.validate({ name: "paper.pdf", size: 30 }, "scan"),
     ).toBeTruthy();
-    const failed = await r.imports.start(
-      { name: "paper.pdf", size: 30 },
-      "document",
-      "failure",
-    );
+    const paper = new File(["paper"], "paper.pdf");
+    const queued = await r.imports.start(paper, "document", "failure");
+    expect(queued.state).toBe("queued");
+    const failed = await r.imports.process(queued, "failure");
     await expect(r.imports.confirm(failed)).rejects.toThrow();
-    const job = await r.imports.start(
-      { name: "syllabus.pdf", size: 30 },
-      "syllabus",
-      "partial",
-    );
+    const syllabus = new File(["syllabus"], "syllabus.txt");
+    const job = await r.imports.process(await r.imports.start(syllabus, "syllabus"), "partial");
     expect(job.state).toBe("partial");
     job.events[0].title = "Reviewed assignment";
     await r.imports.confirm(job);
@@ -122,6 +119,168 @@ describe("repository contracts", () => {
         (e) => e.title === "Reviewed assignment" && e.source === "imported",
       ),
     ).toBe(true);
+  });
+  it("sends every syllabus to the server's reader with the course term's year (card 45)", async () => {
+    const calls: string[] = [];
+    const server = {
+      upload: async (file: File, courseId: string) => { calls.push(`upload ${file.name} ${courseId}`); return { id: "7" }; },
+      extract: async (id: string, year: number) => {
+        calls.push(`extract ${id} ${year}`);
+        return { events: [
+          { title: " Midterm exam ", kind: "exam", date: "2026-10-14", time: "10:00", location: "Knox 110", source: "p. 2" },
+          { title: "Final exam", kind: "exam", date: "", time: "", location: "", source: "Final exam: TBA" },
+          { title: "" },
+        ] };
+      },
+    } as never;
+    const r = createRepositories(undefined, undefined, true, undefined, server);
+    const file = new File(["CSE 442 Syllabus"], "cse442-syllabus.txt");
+    const queued = await r.imports.start(file, "syllabus", "success", "cse442");
+    expect([queued.id, queued.state, queued.metadata.courseId]).toEqual(["7", "queued", "cse442"]);
+    const job = await r.imports.process(queued);
+    // The CSE 442 sample course is in Fall 2026, and even a text file goes to the reader.
+    expect(calls).toEqual(["upload cse442-syllabus.txt cse442", "extract 7 2026"]);
+    // An exam with no posted date is listed unchecked, so the student sees it without having to act on it.
+    expect(job.state).toBe("partial");
+    expect(job.events).toEqual([
+      { id: "", courseId: "cse442", title: "Midterm exam", kind: "exam", date: "2026-10-14", time: "10:00", location: "Knox 110", description: "p. 2", source: "imported" },
+      { id: "", courseId: "cse442", title: "Final exam", kind: "exam", date: "", time: "", location: "", description: "Final exam: TBA", source: "imported", needsReview: true, include: false },
+    ]);
+    expect((await r.imports.process(job, "failure")).state).toBe("failed");
+    expect(calls).toHaveLength(2);
+  });
+  it("turns the reader's weekly classes into review rows (card 44)", async () => {
+    const lecture = { title: "Lecture", kind: "lecture", section: "", days: [1, 3], time: "10:00", location: "Davis 101", firstDate: "2026-08-24", lastDate: "2026-12-04", source: "MW 10:00" };
+    const section = (name: string) => ({ ...lecture, title: "Lab", kind: "lab", section: name, days: [2], firstDate: "", lastDate: "", source: name });
+    const server = {
+      upload: async () => ({ id: "8" }),
+      extract: async () => ({ isSyllabus: true, meetings: [lecture, section("A1"), section("A2"), { ...section("R1"), title: "Recitation", kind: "recitation" }],
+        noClassDates: [{ from: "2026-11-25", to: "2026-11-27" }], events: [] }),
+    } as never;
+    const r = createRepositories(undefined, undefined, true, undefined, server);
+    const course = await r.courses.create({ code: "CSE 442", name: "Software Engineering", color: "#000000", term: "Fall 2026", classesStart: "2026-08-31", classesEnd: "2026-12-11" });
+    const file = new File(["syllabus"], "syllabus.txt");
+    const job = await r.imports.process(await r.imports.start(file, "syllabus", "success", course.id));
+    expect(job.state).toBe("review");
+    expect(job.isSyllabus).toBe(true);
+    expect(job.noClassDates).toEqual([{ from: "2026-11-25", to: "2026-11-27" }]);
+    expect(job.meetings!.map((m) => [m.title, m.days, m.time, m.location, m.starts, m.ends, m.include])).toEqual([
+      // The syllabus's own dates come first; a class with none falls back to the course's.
+      ["Lecture", [1, 3], "10:00", "Davis 101", "2026-08-24", "2026-12-04", true],
+      // Two labs are a choice, so neither is assumed. One recitation is just the recitation.
+      ["Lab A1", [2], "10:00", "Davis 101", "2026-08-31", "2026-12-11", false],
+      ["Lab A2", [2], "10:00", "Davis 101", "2026-08-31", "2026-12-11", false],
+      ["Recitation R1", [2], "10:00", "Davis 101", "2026-08-31", "2026-12-11", true],
+    ]);
+  });
+  it("reports when the reader says a file isn't a syllabus, or finds nothing (card 44)", async () => {
+    let read: unknown = { isSyllabus: false, meetings: [], noClassDates: [], events: [] };
+    const server = { upload: async () => ({ id: "9" }), extract: async () => read } as never;
+    const r = createRepositories(undefined, undefined, true, undefined, server);
+    const file = new File(["resume"], "resume.txt");
+    const notSyllabus = await r.imports.process(await r.imports.start(file, "syllabus", "success", "cse442"));
+    expect([notSyllabus.state, notSyllabus.isSyllabus, notSyllabus.events, notSyllabus.meetings]).toEqual(["review", false, [], []]);
+    read = { isSyllabus: true, meetings: [], noClassDates: [], events: [] };
+    const nothing = await r.imports.process(await r.imports.start(file, "syllabus", "success", "cse442"));
+    expect([nothing.state, nothing.isSyllabus, nothing.events, nothing.meetings]).toEqual(["review", true, [], []]);
+  });
+  it("saves a signed-in student's included events on the server and lists them (card 48)", async () => {
+    const confirmed: unknown[] = [];
+    const midterm = { id: "41", courseId: "cse442", title: "Midterm exam", kind: "exam" as const, date: "2026-10-14",
+      time: "10:00", location: "", description: "", source: "imported" as const };
+    const server = {
+      upload: async () => ({ id: "9" }),
+      extract: async () => ({ events: [
+        { title: "Homework 1", kind: "assignment", date: "2026-09-28", time: "", location: "", source: "" },
+        { title: "Final project", kind: "deadline", date: "2026-12-04", time: "", location: "", source: "" },
+      ] }),
+      confirm: async (...args: unknown[]) => { confirmed.push(args); return { created: 1, skipped: 0 }; },
+      events: async () => [midterm],
+    } as never;
+    const r = createRepositories(undefined, undefined, false, undefined, server);
+    const file = new File(["syllabus"], "cse442-syllabus.txt");
+    const job = await r.imports.process(await r.imports.start(file, "syllabus", "success", "cse442"));
+    job.events[1].include = false;
+    expect(await r.imports.confirm(job)).toEqual({ created: 1, skipped: 0, first: "2026-09-28" });
+    expect(confirmed).toEqual([["9", "cse442", [{ title: "Homework 1", kind: "assignment", date: "2026-09-28", time: "", location: "" }]]]);
+    expect(await r.schedule.list("2026-10-01", "2026-10-31")).toEqual([midterm]);
+    // A local edit of an imported event replaces the server copy instead of showing both.
+    await r.schedule.save({ ...midterm, title: "Midterm exam (room 101)" });
+    expect((await r.schedule.list()).map((e) => e.title)).toEqual(["Midterm exam (room 101)"]);
+  });
+  it("saves each included weekly class as one event per meeting, tied together by a series (card 46)", async () => {
+    const confirmed: unknown[][] = [];
+    const lecture = { title: "Lecture", kind: "lecture", section: "", days: [1, 3], time: "10:00", location: "Davis 101", firstDate: "2026-08-24", lastDate: "2026-09-02", source: "" };
+    const server = {
+      upload: async () => ({ id: "11" }),
+      extract: async () => ({ isSyllabus: true, noClassDates: [{ from: "2026-08-26", to: "2026-08-26" }], events: [],
+        meetings: [lecture, { ...lecture, title: "Lab", kind: "lab", section: "A1", days: [2] }, { ...lecture, title: "Lab", kind: "lab", section: "A2", days: [4] }] }),
+      confirm: async (...args: unknown[]) => { confirmed.push(args); return { created: 1, skipped: 0 }; },
+    } as never;
+    const r = createRepositories(undefined, undefined, false, undefined, server);
+    const course = await r.courses.create({ code: "CSE 442", name: "Software Engineering", color: "#000000", term: "Fall 2026" });
+    const job = await r.imports.process(await r.imports.start(new File(["syllabus"], "s.txt"), "syllabus", "success", course.id));
+    // The student picks lab A2 and leaves A1 out. Series numbers count only what's included.
+    job.meetings![2].include = true;
+    // The earliest date added is a class's, so the schedule opens there.
+    expect((await r.imports.confirm(job)).first).toBe("2026-08-24");
+    const rows = confirmed[0][2] as { title: string; kind: string; date: string; time: string; location: string; series: number }[];
+    expect(rows.map((row) => [row.title, row.kind, row.date, row.time, row.location, row.series])).toEqual([
+      ["CSE 442 Lecture", "lecture", "2026-08-24", "10:00", "Davis 101", 0],
+      ["CSE 442 Lecture", "lecture", "2026-08-31", "10:00", "Davis 101", 0],
+      ["CSE 442 Lecture", "lecture", "2026-09-02", "10:00", "Davis 101", 0],
+      ["CSE 442 Lab A2", "lab", "2026-08-27", "10:00", "Davis 101", 1],
+    ]);
+  });
+  it("adds the demo's sample class to the schedule in the browser (card 46)", async () => {
+    const r = createRepositories();
+    const job = await r.imports.process(await r.imports.start(new File(["syllabus"], "s.txt"), "syllabus", "success", "cse442"));
+    expect(job.meetings!.map((m) => [m.title, m.include])).toEqual([["Lecture", true]]);
+    job.events.forEach((e) => { e.include = false; });
+    const before = (await r.schedule.list()).length;
+    const saved = await r.imports.confirm(job);
+    const added = (await r.schedule.list()).filter((e) => e.seriesId);
+    expect(added.length).toBeGreaterThan(0);
+    expect(saved.created).toBe(added.length);
+    expect((await r.schedule.list()).length).toBe(before + added.length);
+    expect(new Set(added.map((e) => e.seriesId)).size).toBe(1);
+    expect(added.every((e) => e.title === "CSE 442 Lecture" && e.kind === "lecture" && e.source === "imported")).toBe(true);
+  });
+  it("passes on the reader's reason when it can't read a file (card 45)", async () => {
+    const server = {
+      upload: async () => ({ id: "10" }),
+      extract: async () => { throw new Error("You can read 10 syllabi automatically each day. Try again tomorrow."); },
+    } as never;
+    const r = createRepositories(undefined, undefined, true, undefined, server);
+    const file = new File(["syllabus"], "syllabus.txt");
+    const queued = await r.imports.start(file, "syllabus", "success", "cse442");
+    await expect(r.imports.process(queued)).rejects.toThrow("You can read 10 syllabi automatically each day. Try again tomorrow.");
+  });
+  it("shows sample events in the demo, which has no server to read a file (card 45)", async () => {
+    const r = createRepositories();
+    const file = new File(["syllabus"], "syllabus.txt");
+    const job = await r.imports.process(await r.imports.start(file, "syllabus"));
+    expect(job.notice).toBe("This preview shows sample events. Sign in to read your own syllabus.");
+    expect(job.events.map((e) => e.title)).toEqual(["Assignment 1", "Midterm exam"]);
+  });
+  it("names what a renamed or damaged file really is, before uploading (card 45)", async () => {
+    let uploads = 0;
+    const server = { upload: async () => ({ id: String(++uploads) }) } as never;
+    const r = createRepositories(undefined, undefined, true, undefined, server);
+    const pdf = "%PDF-1.4\n1 0 obj <<>> endobj\ntrailer <<>>\n%%EOF\n";
+    for (const [name, content, message] of [
+      ["syllabus.docx", pdf, "This file is named .docx, but it is really a PDF. Rename it to end in .pdf, then choose it again."],
+      ["syllabus.pdf", pdf.slice(0, 20), "This PDF looks cut off. Download it again, then upload the new copy."],
+      ["syllabus.jpg", "\0\0\0\x18ftypheic", "This file is named .jpg, but it is really a HEIC photo. Notely can't read HEIC photos. Take a screenshot of it, or export it as a JPG."],
+      ["syllabus.pdf", "MZ\x90\0 program", "This doesn't look like a real PDF. Open it and save or export it again as a PDF, then upload that."],
+      ["syllabus.txt", "\xD0\xCF\x11\xE0\0\0", "This file is named .txt, but it is really an older Word file (.doc) or a locked document. Open it in Word or Google Docs, remove any password, and save it as .docx or PDF."],
+    ]) {
+      const file = new File([Uint8Array.from(content, (c) => c.charCodeAt(0))], name);
+      await expect(r.imports.start(file, "syllabus", "success", "cse442")).rejects.toThrow(message);
+    }
+    expect(uploads).toBe(0);
+    const good = new File([pdf], "syllabus.pdf");
+    expect((await r.imports.start(good, "syllabus", "success", "cse442")).id).toBe("1");
   });
   it("groups lecture folders and resolves exact lecture links", async () => {
     const r = createRepositories();
