@@ -26,6 +26,7 @@
     "test:syllabus-upload-http": "node backend/tests/syllabus-upload-http.mjs",
     "test:import-confirm": "php backend/tests/import-confirm.php",
     "test:import-confirm-http": "node backend/tests/import-confirm-http.mjs",
+    "test:event-delete": "node backend/tests/event-delete-http.mjs",
     "test:syllabus-ai": "php backend/tests/syllabus-ai.php",
     "test:import-extract": "php backend/tests/import-extract.php",
     "test:import-extract-http": "node backend/tests/import-extract-http.mjs"
@@ -34,7 +35,6 @@
     "@base-ui/react": "^1.0.0",
     "@fontsource-variable/inter": "^5.2.5",
     "lucide-react": "^0.468.0",
-    "pdfjs-dist": "6.3.289",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.3"

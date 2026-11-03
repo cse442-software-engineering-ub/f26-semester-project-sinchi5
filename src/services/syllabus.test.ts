@@ -1,145 +1,98 @@
 import { describe, expect, it } from "vitest";
-import { checkDates, extractEvents, MAX_SYLLABUS_EVENTS, mergeEvents, normalizeEvents, rulesVerdict, type ProposedEvent } from "./syllabus";
+import { checkMeeting, MAX_SYLLABUS_EVENTS, meetingDates, normalizeBreaks, normalizeEvents, normalizeMeetings } from "./syllabus";
 
-// The source line is checked separately so each expectation stays readable.
-const withoutSource = (events: ProposedEvent[]) => events.map(({ source: _source, ...event }) => event);
+const MWF = { days: [1, 3, 5], starts: "2026-08-24", ends: "2026-09-04" };
 
-describe("syllabus event extraction (card 44)", () => {
-  it("Task test 1: finds clear events with their kind, ISO date, and time", () => {
-    const lines = [
-      "Homework 1 due September 28, 2026",
-      "Midterm exam October 14, 2026 at 10:00 AM",
-      "Final project due December 4, 2026",
-    ];
-    const events = extractEvents(lines.join("\n"), 2026);
-    expect(withoutSource(events)).toEqual([
-      { title: "Homework 1", kind: "assignment", date: "2026-09-28" },
-      { title: "Midterm exam", kind: "exam", date: "2026-10-14", time: "10:00" },
-      { title: "Final project", kind: "deadline", date: "2026-12-04" },
-    ]);
-    expect(events.map((e) => e.source)).toEqual(lines);
+describe("turning a weekly class into its dates (card 44)", () => {
+  it("Task test 1 - a class lands on the wrong days", () => {
+    expect(meetingDates(MWF)).toEqual(["2026-08-24", "2026-08-26", "2026-08-28", "2026-08-31", "2026-09-02", "2026-09-04"]);
+    // SOC 322's pattern: Tuesdays and Thursdays only.
+    expect(meetingDates({ days: [2, 4], starts: "2026-08-25", ends: "2026-09-03" })).toEqual(["2026-08-25", "2026-08-27", "2026-09-01", "2026-09-03"]);
   });
 
-  it("Task test 2: flags a relative date for review instead of guessing it", () => {
-    const events = extractEvents("Quiz next Friday\nHomework 2 due October 5, 2026", 2026);
-    expect(withoutSource(events)).toEqual([
-      { title: "Quiz", kind: "quiz", date: "", needsReview: true },
-      { title: "Homework 2", kind: "assignment", date: "2026-10-05" },
-    ]);
+  it("Task test 2 - a class shows up on a day with no class", () => {
+    const noClass = [{ from: "2026-08-26", to: "2026-08-26" }, { from: "2026-08-31", to: "2026-09-02" }];
+    expect(meetingDates(MWF, noClass)).toEqual(["2026-08-24", "2026-08-28", "2026-09-04"]);
+    expect(meetingDates(MWF, [{ from: "2026-08-01", to: "2026-12-31" }])).toEqual([]);
   });
 
-  it("Task test 3: proposes nothing for lines without dates and keeps accents and dashes", () => {
-    expect(extractEvents("Office hours: Mondays 2-3 PM\nGrading: 40% projects", 2026)).toEqual([]);
-    const [event] = extractEvents("Exposé – final draft due December 1, 2026", 2026);
-    expect(event).toMatchObject({ title: "Exposé – final draft", kind: "deadline", date: "2026-12-01" });
+  it("Task test 3 - the first or last class is dropped, or a date outside the range is added", () => {
+    // Starts midweek and ends on a class day; the days before the start don't count.
+    expect(meetingDates({ days: [1, 3], starts: "2026-08-26", ends: "2026-09-07" })).toEqual(["2026-08-26", "2026-08-31", "2026-09-02", "2026-09-07"]);
+    // Neither end is a class day.
+    expect(meetingDates({ days: [3], starts: "2026-08-24", ends: "2026-08-25" })).toEqual([]);
   });
 
-  it("ignores the acceptance test's syllabus heading, which has a year but no day", () => {
-    const text = "CSE 442 Software Engineering - Fall 2026 Syllabus\nHomework 1 due September 28, 2026";
-    expect(extractEvents(text, 2026).map((e) => e.title)).toEqual(["Homework 1"]);
+  it("Task test 4 - a clock change moves a class to another day", () => {
+    // The clocks go back on November 1, 2026.
+    expect(meetingDates({ days: [1], starts: "2026-10-26", ends: "2026-11-09" })).toEqual(["2026-10-26", "2026-11-02", "2026-11-09"]);
   });
 
-  it("reads other common date and time formats, using the given year when one is missing", () => {
-    const events = extractEvents([
-      "- Sept. 8: Quiz 1",
-      "Lab 2 report due Fri, 10/9 by 11:59 p.m.",
-      "2026-11-20 Project proposal",
-      "Final exam: 15 December at noon",
-      "| Week 3 | Sep 15 | HW 2 due |",
-      "Paper due Oct 1 at midnight",
-    ].join("\n"), 2026);
-    expect(withoutSource(events)).toEqual([
-      { title: "Quiz 1", kind: "quiz", date: "2026-09-08" },
-      { title: "Lab 2 report", kind: "assignment", date: "2026-10-09", time: "23:59" },
-      { title: "Project proposal", kind: "deadline", date: "2026-11-20" },
-      { title: "Final exam", kind: "exam", date: "2026-12-15", time: "12:00" },
-      { title: "HW 2", kind: "assignment", date: "2026-09-15" },
-      { title: "Paper", kind: "deadline", date: "2026-10-01", time: "23:59" },
-    ]);
-  });
-
-  it("flags impossible dates and lines with more than one date for review", () => {
-    expect(withoutSource(extractEvents("Essay due February 30, 2026", 2026)))
-      .toEqual([{ title: "Essay", kind: "deadline", date: "", needsReview: true }]);
-    expect(extractEvents("Homework 3 assigned Sep 1, due Sep 8", 2026)[0])
-      .toMatchObject({ date: "", needsReview: true });
-  });
-
-  it("skips bare fractions without an event word and duplicate events", () => {
-    expect(extractEvents("Participation counts 1/2 of the grade", 2026)).toEqual([]);
-    expect(extractEvents("Midterm exam October 14, 2026\nMidterm exam Oct 14", 2026)).toHaveLength(1);
+  it("Task test 5 - a class with impossible dates or no days can be added", () => {
+    expect(checkMeeting(MWF)).toBeNull();
+    expect(checkMeeting({ ...MWF, days: [] })).toBe("Choose at least one day.");
+    expect(checkMeeting({ ...MWF, starts: "" })).toBe("Choose when each class starts and ends.");
+    expect(checkMeeting({ ...MWF, ends: "" })).toBe("Choose when each class starts and ends.");
+    expect(checkMeeting({ ...MWF, ends: "2026-08-24" })).toBe("Choose an end date after the start date.");
+    expect(checkMeeting({ ...MWF, ends: "2026-08-01" })).toBe("Choose an end date after the start date.");
+    expect(checkMeeting({ ...MWF, ends: "2027-08-25" })).toBeNull();
+    expect(checkMeeting({ ...MWF, ends: "2027-08-26" })).toBe("Repeating events can run for at most one year.");
+    // Wednesdays only, between a Monday and a Tuesday; and a range that is all break.
+    const none = "This class has no meetings between its start and end dates.";
+    expect(checkMeeting({ days: [3], starts: "2026-08-24", ends: "2026-08-25" })).toBe(none);
+    expect(checkMeeting(MWF, [{ from: "2026-08-01", to: "2026-12-31" }])).toBe(none);
   });
 });
 
-describe("normalizing proposed events (card 44)", () => {
-  it("keeps valid fields and flags events without a real date", () => {
-    expect(normalizeEvents([
-      { title: "  Homework 1 ", kind: "assignment", date: "2026-09-28", time: "23:59", source: "HW1 due 9/28" },
-      { title: "Quiz", kind: "pop quiz", date: "2026-02-30", time: "25:00" },
-      { title: "Final", kind: "exam", date: "December 4" },
+describe("cleaning what the reader found (card 44)", () => {
+  it("Task test 6 - a bad weekly class from the reader reaches the review screen", () => {
+    expect(normalizeMeetings([
+      { title: " Lecture ", kind: "lecture", section: "", days: [5, 1, 3, 3], time: "13:00", location: "Knox 109", firstDate: "2026-08-24", lastDate: "2026-12-07", source: "MoWeFr" },
+      { title: "", kind: "party", section: "R1", days: [2, 9, "x", 1.5], time: "25:00", location: 7, firstDate: "2026-02-30", lastDate: "soon", source: null },
+      { title: "Lab", kind: "lab", days: [], time: "10:00" },
+      "not a class",
     ])).toEqual([
-      { title: "Homework 1", kind: "assignment", date: "2026-09-28", time: "23:59", source: "HW1 due 9/28" },
-      { title: "Quiz", kind: "other", date: "", source: "", needsReview: true },
-      { title: "Final", kind: "exam", date: "", source: "", needsReview: true },
+      { title: "Lecture", kind: "lecture", section: "", days: [1, 3, 5], time: "13:00", location: "Knox 109", firstDate: "2026-08-24", lastDate: "2026-12-07", source: "MoWeFr" },
+      { title: "Lecture", kind: "lecture", section: "R1", days: [2], time: "", location: "", firstDate: "", lastDate: "", source: "" },
+    ]);
+    expect(normalizeMeetings(undefined)).toEqual([]);
+    expect(normalizeMeetings(Array(70).fill({ title: "Lab", kind: "lab", days: [1] }))).toHaveLength(60);
+  });
+
+  it("Task test 7 - a bad date is treated as real, or an item without a date looks finished", () => {
+    expect(normalizeEvents([
+      { title: "Midterm exam", kind: "exam", date: "2026-10-14", time: "10:00", location: "Knox 110", source: "Midterm exam October 14" },
+      { title: "Final exam", kind: "exam", date: "", time: "", location: "", source: "Final exam: TBA" },
+      { title: "Quiz 1", kind: "quiz", date: "2026-02-30", time: "7pm", source: "" },
+      { title: "Poster", kind: "admin", date: "2026-11-02" },
+    ])).toEqual([
+      { title: "Midterm exam", kind: "exam", date: "2026-10-14", time: "10:00", location: "Knox 110", source: "Midterm exam October 14" },
+      { title: "Final exam", kind: "exam", date: "", source: "Final exam: TBA", needsReview: true },
+      { title: "Quiz 1", kind: "quiz", date: "", source: "", needsReview: true },
+      { title: "Poster", kind: "other", date: "2026-11-02", source: "" },
     ]);
   });
 
-  it("drops untitled or malformed items, strips control characters, and caps the list", () => {
-    expect(normalizeEvents("not a list")).toEqual([]);
-    expect(normalizeEvents([null, 4, { title: "" }, { title: "\u0000​" }])).toEqual([]);
-    expect(normalizeEvents([{ title: "Lab\u0007 1", date: "2026-09-01" }])[0].title).toBe("Lab 1");
-    const many = Array.from({ length: MAX_SYLLABUS_EVENTS + 5 }, (_, i) => ({ title: `Quiz ${i}`, date: "2026-09-01" }));
+  it("Task test 8 - text is lost, duplicates pile up, or the list has no limit", () => {
+    expect(normalizeEvents([{ title: "Exposé – final draft", kind: "deadline", date: "2026-12-01" }])[0].title).toBe("Exposé – final draft");
+    expect(normalizeEvents([{ title: "Quiz​ 1‮", date: "2026-11-02" }])[0].title).toBe("Quiz 1");
+    const same = { title: "Homework 1", kind: "assignment", date: "2026-09-28", time: "" };
+    expect(normalizeEvents([same, { ...same, title: "homework 1" }])).toHaveLength(1);
+    // Same day, different items: both stay.
+    expect(normalizeEvents([same, { ...same, title: "Quiz 1", kind: "quiz" }])).toHaveLength(2);
+    const many = Array.from({ length: MAX_SYLLABUS_EVENTS + 5 }, (_, i) => ({ title: `Item ${i}`, date: "2026-09-28" }));
     expect(normalizeEvents(many)).toHaveLength(MAX_SYLLABUS_EVENTS);
-    expect(normalizeEvents([{ title: "x".repeat(300), date: "2026-09-01" }])[0].title).toHaveLength(255);
-  });
-});
-
-describe("rules first, AI only when needed (card 44)", () => {
-  const syllabus = [
-    "CSE 442 Software Engineering, Fall 2026. Read this whole syllabus before the first class meeting.",
-    "Homework 1 due September 28, 2026",
-    "Midterm exam October 14, 2026 at 10:00 AM",
-    "Final project due December 4, 2026",
-  ].join("\n");
-
-  it("keeps the rules' events when they read the syllabus cleanly, even a short one", () => {
-    expect(rulesVerdict(syllabus, extractEvents(syllabus, 2026))).toBeNull();
-    const short = "Homework 1 due September 28, 2026\nMidterm exam October 14, 2026";
-    expect(rulesVerdict(short, extractEvents(short, 2026))).toBeNull();
-    // No reader can turn "next Friday" into a date, so it is left for the student, not sent to the AI.
-    const relative = `${short}\nQuiz 1 next Friday\nProject proposal TBA`;
-    expect(rulesVerdict(relative, extractEvents(relative, 2026))).toBeNull();
+    expect(normalizeEvents("not a list")).toEqual([]);
   });
 
-  it("asks for the AI reader when the rules find no text, no events, unsure dates, or undated items", () => {
-    expect(rulesVerdict("", [])).toBe("no-text");
-    const policies = "Attendance is expected at every lecture and lab section this semester. ".repeat(3);
-    expect(rulesVerdict(policies, extractEvents(policies, 2026))).toBe("no-events");
-    const clashing = `${syllabus}\nQuizzes on October 2 and October 9\nLabs due 10/16, 10/23\nDemos December 1 or December 3`;
-    expect(rulesVerdict(clashing, extractEvents(clashing, 2026))).toBe("unsure");
-    // A table the rules couldn't pair up: names on one line, dates on another.
-    const split = `${syllabus}\nMidterm exam 2\nQuiz 3\nProject 2 due\nFinal exam\nOct 30 Nov 13 Dec 1 Dec 10`;
-    expect(rulesVerdict(split, extractEvents(split, 2026))).toBe("missed");
-  });
-
-  it("flags AI dates that the file never mentions, and keeps dates it does", () => {
-    const ai = [
-      { title: "Midterm exam", kind: "exam" as const, date: "2026-10-14", source: "" },
-      { title: "Quiz 9", kind: "quiz" as const, date: "2026-11-20", source: "" },
-      { title: "Lab 1", kind: "assignment" as const, date: "", source: "", needsReview: true as const },
-    ];
-    expect(checkDates(ai, `${syllabus}\nLab 1 week 3`).map((e) => [e.title, e.needsReview ?? false])).toEqual([
-      ["Midterm exam", false], ["Quiz 9", true], ["Lab 1", true],
+  it("Task test 9 - a no-class range is lost or runs backward", () => {
+    expect(normalizeBreaks([
+      { from: "2026-09-07", to: "2026-09-07" }, { from: "2026-11-23", to: "2026-11-27" },
+      { from: "2026-10-12", to: "2026-10-01" }, { from: "2026-12-24" }, { from: "nope", to: "2026-12-25" }, "not a break",
+    ])).toEqual([
+      { from: "2026-09-07", to: "2026-09-07" }, { from: "2026-11-23", to: "2026-11-27" },
+      { from: "2026-10-12", to: "2026-10-12" }, { from: "2026-12-24", to: "2026-12-24" },
     ]);
-    expect(checkDates(ai.slice(0, 2), "10/14 midterm\n11-20")[1].needsReview).toBe(true);
-    expect(checkDates(ai.slice(0, 2), "")).toEqual(ai.slice(0, 2));
-  });
-
-  it("adds dated items the rules found on days the AI reader left empty", () => {
-    const rules = extractEvents(`${syllabus}\nOctober 1, 2026 Lecture: requirements`, 2026);
-    const ai = [{ title: "Midterm", kind: "exam" as const, date: "2026-10-14", source: "Midterm exam October 14" }];
-    expect(mergeEvents(ai, rules).map((e) => [e.title, e.date])).toEqual([
-      ["Midterm", "2026-10-14"], ["Homework 1", "2026-09-28"], ["Final project", "2026-12-04"],
-    ]);
+    expect(normalizeBreaks(undefined)).toEqual([]);
   });
 });

@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { Dialog } from "@base-ui/react/dialog";
 import { useSearchParams, Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Plus, ArrowUpRight } from "lucide-react";
 import { useApp } from "../app/context";
-import { Modal, PageHeading, EventRow, Empty } from "../shared/ui";
+import { Modal, PageHeading, EventRow, Empty, formatEventTime } from "../shared/ui";
 import { dateKey } from "../services/fixtures";
-import type { CourseEvent, EventKind } from "../domain";
+import { isClass, type CourseEvent, type EventKind } from "../domain";
 import s from "../app/App.module.css";
 export function EventDialog({
   event,
@@ -31,6 +32,7 @@ export function EventDialog({
   );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const update = (key: keyof CourseEvent, v: string) =>
     setValue({ ...value, [key]: v });
   return (
@@ -92,6 +94,8 @@ export function EventDialog({
             >
               {[
                 "lecture",
+                "recitation",
+                "lab",
                 "assignment",
                 "quiz",
                 "exam",
@@ -140,6 +144,7 @@ export function EventDialog({
         {event?.source === "imported" && (
           <p className={s.notice}>
             Imported from your syllabus. You can update these details.
+            {event.seriesId && " Changes apply to this meeting only."}
           </p>
         )}
         {value.kind === "lecture" && value.courseId && (
@@ -151,10 +156,94 @@ export function EventDialog({
             Open lecture notes <ArrowUpRight size={16} />
           </Link>
         )}
-        <button className={s.primary} disabled={busy}>
-          {busy ? "Saving…" : event ? "Save changes" : "Create event"}
-        </button>
+        <div className={s.actions}>
+          {event && (
+            <button type="button" className={s.dangerOutline} disabled={busy} onClick={() => setConfirming(true)}>
+              Delete event
+            </button>
+          )}
+          <button className={s.primary} disabled={busy}>
+            {busy ? "Saving…" : event ? "Save changes" : "Create event"}
+          </button>
+        </div>
       </form>
+      {event && confirming && (
+        <DeleteEventDialog
+          title={event.title}
+          repeats={Boolean(event.seriesId)}
+          onDelete={async (wholeSeries) => {
+            await repo.schedule.remove(event, wholeSeries);
+            await refresh();
+            onClose();
+          }}
+          onClose={() => setConfirming(false)}
+        />
+      )}
+    </Modal>
+  );
+}
+// Card 173: confirms deleting one event. Cancel, Escape, and the X keep it and return to Event details.
+// Card 48: a weekly class asks whether to delete this one meeting, such as a cancelled class, or all of them.
+function DeleteEventDialog({
+  title,
+  repeats,
+  onDelete,
+  onClose,
+}: {
+  title: string;
+  repeats: boolean;
+  // Resolves once the event is gone; the caller then closes Event details too.
+  onDelete: (wholeSeries: boolean) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [deleting, setDeleting] = useState<"" | "one" | "all">("");
+  const [error, setError] = useState("");
+  const pending = useRef(false);
+  async function confirm(wholeSeries: boolean) {
+    if (pending.current) return;
+    pending.current = true;
+    setDeleting(wholeSeries ? "all" : "one");
+    setError("");
+    try {
+      await onDelete(wholeSeries);
+    } catch {
+      // Stay disabled after success until the caller removes the dialog.
+      pending.current = false;
+      setDeleting("");
+      setError("Could not delete this event. Please try again.");
+    }
+  }
+  return (
+    <Modal
+      title="Delete this event?"
+      description={repeats ? `${title} repeats every week. Delete just this one, or all of them?` : `${title} will be removed from your schedule.`}
+      dismissible={!deleting}
+      onClose={onClose}
+    >
+      {error && (
+        <p className={s.error} role="alert">
+          {error}
+        </p>
+      )}
+      <div className={s.actions}>
+        <Dialog.Close className={s.secondary} disabled={Boolean(deleting)}>
+          Cancel
+        </Dialog.Close>
+        {repeats ? (
+          <>
+            <button className={s.dangerOutline} disabled={Boolean(deleting)} onClick={() => confirm(false)}>
+              {deleting === "one" ? "Deleting…" : "Delete this one"}
+            </button>
+            <button className={s.danger} disabled={Boolean(deleting)} onClick={() => confirm(true)}>
+              {deleting === "all" ? "Deleting…" : "Delete all"}
+            </button>
+          </>
+        ) : (
+          <button className={s.danger} disabled={Boolean(deleting)} onClick={() => confirm(false)}>
+            {deleting ? "Deleting…" : "Delete event"}
+          </button>
+        )}
+      </div>
     </Modal>
   );
 }
@@ -243,7 +332,9 @@ export function Schedule() {
             ))}
             {days.map((d) => {
               const key = dateKey(d);
-              const events = state.events.filter((e) => e.date === key);
+              // A square fits only two events, so exams and due items go ahead of classes (card 48).
+              const events = state.events.filter((e) => e.date === key)
+                .sort((a, b) => Number(isClass(a.kind)) - Number(isClass(b.kind)));
               return (
                 <button
                   key={key}
@@ -264,7 +355,7 @@ export function Schedule() {
                           )?.color,
                         }}
                       />
-                      {e.kind}: {e.title}
+                      {e.time ? `${formatEventTime(e.time)} ` : ""}{e.kind}: {e.title}
                     </small>
                   ))}
                   {events.length > 2 && (

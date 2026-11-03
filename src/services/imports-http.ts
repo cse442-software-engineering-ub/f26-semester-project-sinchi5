@@ -10,6 +10,10 @@ export interface SyllabusJob {
   type: string;
   size: number;
   state: "queued" | "processing" | "review" | "failed" | "completed";
+  // What the reader found (card 127); the browser cleans it before showing it (card 44).
+  isSyllabus?: boolean;
+  meetings?: unknown[];
+  noClassDates?: unknown[];
   events: unknown[];
   createdAt: string;
 }
@@ -24,17 +28,23 @@ export function createHttpSyllabus(endpoint = `${import.meta.env.BASE_URL}api/in
       // A 20 MB file can take a while on a slow connection.
       return (await send<{ job: SyllabusJob }>("syllabus-upload", { courseId, fileName: file.name, content }, 120000)).job;
     },
-    // Reads a PDF, DOCX, or image job on the server, which can take a couple of minutes.
+    // Reads a job on the server. The reader may try three models, so this outlasts the server's own limit.
     async extract(id: string, year: number) {
-      return (await send<{ job: SyllabusJob }>("import-extract", { id, year }, 180000)).job;
+      return (await send<{ job: SyllabusJob }>("import-extract", { id, year }, 330000)).job;
     },
-    // Saves the reviewed events to the course (card 47). Sending it again adds nothing.
-    async confirm(id: string, courseId: string, events: Pick<CourseEvent, "title" | "kind" | "date" | "time">[]) {
-      return (await send<{ created: number }>("import-confirm", { id, courseId, events })).created;
+    // Saves the reviewed events to the course (card 47). Sending it again adds nothing, and an event the
+    // course already has is skipped.
+    async confirm(id: string, courseId: string, events: (Pick<CourseEvent, "title" | "kind" | "date" | "time" | "location"> & { series?: number })[]) {
+      // A semester of classes is hundreds of rows, far more than the usual request.
+      return send<{ created: number; skipped: number }>("import-confirm", { id, courseId, events }, 60000);
     },
     // The student's imported events, for the schedule (card 48).
     async events() {
       return (await send<{ events: CourseEvent[] }>("events")).events;
+    },
+    // Deletes one of the student's syllabus events (card 172), or every meeting of its weekly class (card 48).
+    async deleteEvent(id: string, wholeSeries = false) {
+      await send<{ event: { id: string } }>("event-delete", wholeSeries ? { id, series: true } : { id });
     },
   };
 }

@@ -1,8 +1,9 @@
 export const BRAND = "Notely";
 export type CollaboratorPermission = "view" | "edit";
 export type Visibility = "private" | "shared";
-export type EventKind =
-  "lecture" | "assignment" | "quiz" | "exam" | "deadline" | "other";
+export const CLASS_KINDS = ["lecture", "recitation", "lab"] as const;
+export type ClassKind = (typeof CLASS_KINDS)[number];
+export type EventKind = ClassKind | "assignment" | "quiz" | "exam" | "deadline" | "other";
 export interface User {
   id: string;
   name: string;
@@ -12,18 +13,36 @@ export interface OnboardingState {
   completed: boolean;
   step: number;
 }
+// Weekly classes are on the schedule, but they aren't something due (card 48).
+export const isClass = (kind: EventKind) => (CLASS_KINDS as readonly EventKind[]).includes(kind);
 export interface Course {
   id: string;
   code: string;
   name: string;
   color: string;
   term: string;
+  // First and last day of classes, when the student gave them (card 46). A syllabus's own dates come first.
+  classesStart?: string;
+  classesEnd?: string;
 }
 export interface Category {
   id: string;
   name: string;
 }
+export interface ChecklistItem {
+  text: string;
+  done: boolean;
+}
+export type HighlightColor = "yellow" | "green" | "pink";
+
+export interface NoteHighlight {
+  start: number;
+  end: number;
+  color: HighlightColor;
+}
 export interface Note {
+  checklist?: ChecklistItem[];
+  highlights?: NoteHighlight[];
   id: string;
   ownerId?: string;
   // Recorded at creation time so comment permission checks (task #65) can
@@ -71,6 +90,8 @@ export interface CourseEvent {
   location: string;
   description: string;
   source: "manual" | "imported";
+  // Ties together the saved meetings of one weekly class from a syllabus (card 47).
+  seriesId?: string | null;
 }
 export interface DetectedMetadata {
   title: string;
@@ -85,6 +106,20 @@ export interface DetectedEvent extends CourseEvent {
   needsReview?: boolean;
   include?: boolean;
 }
+// A weekly class found in a syllabus (card 44). days are numbers, with 0 for Sunday. It becomes one saved
+// event per meeting between starts and ends, skipping the job's noClassDates.
+export interface DetectedMeeting {
+  title: string;
+  kind: ClassKind;
+  section: string;
+  days: number[];
+  time: string;
+  location: string;
+  starts: string;
+  ends: string;
+  source: string;
+  include: boolean;
+}
 export interface UploadJob {
   id: string;
   kind: UploadKind;
@@ -95,9 +130,11 @@ export interface UploadJob {
   // The text of an uploaded TXT/Markdown note, saved as the note's body (card 35).
   body?: string;
   events: DetectedEvent[];
-  // How a syllabus was read (card 45): by the free rules, by the AI reader after the rules found too
-  // little, by the rules alone because the AI reader couldn't help (notice says why), or a demo sample.
-  reader?: "rules" | "ai" | "rules-only" | "sample";
+  meetings?: DetectedMeeting[];
+  noClassDates?: { from: string; to: string }[];
+  // False when the reader says the file isn't a course syllabus at all (card 127).
+  isSyllabus?: boolean;
+  // Shown on the review screen, such as when a demo shows sample results (card 45).
   notice?: string;
 }
 export interface NoteQuery {
@@ -154,6 +191,9 @@ export interface Collaborator {
 export interface ScheduleRepository {
   list(from?: string, to?: string): Promise<CourseEvent[]>;
   save(event: CourseEvent): Promise<CourseEvent>;
+  // Card 173: removes the event from the schedule (a syllabus event also from the server).
+  // With wholeSeries, every meeting of the event's weekly class goes too (card 48).
+  remove(event: CourseEvent, wholeSeries?: boolean): Promise<void>;
   lectureNotes(event: CourseEvent): Promise<Note[]>;
 }
 export interface ImportRepository {
@@ -161,9 +201,9 @@ export interface ImportRepository {
   // Registers the file as a queued job; a signed-in student's syllabus goes to the server (card 43).
   start(file: File, kind: UploadKind, scenario?: string, courseId?: string): Promise<UploadJob>;
   // Reads a queued job's file and proposes note details or schedule events (cards 44 and 45).
-  // onAutomaticReading is called when the AI reader is asked, which can take up to a minute.
-  process(job: UploadJob, file: File, scenario?: string, onAutomaticReading?: () => void): Promise<UploadJob>;
-  confirm(job: UploadJob): Promise<void>;
+  process(job: UploadJob, scenario?: string): Promise<UploadJob>;
+  // first is the earliest date added, for opening the schedule on it (card 48).
+  confirm(job: UploadJob): Promise<{ created: number; skipped: number; first: string }>;
 }
 export interface Repositories {
   auth: AuthRepository;

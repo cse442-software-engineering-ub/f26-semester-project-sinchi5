@@ -1,5 +1,6 @@
 // Card 45: the "Upload syllabus" window for a signed-in student, against the mocked API in
 // support/account-fixture.ts. No server is needed and the Gemini API is never called.
+import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { test, expect } from "./support/account-fixture";
 import { openUpload, pdfFile, photoFile, signUpWithCourse, SYLLABUS, textFile as file } from "./support/syllabus";
@@ -33,7 +34,7 @@ test("Task test 1: Continue stays greyed out until a valid file is chosen for a 
   await expect(continueButton).toBeDisabled();
 });
 
-test("Task test 2: processing states lead to the detected events, read in the browser", async ({ page }) => {
+test("Task test 2: processing states lead to the detected events, read on the server", async ({ page }) => {
   await signUpWithCourse(page);
   const routes = apiRoutes(page);
   await openUpload(page);
@@ -47,8 +48,8 @@ test("Task test 2: processing states lead to the detected events, read in the br
   await expect(dialog.getByLabel("Event title").nth(1)).toHaveValue("Midterm exam");
   await expect(dialog.getByLabel("Due date").nth(1)).toHaveValue("2026-10-14");
   await expect(dialog.getByLabel("Time").nth(1)).toHaveValue("10:00");
-  // The text file is uploaded to the student's job, but never sent to the paid reader.
-  expect(routes.filter((r) => r !== "notes" && r !== "events")).toEqual(["syllabus-upload"]);
+  // Every syllabus goes to the server's reader once, even a text file.
+  expect(routes.filter((r) => r !== "notes" && r !== "events")).toEqual(["syllabus-upload", "import-extract"]);
 });
 
 test("Task test 3: a failed job offers Try again, which reaches the review screen", async ({ page }) => {
@@ -66,44 +67,71 @@ test("Task test 3: a failed job offers Try again, which reaches the review scree
   await expect(dialog.getByLabel("Event title")).toHaveCount(3);
 });
 
-test("a PDF with clear dates is read in the browser, without the automatic reader", async ({ page }) => {
+for (const [name, choose] of [["PDF", pdfFile("syllabus.pdf", SYLLABUS.split("\n"))], ["photo", photoFile("syllabus.png")]] as const) {
+  test(`a ${name} goes to the reader once, and an item with no posted date is flagged`, async ({ page }) => {
+    await signUpWithCourse(page);
+    const routes = apiRoutes(page);
+    await openUpload(page);
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Choose upload file").setInputFiles(choose);
+    await dialog.getByRole("button", { name: "Continue", exact: true }).click();
+    await expect(dialog.getByLabel("Event title")).toHaveCount(2);
+    await expect(dialog.getByLabel("Event title").first()).toHaveValue("Reading response 1");
+    await expect(dialog.getByText("1 has no posted date, so it starts unchecked.", { exact: false })).toBeVisible();
+    expect(routes.filter((r) => r !== "notes" && r !== "events")).toEqual(["syllabus-upload", "import-extract"]);
+  });
+}
+
+test("when the reader can't read a file, the reason is shown and the student's own events can still be saved", async ({ page }) => {
   await signUpWithCourse(page);
-  const routes = apiRoutes(page);
   await openUpload(page);
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Choose upload file").setInputFiles(pdfFile("syllabus.pdf", SYLLABUS.split("\n")));
+  await dialog.getByLabel("Choose upload file").setInputFiles(file("limit.txt", SYLLABUS));
   await dialog.getByRole("button", { name: "Continue", exact: true }).click();
-  await expect(dialog.getByRole("button", { name: "Add to schedule" })).toBeVisible();
-  await expect(dialog.getByLabel("Event title")).toHaveCount(3);
-  await expect(dialog.getByLabel("Due date").nth(2)).toHaveValue("2026-12-04");
-  expect(routes.filter((r) => r !== "notes" && r !== "events")).toEqual(["syllabus-upload"]);
+  await expect(dialog.getByRole("heading", { name: "That file needs another try" })).toBeVisible();
+  await expect(dialog.getByRole("alert")).toHaveText("You can read 10 syllabi automatically each day. Try again tomorrow.");
+  await expect(dialog.getByRole("button", { name: "Try again" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Choose a different file" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Add events by hand" }).click();
+  const added = dialog.getByRole("group", { name: "Added by you" });
+  await added.getByLabel("Event title").fill("Midterm exam");
+  await added.getByLabel("Type").selectOption("exam");
+  await added.getByLabel("Due date").fill("2026-10-14");
+  await dialog.getByRole("button", { name: "Add to schedule" }).click();
+  await expect(dialog.getByRole("heading", { name: "A little more organized." })).toBeVisible();
+  await expect(dialog.getByText("Added 1 event to CSE 442.")).toBeVisible();
 });
 
-test("a photo goes to the automatic reader once, and its unclear dates are flagged", async ({ page }) => {
+test("while a syllabus is read, playful lines keep the student company", async ({ page }) => {
   await signUpWithCourse(page);
-  const routes = apiRoutes(page);
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/api/index.php?route=import-extract", async (route) => {
+    await held;
+    await route.fallback();
+  });
   await openUpload(page);
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Choose upload file").setInputFiles(photoFile("syllabus.png"));
+  await dialog.getByLabel("Choose upload file").setInputFiles(file("cse442-syllabus.txt", SYLLABUS));
+  await page.clock.install();
   await dialog.getByRole("button", { name: "Continue", exact: true }).click();
-  await expect(dialog.getByLabel("Event title")).toHaveCount(2);
-  await expect(dialog.getByLabel("Event title").first()).toHaveValue("Reading response 1");
-  await expect(dialog.getByText("Some details need your attention.", { exact: false })).toBeVisible();
-  expect(routes.filter((r) => r !== "notes" && r !== "events")).toEqual(["syllabus-upload", "import-extract"]);
-});
-
-test("when the automatic reader can't help, the reason is shown with what was found", async ({ page }) => {
-  await signUpWithCourse(page);
-  await openUpload(page);
-  const dialog = page.getByRole("dialog");
-  // The rules can't pair these names with dates, so they ask the automatic reader, which is at its limit.
-  const split = [...SYLLABUS.split("\n"), "Midterm exam 2", "Quiz 3", "Project 2 due", "Final exam", "Oct 30 Nov 13 Dec 1 Dec 10"];
-  await dialog.getByLabel("Choose upload file").setInputFiles(file("limit.txt", split.join("\n")));
-  await dialog.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(dialog.getByText("Reading your syllabus carefully. This can take a minute or two.")).toBeVisible();
+  // Hidden from screen readers, which hear the message above once instead of every line.
+  const line = dialog.locator('p[aria-hidden="true"]');
+  const first = await line.textContent();
+  expect(first).toMatch(/…$/);
+  await page.clock.runFor(3500);
+  await expect(line).not.toHaveText(first!);
+  // A long read says it's still going instead of starting the jokes over.
+  await page.clock.runFor(60000);
+  await expect(line).toHaveText(/Still reading|Not stuck|strong opinions|notes on the notes|Still here/);
+  expect((await new AxeBuilder({ page }).include('[role="dialog"]').analyze()).violations).toEqual([]);
+  // With reduced motion on, nothing sweeps or tilts.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect.poll(() => line.locator("span").evaluate((el) => getComputedStyle(el, "::before").animationName)).toBe("none");
+  await expect.poll(() => dialog.locator('span[aria-hidden="true"]:has(i)').evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
+  release();
   await expect(dialog.getByRole("button", { name: "Add to schedule" })).toBeVisible();
-  await expect(dialog.getByText("You can read 5 syllabi automatically each day. Try again tomorrow. "
-    + "Check these events against your syllabus, and add any that are missing.")).toBeVisible();
-  await expect(dialog.getByLabel("Event title").first()).toHaveValue("Homework 1");
 });
 
 test("a renamed or damaged file is named for what it is before anything uploads", async ({ page }) => {

@@ -38,17 +38,32 @@ it("uploads the file as base64 with its name and course, using the session's CSR
 it("asks the server to read a job for the course year and passes on its messages (card 45)", async () => {
   const api = fakeApi((call) => {
     if (call.route === "session") return { json: { csrfToken: "token" } };
-    if (call.body?.id === "13") return { status: 429, json: { error: "You can read 5 syllabi automatically each day. Try again tomorrow." } };
+    if (call.body?.id === "13") return { status: 429, json: { error: "You can read 10 syllabi automatically each day. Try again tomorrow." } };
     return { json: { job: { ...job, state: "review", events: [{ title: "Quiz 1" }] } } };
   });
   const syllabus = createHttpSyllabus("/api/index.php", api.fetcher);
   expect((await syllabus.extract("12", 2026)).events).toEqual([{ title: "Quiz 1" }]);
   expect(api.calls[1]).toMatchObject({ route: "import-extract", body: { id: "12", year: 2026 } });
   const limited = syllabus.extract("13", 2026);
-  await expect(limited).rejects.toThrow("You can read 5 syllabi automatically each day.");
+  await expect(limited).rejects.toThrow("You can read 10 syllabi automatically each day.");
   await expect(limited).rejects.toBeInstanceOf(NoteServiceError);
   const offline = createHttpSyllabus("/api/index.php", (async () => { throw new TypeError("offline"); }) as unknown as typeof fetch);
   await expect(offline.extract("12", 2026)).rejects.toThrow("Could not reach Notely. Check your connection and try again.");
+});
+
+it("saves reviewed events with their counts, and deletes one event or a whole class (cards 47 and 48)", async () => {
+  const api = fakeApi((call) => {
+    if (call.route === "session") return { json: { csrfToken: "token" } };
+    return call.route === "import-confirm" ? { json: { created: 2, skipped: 1 } } : { json: { event: { id: "5" } } };
+  });
+  const syllabus = createHttpSyllabus("/api/index.php", api.fetcher);
+  const rows = [{ title: "CSE 442 Lecture", kind: "lecture" as const, date: "2026-08-24", time: "10:00", location: "Davis 101", series: 0 }];
+  expect(await syllabus.confirm("12", "c1", rows)).toEqual({ created: 2, skipped: 1 });
+  expect(api.calls[1]).toMatchObject({ route: "import-confirm", body: { id: "12", courseId: "c1", events: rows } });
+  await syllabus.deleteEvent("5");
+  await syllabus.deleteEvent("5", true);
+  const deletes = api.calls.filter((c) => c.route === "event-delete").map((c) => c.body);
+  expect(deletes).toEqual([{ id: "5" }, { id: "5", series: true }]);
 });
 
 it("treats a non-JSON success reply as a failure instead of crashing", async () => {
