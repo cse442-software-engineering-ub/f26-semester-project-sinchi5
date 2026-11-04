@@ -56,6 +56,7 @@ Accounts and signed-in users' notes (with their history, comments, and collabora
 **Imports**
 - Upload documents (PDF, DOCX, TXT, Markdown, images), scan photos, or upload a syllabus. Files are validated (type, empty file, 20 MB limit), then shown on a review screen before anything is saved.
 - Syllabus imports find weekly classes, assignments, and exams and add them to the calendar after review. Each weekly class repeats on its posted days, from the syllabus's first and last class (or the course's optional "Classes start" and "Classes end"), skipping no-class dates the syllabus lists. When several sections are listed, the student picks theirs. A file with nothing to add, or one that isn't a syllabus, gets its own screen. Uploading a syllabus again adds only what's new, and deleting a class asks whether to remove that one meeting or all of them. Gemini reads every syllabus on the server ([backend/lib/syllabus-ai.php](backend/lib/syllabus-ai.php)), and the browser cleans what it finds and turns each weekly class into its dates ([src/services/syllabus.ts](src/services/syllabus.ts)). A renamed or damaged file is caught in the browser before anything uploads ([src/services/syllabus-file.ts](src/services/syllabus-file.ts)).
+- Uploaded notes are sorted into course and lecture folders (card 35): the course code and lecture date are read from TXT/Markdown text or the file name by local rules in [src/services/noteMetadata.ts](src/services/noteMetadata.ts) (`Course:` and `Lecture date:` headers win; deadlines in prose are ignored). Anything not found shows **Not detected** and can be filled in on the review screen, and TXT/Markdown text becomes the note body. Try it with [tests/fixtures/cse442-lecture.txt](tests/fixtures/cse442-lecture.txt).
 - Extraction is simulated. A **Prototype preview options** control in the dialog exercises success, partial, and failure outcomes.
 
 **Settings**
@@ -397,6 +398,7 @@ On the server:
 | --- | --- |
 | `npm test` | Vitest unit tests: repository contracts, filtering, pinning, the auth adapter, validation, and the collaborator mock |
 | `npm run test:e2e` | Playwright browser tests (needs `npx playwright install chromium firefox webkit` once) |
+| `npx playwright test tests/note-metadata.spec.ts --project=chromium --project=mobile` | Card 35: upload a lecture note, check the detected course and date survive a reload, and that missing ones stay **Not detected** |
 | `npm run test:static-build` | Hash-routing build under a static server with no rewrites (build first) |
 | `npm run test:php` | PHP validation, hashing, and configuration checks. No database needed. |
 | `npm run test:schema` | Read-only check that a live DEV/TEST database matches the expected schema |

@@ -399,6 +399,12 @@ export function ImportDialog({
               onChange={(e) => void pick(e.target.files?.[0])}
             />
           </label>
+          {kind !== "syllabus" && (
+            <p className={s.muted}>
+              Course codes and dates are detected from TXT/Markdown text and filenames. PDF, DOCX, and image
+              contents are not read yet. You can review or add missing details before saving.
+            </p>
+          )}
           {kind === "syllabus" && (
             <details className={s.demoDetails}>
               <summary>Tips for the best result</summary>
@@ -570,7 +576,7 @@ export function ImportDialog({
               />
             </label>
           )}
-          <div className={kind === "syllabus" ? undefined : s.formRow}>
+          <div className={kind === "syllabus" ? undefined : `${s.formRow} ${s.importMetadata}`}>
             <label>
               Course
               <select
@@ -582,6 +588,7 @@ export function ImportDialog({
                   })
                 }
               >
+                {kind !== "syllabus" && <option value="">Not detected</option>}
                 {state.courses.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.code}
@@ -592,9 +599,11 @@ export function ImportDialog({
             {kind !== "syllabus" && (
               <label>
                 Lecture date
+                {/* Card 35: a date that wasn't detected may stay empty; the note is saved undated. */}
                 <input
                   type="date"
-                  required
+                  aria-label="Lecture date"
+                  aria-describedby={!job.metadata.lectureDate ? "import-date-missing" : undefined}
                   value={job.metadata.lectureDate}
                   onChange={(e) =>
                     setJob({
@@ -603,6 +612,7 @@ export function ImportDialog({
                     })
                   }
                 />
+                {!job.metadata.lectureDate && <small id="import-date-missing">Not detected</small>}
               </label>
             )}
           </div>

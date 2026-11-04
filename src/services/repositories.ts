@@ -27,6 +27,7 @@ import {
   dateKey,
   offsetDate,
 } from "./fixtures";
+import { detectNoteMetadata } from "./noteMetadata";
 interface Store {
   user: User | null;
   completed: boolean;
@@ -78,7 +79,7 @@ export function filterNotes(
         (!query.category || n.category === query.category) &&
         (!query.visibility || n.visibility === query.visibility) &&
         (!query.from || n.lectureDate >= query.from) &&
-        (!query.to || n.lectureDate <= query.to),
+        (!query.to || (!!n.lectureDate && n.lectureDate <= query.to)),
     )
     .sort((a, b) =>
       Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) ||
@@ -360,7 +361,16 @@ export function createRepositories(
         const problem = kind === "syllabus" ? await fileTypeProblem(file) : null;
         if (problem) throw new Error(problem);
         if (kind === "syllabus" && serverSyllabus) return { ...job, id: (await serverSyllabus.upload(file, courseId)).id };
-        return { ...job, id: id() };
+        // Card 35: TXT/Markdown text becomes the note body, and is where its course and lecture date are read from.
+        let body: string | undefined;
+        if (kind !== "syllabus" && /\.(txt|md)$/i.test(file.name)) {
+          try {
+            body = await file.text();
+          } catch {
+            throw new Error("This file could not be read. Please choose it again.");
+          }
+        }
+        return { ...job, id: id(), ...(body === undefined ? {} : { body }) };
       },
       async process(job, scenario = "success") {
         // "Processing failed" in the prototype preview options shows the failure screen on purpose.
@@ -388,8 +398,14 @@ export function createRepositories(
           read = { meetings, noClassDates: normalizeBreaks(result.noClassDates), isSyllabus: result.isSyllabus !== false,
             ...("notice" in result ? { notice: result.notice } : {}) };
         }
-        const partial = scenario === "partial" || events.some((e) => e.needsReview);
-        return { ...job, state: partial ? "partial" : "review", events, ...read };
+        // Card 35: a note gets its course and lecture date from its TXT/Markdown text or its file name.
+        // Anything not found stays empty for the student to fill in, rather than guessing.
+        let note: Partial<Pick<UploadJob, "metadata">> = {};
+        if (job.kind !== "syllabus")
+          note = { metadata: { ...job.metadata, ...detectNoteMetadata(job.body ?? "", job.name, db.courses) } };
+        const missing = !!note.metadata && (!note.metadata.courseId || !note.metadata.lectureDate);
+        const partial = scenario === "partial" || missing || events.some((e) => e.needsReview);
+        return { ...job, ...note, state: partial ? "partial" : "review", events, ...read };
       },
       async confirm(job) {
         if (job.state !== "review" && job.state !== "partial")
@@ -419,7 +435,7 @@ export function createRepositories(
         }
         await repo.notes.create({
           ...job.metadata,
-          body: `Imported from ${job.name}.\n\nYour document is ready to organize. Add your notes here.`,
+          body: job.body ?? `Imported from ${job.name}.\n\nYour document is ready to organize. Add your notes here.`,
         });
         return { created: 0, skipped: 0, first: "" };
       },

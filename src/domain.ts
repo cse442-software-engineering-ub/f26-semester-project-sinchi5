@@ -127,6 +127,8 @@ export interface UploadJob {
   state:
     "queued" | "processing" | "review" | "completed" | "partial" | "failed";
   metadata: DetectedMetadata;
+  // The text of an uploaded TXT/Markdown note, saved as the note's body (card 35).
+  body?: string;
   events: DetectedEvent[];
   meetings?: DetectedMeeting[];
   noClassDates?: { from: string; to: string }[];
