@@ -13,6 +13,25 @@ function memory() {
 }
 
 describe("repository contracts", () => {
+  it("matches one complete tag and combines it with search, course, and sorting", async () => {
+    const [first, second, third] = seedNotes();
+    const notes = [
+      { ...first, title: "Exam outline", body: "", tags: ["exam"], courseId: "cse442", pinned: false },
+      { ...second, title: "Final exam guide", body: "", tags: ["final exam"], courseId: "cse442", pinned: false },
+      { ...third, title: "Project plan", body: "", tags: ["project"], courseId: "cse442", pinned: false },
+      { ...first, id: "other-exam", title: "Exam 331 review", body: "", tags: ["exam"], courseId: "cse331", pinned: false },
+    ];
+    expect(filterNotes(notes, { tag: "exam" }).map((n) => n.title).sort()).toEqual(["Exam 331 review", "Exam outline"]);
+    expect(filterNotes(notes, { tag: "final exam" }).map((n) => n.title)).toEqual(["Final exam guide"]);
+    expect(filterNotes(notes, { tag: "exam", course: "cse442" }).map((n) => n.title)).toEqual(["Exam outline"]);
+    expect(filterNotes(notes, { tag: "exam", course: "cse442", q: "plan" })).toEqual([]);
+    expect(filterNotes(notes, { tag: "exam", sort: "title" }).map((n) => n.title)).toEqual(["Exam 331 review", "Exam outline"]);
+
+    const repo = createRepositories(memory(), null, false);
+    await repo.notes.create({ title: "Half done", tags: ["50%_done"] });
+    await repo.notes.create({ title: "Fifty X", tags: ["50Xdone"] });
+    expect((await repo.notes.list({ tag: "50%_done" })).map((n) => n.title)).toEqual(["Half done"]);
+  });
   it("combines keyword, course, visibility, category and date filters", () => {
     const notes = seedNotes();
     expect(
