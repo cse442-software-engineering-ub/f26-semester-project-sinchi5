@@ -139,6 +139,14 @@ textarea {
   color: var(--text);
   font-size: 0.85rem;
 }
+/* Card 164: iPhone Safari zooms in on any field with text under 16px, so phones use 16px. */
+@media (max-width: 767px) {
+  input:not([type="color"]),
+  select,
+  textarea {
+    font-size: 1rem;
+  }
+}
 textarea {
   resize: vertical;
   line-height: 1.7;
