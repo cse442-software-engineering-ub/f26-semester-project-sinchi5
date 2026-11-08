@@ -1030,7 +1030,8 @@
 }
 .formRow {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, ...) lets a date box shrink, so 16px phone text can't push it past the edge. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
 .form > .primary {
@@ -2775,18 +2776,26 @@
   .importMetadata {
     grid-template-columns: minmax(0, 1fr);
   }
-  .noteMetadata label,
-  .noteMetadata input,
-  .noteMetadata select {
+  .noteMetadata label {
     font-size: 0.875rem;
   }
+  /* Card 164: 16px fields, so iPhone Safari doesn't zoom in when one is tapped. */
+  .noteMetadata input,
+  .noteMetadata select,
+  .search input,
+  .libraryToolbar > select,
+  .filters input,
+  .filters select {
+    font-size: 1rem;
+  }
+  /* The highlight layer sits under the note body, so both keep the same size. */
   .editor .noteBody {
     min-height: 420px;
-    font-size: 0.85rem;
+    font-size: 1rem;
   }
   .highlightLayer {
     min-height: 420px;
-    font-size: 0.85rem;
+    font-size: 1rem;
   }
   .editorTop {
     gap: 5px;
