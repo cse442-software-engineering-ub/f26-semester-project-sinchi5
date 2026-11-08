@@ -204,6 +204,13 @@ export default function App() {
       </aside>
       <div className={s.mainWrap}>
         <header className={s.topbar}>
+          {/* Card 165: phones hide the left menu, so the top bar shows the name there instead. */}
+          <Link to="/" className={s.topBrand}>
+            <span>
+              <BookOpen size={17} />
+            </span>
+            {BRAND}
+          </Link>
           <span className={s.breadcrumb}>
             My workspace <span>/</span>{" "}
             {location.pathname === "/"

@@ -216,6 +216,10 @@
   color: var(--muted);
   margin-left: auto;
 }
+/* Shown only on phones (see the max-width: 767px block); desktop has the name in the left menu. */
+.topBrand {
+  display: none;
+}
 .topActions {
   display: flex;
   align-items: center;
@@ -2401,11 +2405,31 @@
     padding: 0 20px;
     gap: 14px;
   }
+  /* Card 165: on a phone the name takes this spot; the path only fit as "My …". */
   .breadcrumb {
-    font-size: 0.65rem;
+    display: none;
   }
   .topSearch {
     margin-left: auto;
+  }
+  .topBrand {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 7px;
+    min-height: 44px;
+    font-size: 1.15rem;
+    font-weight: 650;
+    letter-spacing: -0.05em;
+  }
+  .topBrand > span {
+    width: 28px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    background: var(--sage);
+    border-radius: 8px;
+    color: #536e50;
   }
   .topActions {
     gap: 4px;
