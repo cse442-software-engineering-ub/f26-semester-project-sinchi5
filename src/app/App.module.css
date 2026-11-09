@@ -311,6 +311,74 @@
   color: var(--text);
   padding: 0;
 }
+.weekCard {
+  min-width: 0;
+  margin-bottom: 32px;
+  padding: clamp(18px, 3vw, 32px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+.weekCard h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+}
+.weekSummary {
+  margin: 8px 0 24px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.weekDay {
+  margin-bottom: 24px;
+}
+.weekDay h3 {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.weekRow {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 60px;
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  text-align: left;
+  border-radius: 6px;
+}
+.weekRow:hover {
+  background: var(--surface-soft);
+}
+.weekRow:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+.weekTime {
+  font-size: 0.8rem;
+}
+.weekInfo {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.weekInfo strong,
+.weekInfo > span {
+  display: block;
+  line-height: 1.5;
+}
+.weekInfo strong {
+  font-size: 0.9rem;
+  font-weight: 550;
+}
+.weekInfo > span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
 .hero {
   min-height: 272px;
   border-radius: 12px;
@@ -1345,7 +1413,7 @@
 }
 .filters {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
   gap: 12px;
   padding: 20px;
   background: var(--surface-soft);

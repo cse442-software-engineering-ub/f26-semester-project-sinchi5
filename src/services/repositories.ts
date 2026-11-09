@@ -75,6 +75,7 @@ export function filterNotes(
             .join(" ")
             .toLowerCase()
             .includes(q)) &&
+        (!query.tag || n.tags.includes(query.tag)) &&
         (!query.course || n.courseId === query.course) &&
         (!query.category || n.category === query.category) &&
         (!query.visibility || n.visibility === query.visibility) &&
