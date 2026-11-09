@@ -8,11 +8,11 @@ import {
   Camera,
   UploadCloud,
   Sparkles,
-  BookOpen,
 } from "lucide-react";
 import { useApp } from "../app/context";
-import { PageHeading, NoteCard, EventRow, Empty } from "../shared/ui";
+import { PageHeading, NoteCard, EventRow, Empty, formatEventTime } from "../shared/ui";
 import { dateKey } from "../services/fixtures";
+import { weekAhead } from "../services/upcoming";
 import { EventDialog } from "./schedule";
 import { isClass, type CourseEvent, type UploadKind } from "../domain";
 import s from "../app/App.module.css";
@@ -28,6 +28,10 @@ export function Dashboard({
   const { state } = useApp();
   const [event, setEvent] = useState<CourseEvent>();
   const today = dateKey();
+  // Task #135 / Story #133: use Task #134's ordered groups on every schedule update.
+  const week = weekAhead(state.events, today);
+  // A day can contain several due items; the summary counts events, not groups.
+  const weekCount = week.reduce((total, group) => total + group.events.length, 0);
   const day = state.events.filter((e) => e.date === today);
   const deadlines = state.events
     .filter((e) => !isClass(e.kind) && e.date >= today)
@@ -59,49 +63,46 @@ export function Dashboard({
           </button>
         }
       />
-      <section className={s.hero}>
-        <div className={s.heroCopy}>
-          <span className={s.heroEyebrow}>
-            <span /> YOUR SPACE TO THINK
-          </span>
-          <h2>
-            Big ideas start
-            <br />
-            with a little note.
-          </h2>
-          <p>
-            Pick up where you left off, or turn a fresh
-            <br className={s.desktopOnly} /> page. Your next idea is waiting.
-          </p>
-          <Link className={s.heroLink} to="/notes">
-            Find your flow <ArrowRight size={17} />
-          </Link>
-        </div>
-        <div className={s.heroArt} aria-hidden="true">
-          <span className={s.starOne}>✳</span>
-          <span className={s.starTwo}>✦</span>
-          <div className={s.artOrbit} />
-          <div className={s.artBack} />
-          <div className={s.artPaper}>
-            <span>
-              <BookOpen size={21} /> a little note
-            </span>
-            <h3>
-              Less noise.
-              <br />
-              More possibility.
-            </h3>
-            <i />
-            <i />
-            <i />
-            <div>
-              good things are taking shape <span>↗</span>
-            </div>
-          </div>
-          <div className={s.artChip}>
-            <Sparkles size={15} /> One thought at a time
-          </div>
-        </div>
+      <section className={s.weekCard} aria-labelledby="week-heading">
+        <h2 id="week-heading">Your week at a glance</h2>
+        {weekCount ? (
+          <>
+            <p className={s.weekSummary}>
+              {weekCount} {weekCount === 1 ? "thing" : "things"} due this week
+            </p>
+            {week.map((group) => (
+              <section className={s.weekDay} key={group.date} aria-label={group.label}>
+                <h3>{group.label}</h3>
+                {group.events.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={s.weekRow}
+                    // Reuse the dashboard's existing EventDialog selection and focus return.
+                    onClick={() => setEvent(item)}
+                  >
+                    <span className={s.weekTime}>
+                      {/* Empty times represent all-day events; the shared helper handles AM/PM. */}
+                      {item.time ? formatEventTime(item.time) : "All day"}
+                    </span>
+                    <span className={s.weekInfo}>
+                      <strong>{item.title}</strong>
+                      <span>
+                        {state.courses.find((course) => course.id === item.courseId)?.code || "Personal"} · {item.kind}
+                      </span>
+                    </span>
+                    <ArrowUpRight size={16} aria-hidden="true" />
+                  </button>
+                ))}
+              </section>
+            ))}
+          </>
+        ) : (
+          <Empty title="Nothing due this week.">Enjoy the breathing room.</Empty>
+        )}
+        <Link className={s.textLink} to="/assignments">
+          See the whole semester <ArrowRight size={17} aria-hidden="true" />
+        </Link>
       </section>
       <div className={s.dashboardGrid}>
         <div>
