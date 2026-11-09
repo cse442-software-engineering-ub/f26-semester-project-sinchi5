@@ -78,6 +78,9 @@ test("clears only after CLEAR", async ({ page }) => {
   let { dialog, box, clear } = await openClear(page);
   await box.press("Enter");
   await expect(dialog).toBeVisible();
+  await box.fill("clear");
+  await box.press("Enter");
+  await expect(dialog).toBeVisible();
   await close(dialog);
   // Reloading the Notes page reads the list back from the mocked server.
   await page.goto("/notes");
@@ -122,5 +125,6 @@ test("signed out cannot clear", async ({ page }) => {
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Good to see you again." })).toBeVisible();
   await expect(page.getByRole("button", { name: "Clear workspace" })).toHaveCount(0);
+  await page.waitForLoadState("networkidle");
   expect(clears.count).toBe(0);
 });

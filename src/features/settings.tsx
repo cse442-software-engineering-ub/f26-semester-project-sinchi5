@@ -130,6 +130,7 @@ export function Settings() {
                 onChange={(e) => setConfirmText(e.target.value)}
                 autoComplete="off"
                 autoCapitalize="characters"
+                autoCorrect="off"
                 spellCheck={false}
               />
             </label>
