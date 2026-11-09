@@ -864,19 +864,23 @@
   border-radius: 5px;
   padding: 3px 6px;
 }
-.deadline {
+.comingUpRow {
   display: flex;
   gap: 10px;
   width: 100%;
+  min-height: 44px;
   text-align: left;
   padding: 12px 0;
   border-bottom: 1px solid var(--line);
 }
-.deadline:last-child {
+.comingUpRow:last-child {
   border-bottom: 0;
   padding-bottom: 0;
 }
-.deadlineIcon {
+.comingUpRow:hover {
+  background: var(--surface-soft);
+}
+.comingUpIcon {
   width: 31px;
   height: 31px;
   border-radius: 7px;
@@ -886,22 +890,33 @@
   color: var(--muted);
   flex-shrink: 0;
 }
-.deadline strong {
-  font-size: 0.7rem;
+.comingUpInfo {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.comingUpInfo strong {
+  font-size: 0.85rem;
   font-weight: 500;
   display: block;
   line-height: 1.5;
 }
-.deadline small {
-  font-size: 0.56rem;
+.comingUpInfo small,
+.comingUpInfo time {
+  font-size: 0.75rem;
   color: var(--muted);
   display: block;
   margin: 4px 0;
 }
-.deadline em {
+.comingUpInfo em {
+  display: block;
   font-style: normal;
-  font-size: 0.55rem;
+  font-size: 0.75rem;
   color: var(--primary);
+}
+.comingUpEmpty {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.6;
 }
 .quietNote {
   display: flex;

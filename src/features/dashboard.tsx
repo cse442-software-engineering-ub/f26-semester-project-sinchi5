@@ -12,9 +12,9 @@ import {
 import { useApp } from "../app/context";
 import { PageHeading, NoteCard, EventRow, Empty, formatEventTime } from "../shared/ui";
 import { dateKey } from "../services/fixtures";
-import { weekAhead } from "../services/upcoming";
+import { comingUp, weekAhead } from "../services/upcoming";
 import { EventDialog } from "./schedule";
-import { isClass, type CourseEvent, type UploadKind } from "../domain";
+import { type CourseEvent, type UploadKind } from "../domain";
 import s from "../app/App.module.css";
 export function Dashboard({
   onImport,
@@ -33,9 +33,9 @@ export function Dashboard({
   // A day can contain several due items; the summary counts events, not groups.
   const weekCount = week.reduce((total, group) => total + group.events.length, 0);
   const day = state.events.filter((e) => e.date === today);
-  const deadlines = state.events
-    .filter((e) => !isClass(e.kind) && e.date >= today)
-    .slice(0, 3);
+  // Task #136 / Story #133: Task #134 selects the next three exams/projects,
+  // excluding the current seven-day window reserved for the week card.
+  const upcoming = comingUp(state.events, today);
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -232,36 +232,42 @@ export function Dashboard({
               See your full schedule <ArrowRight size={15} />
             </Link>
           </section>
-          <section className={s.panel}>
+          <section className={s.panel} aria-labelledby="coming-up-heading">
             <div className={s.sectionHeading}>
-              <h2>A little heads-up</h2>
-              <span className={s.count}>{deadlines.length}</span>
+              <h2 id="coming-up-heading">Coming up</h2>
+              <span className={s.count}>{upcoming.length}</span>
             </div>
-            {deadlines.map((e) => (
+            {upcoming.map((e) => (
               <button
-                className={s.deadline}
+                type="button"
+                className={s.comingUpRow}
                 key={e.id}
+                // Share the existing dashboard EventDialog and its focus restoration.
                 onClick={() => setEvent(e)}
               >
-                <span className={s.deadlineIcon}>
+                <span className={s.comingUpIcon} aria-hidden="true">
                   <FileText size={17} />
                 </span>
-                <span>
+                <span className={s.comingUpInfo}>
                   <strong>{e.title}</strong>
                   <small>
-                    {state.courses.find((c) => c.id === e.courseId)?.code} ·{" "}
-                    {e.kind}
+                    {state.courses.find((c) => c.id === e.courseId)?.code || "Personal"}
                   </small>
-                  <em>
+                  <time dateTime={e.date}>
+                    {/* Local noon preserves the event's calendar date without UTC shifts. */}
                     {new Date(e.date + "T12:00:00").toLocaleDateString(
-                      undefined,
-                      { month: "short", day: "numeric" },
-                    )}{" "}
-                    · {e.time}
-                  </em>
+                      "en-US",
+                      { weekday: "short", month: "short", day: "numeric" },
+                    )}
+                  </time>
+                  {/* Task #134 supplies calendar-day distances, including across DST. */}
+                  <em>in {e.daysAway} days</em>
                 </span>
               </button>
             ))}
+            {upcoming.length === 0 && (
+              <p className={s.comingUpEmpty}>No exams or projects coming up.</p>
+            )}
           </section>
           <div className={s.quietNote}>
             <Sparkles size={20} />
