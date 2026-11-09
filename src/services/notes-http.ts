@@ -59,10 +59,11 @@ export function createHttpNotes(
   });
   return {
     async list(q) {
-      // Let the server narrow by category (card 41). The other filters and the sort stay in the
-      // browser, which also re-applies the category, so an unknown value just gives an empty list.
+      // Narrow by category and exact tag on the server. Re-apply the filters locally so
+      // the demo and signed-in notes share the same list contract.
       const category = NOTE_CATEGORIES.includes(q?.category ?? "") ? `&category=${encodeURIComponent(q!.category!)}` : "";
-      const { notes } = await send<{ notes: Note[] }>(`notes${category}`);
+      const tag = q?.tag ? `&tag=${encodeURIComponent(q.tag)}` : "";
+      const { notes } = await send<{ notes: Note[] }>(`notes${category}${tag}`);
       return filterNotes(notes, q);
     },
     async get(noteId) {

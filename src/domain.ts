@@ -139,6 +139,7 @@ export interface UploadJob {
 }
 export interface NoteQuery {
   q?: string;
+  tag?: string;
   course?: string;
   category?: string;
   visibility?: string;

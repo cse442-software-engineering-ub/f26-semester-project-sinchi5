@@ -65,10 +65,15 @@ export function Notes() {
   // An empty result that comes only from a category filter gets its own message and a "New note"
   // action for that category; any other empty result keeps the general "No notes found".
   const selectedCategory = params.get("category");
+  const selectedTag = params.get("tag") || "";
+  // The provider keeps the full accessible notes list, so choices stay available
+  // even when the current search or another filter has no matches.
+  const availableTags = [...new Set([...state.notes.flatMap((note) => note.tags), selectedTag].filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
   const emptyCategory =
     isNoteCategory(selectedCategory) &&
     !params.get("q") &&
-    !["course", "visibility", "from", "to"].some((name) => params.get(name))
+    !["tag", "course", "visibility", "from", "to"].some((name) => params.get(name))
       ? selectedCategory
       : undefined;
   const key = params.toString();
@@ -179,7 +184,7 @@ export function Notes() {
     await refresh();
   }
 
-  const active = ["course", "category", "visibility", "from", "to"].filter(
+  const active = ["course", "category", "tag", "visibility", "from", "to"].filter(
     (k) => params.get(k),
   );
   return (
@@ -321,6 +326,18 @@ export function Notes() {
             </select>
           </label>
           <label>
+            Tags
+            <select
+              value={selectedTag}
+              onChange={(e) => set("tag", e.target.value)}
+            >
+              <option value="">All tags</option>
+              {availableTags.map((tag) => (
+                <option key={tag} value={tag}>{tag}</option>
+              ))}
+            </select>
+          </label>
+          <label>
             Visibility
             <select
               value={params.get("visibility") || ""}
@@ -354,9 +371,11 @@ export function Notes() {
         <span>{notes.length} notes in your space</span>
         <div className={s.actions}>
           {active.map((k) => (
-            <button className={s.chip} key={k} onClick={() => set(k, "")}>
-              {state.courses.find((c) => c.id === params.get(k))?.code ||
-                params.get(k)}{" "}
+            <button className={s.chip} key={k} onClick={() => set(k, "")}
+              aria-label={k === "tag" ? `Clear tag filter ${params.get(k)}` : undefined}>
+              {k === "course"
+                ? state.courses.find((c) => c.id === params.get(k))?.code || params.get(k)
+                : params.get(k)}{" "}
               <X size={12} />
             </button>
           ))}
