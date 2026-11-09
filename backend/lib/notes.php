@@ -166,7 +166,7 @@ function noteFields(array $input): array
     return [$course, $date === '' ? null : $date, $category, $visibility, $tags];
 }
 
-// Optional narrowing for the notes list (cards 41 and 55). Every filter is optional, an empty value
+// Optional narrowing for the notes list (cards 41, 55, and 175). Every filter is optional, an empty value
 // counts as absent, and filters combine with AND on top of "notes this user may view".
 // Returns [extra SQL starting with " AND ...", bound values].
 function noteListFilter(array $query): array
@@ -187,6 +187,16 @@ function noteListFilter(array $query): array
         }
         $sql .= ' AND n.category = ?';
         $values[] = $category;
+    }
+    $tag = $text('tag');
+    if ($tag !== null) {
+        if (!preg_match('//u', $tag) || characterCount($tag) > 100) {
+            throw new HttpError(422, 'Keep the tag to 100 characters of plain text.');
+        }
+        // Tags are a JSON array. JSON_CONTAINS compares one complete string element,
+        // so spaces, SQL wildcards, and tag substrings are all literal.
+        $sql .= ' AND JSON_CONTAINS(n.tags, JSON_QUOTE(?)) = 1';
+        $values[] = $tag;
     }
     $keyword = $text('q');
     if ($keyword !== null) {

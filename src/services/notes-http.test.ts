@@ -49,6 +49,18 @@ it("asks the server for one category and still applies the other filters in the 
   expect(api.calls.map((call) => call.route)).toEqual(["notes&category=Work", "notes&category=Work"]);
 });
 
+it("sends an encoded exact tag and combines it with the category", async () => {
+  const [first, second] = seedNotes();
+  const notes = [
+    { ...first, title: "Half done", category: "School", tags: ["50%_done"] },
+    { ...second, title: "Fifty X", category: "School", tags: ["50Xdone"] },
+  ];
+  const api = fakeApi(() => ({ json: { notes } }));
+  const repo = createHttpNotes(courses, "/api/index.php", api.fetcher);
+  expect((await repo.list({ tag: "50%_done", category: "School" })).map((n) => n.title)).toEqual(["Half done"]);
+  expect(api.calls[0].route).toBe("notes&category=School&tag=50%25_done");
+});
+
 it("sends no category for All categories or an unknown value, and shows nothing for the unknown one", async () => {
   const [first] = seedNotes();
   const api = fakeApi(() => ({ json: { notes: [{ ...first, category: "School", pinned: false }] } }));
