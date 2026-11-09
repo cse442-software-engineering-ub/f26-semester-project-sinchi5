@@ -1454,6 +1454,118 @@
   padding: 0;
   margin: 0;
 }
+/* Card 139: semester assignments list. */
+.assignmentsPage {
+  max-width: 900px;
+}
+
+.assignmentsPage > .sectionHeading {
+  align-items: flex-end;
+  margin-bottom: 28px;
+}
+
+.assignmentsPage > .sectionHeading h1 {
+  margin: 0 0 8px;
+  font-size: 2rem;
+  font-weight: 550;
+  letter-spacing: -0.05em;
+}
+
+.assignmentFilter {
+  min-width: 170px;
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.assignmentFilter select {
+  margin-top: 6px;
+  font-size: 0.74rem;
+}
+
+.assignmentWeeks {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.assignmentWeek h2 {
+  margin-bottom: 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.assignmentRows {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.assignmentRow {
+  width: 100%;
+  min-height: 68px;
+  padding: 13px 16px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.assignmentRow:last-child {
+  border-bottom: 0;
+}
+
+.assignmentWhen {
+  width: 110px;
+  flex-shrink: 0;
+}
+
+.assignmentWhen strong,
+.assignmentWhen span,
+.assignmentInfo strong,
+.assignmentInfo span {
+  display: block;
+}
+
+.assignmentWhen strong {
+  font-size: 0.7rem;
+  font-weight: 550;
+}
+
+.assignmentWhen span {
+  margin-top: 4px;
+  font-size: 0.64rem;
+  color: var(--muted);
+}
+
+.assignmentInfo {
+  min-width: 0;
+  flex: 1;
+}
+
+.assignmentInfo strong {
+  overflow-wrap: anywhere;
+  font-size: 0.82rem;
+  font-weight: 550;
+}
+
+.assignmentInfo span {
+  margin-top: 5px;
+  font-size: 0.66rem;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.assignmentPast {
+  margin-top: 26px;
+}
+
+.assignmentPast > .textLink {
+  margin-bottom: 12px;
+}
 .scheduleLayout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
@@ -2738,6 +2850,55 @@
   }
   .noteList .cardFooter {
     margin-top: 4px;
+  }
+  .assignmentsPage {
+    max-width: none;
+    width: 100%;
+  }
+
+  .assignmentsPage > .sectionHeading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .assignmentsPage > .sectionHeading h1 {
+    font-size: 1.75rem;
+  }
+
+  .assignmentFilter {
+    width: 100%;
+  }
+
+  .assignmentFilter select {
+    width: 100%;
+    font-size: 1rem;
+  }
+
+  .assignmentRow {
+    min-height: 60px;
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .assignmentWhen {
+    width: 88px;
+  }
+
+  .assignmentWhen strong {
+    font-size: 0.66rem;
+  }
+
+  .assignmentWhen span {
+    font-size: 0.62rem;
+  }
+
+  .assignmentInfo strong {
+    font-size: 0.78rem;
+  }
+
+  .assignmentInfo span {
+    font-size: 0.62rem;
   }
   .calendarPanel {
     padding: 14px;

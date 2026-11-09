@@ -13,6 +13,7 @@ import {
   BookOpen,
   Sun,
   CalendarDays,
+  ClipboardList,
   Files,
   Settings as SettingsIcon,
   Plus,
@@ -27,6 +28,7 @@ import {
 import { useApp } from "./context";
 import { Dashboard } from "../features/dashboard";
 import { Schedule, EventDialog } from "../features/schedule";
+import { Assignments } from "../features/assignments";
 import { Notes, NoteWorkspace, CoursePage } from "../features/notes";
 import { Settings } from "../features/settings";
 import { Onboarding } from "../features/onboarding";
@@ -37,6 +39,7 @@ import s from "./App.module.css";
 const nav = [
   { to: "/", label: "Today", icon: Sun },
   { to: "/schedule", label: "Schedule", icon: CalendarDays },
+  { to: "/assignments", label: "Assignments", icon: ClipboardList },
   { to: "/notes", label: "Notes", icon: Files },
 ];
 export default function App() {
@@ -296,6 +299,7 @@ export default function App() {
               }
             />
             <Route path="/schedule" element={<Schedule />} />
+            <Route path="/assignments" element={<Assignments />} />
             <Route path="/notes" element={<Notes />} />
             <Route path="/notes/:id" element={<NoteWorkspace />} />
             <Route path="/courses/:id" element={<CoursePage />} />
