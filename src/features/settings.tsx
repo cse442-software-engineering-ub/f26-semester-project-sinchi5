@@ -8,6 +8,7 @@ import s from "../app/App.module.css";
 export function Settings() {
   const { state, repo, refresh, setTheme } = useApp();
   const [reset, setReset] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
   const isDemo = state.user?.id === "student";
@@ -100,7 +101,7 @@ export function Settings() {
                     : "Remove every note, course, and event in this browser."}
                 </small>
               </span>
-              <button className={s.secondary} onClick={() => { setError(""); setReset(true); }}>
+              <button className={s.secondary} onClick={() => { setError(""); setConfirmText(""); setReset(true); }}>
                 {isDemo ? "Reset sample data" : "Clear workspace"}
               </button>
             </li>
@@ -120,6 +121,19 @@ export function Settings() {
             : "This permanently deletes the notes you own, plus the courses and events saved in this browser. It cannot be undone."}
           onClose={() => setReset(false)}
         >
+          {/* The sample workspace only resets sample data, so it skips the typed confirmation. */}
+          {!isDemo && (
+            <label className={s.confirmField}>
+              Type CLEAR to confirm
+              <input
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+              />
+            </label>
+          )}
           {error && (
             <p className={s.error} role="alert">
               {error}
@@ -127,6 +141,7 @@ export function Settings() {
           )}
           <button
             className={s.danger}
+            disabled={!isDemo && confirmText !== "CLEAR"}
             onClick={async () => {
               try {
                 await repo.reset();
