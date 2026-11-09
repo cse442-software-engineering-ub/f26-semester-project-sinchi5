@@ -11,7 +11,7 @@ const taskNotes: Seed[] = [
   { title: "Project outline", tag: "project", course: true },
 ];
 const titles = (page: Page) => page.locator('a[href^="/notes/"] h3');
-const editorCourse = (page: Page) => page.locator('select:has(option:text-is("No course"))');
+const editorCourse = (page: Page) => page.getByRole("combobox", { name: "Course", exact: true });
 const filterCourse = (page: Page) => page.locator('select:has(option:text-is("All courses"))');
 async function expectTitles(page: Page, expected: string[]) {
   await expect(titles(page)).toHaveCount(expected.length);
