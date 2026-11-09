@@ -1110,6 +1110,9 @@
   align-self: flex-start;
   margin-top: 4px;
 }
+.confirmField {
+  margin-bottom: 17px;
+}
 .dropzone {
   display: flex;
   align-items: center;
