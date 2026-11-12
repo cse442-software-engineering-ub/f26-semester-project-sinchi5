@@ -167,4 +167,7 @@ try {
   }));
   for (const result of cleanup) if (result.status === "rejected") throw result.reason;
 }
-if (complete) console.log("PASS: profile photos are checked, stored, served safely, and removed");
+if (complete) {
+  console.log("PASS 5: existing request limits, profile updates, method checks, and temporary account cleanup");
+  console.log("PASS: profile photos are checked, stored, served safely, and removed");
+}

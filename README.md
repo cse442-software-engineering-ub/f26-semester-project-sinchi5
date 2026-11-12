@@ -140,6 +140,13 @@ replacement and zero rows after account deletion. Fixtures in `backend/tests/dat
 are real 64×64 PNG/JPEG/WebP images, a real 16×16 PNG, and plain text disguised as a
 PNG. No GD or intl extension is required by the application or tests.
 
+Configure PHP's `display_errors=Off` and `display_startup_errors=Off` at server
+startup, and use a writable `upload_tmp_dir`/`sys_temp_dir`. PHP may spool large
+request bodies before the API entry point runs; startup warnings must not enter
+HTTP responses. For a local CLI server, pass `-d display_errors=0
+-d display_startup_errors=0` before `-S` (and temporary-directory overrides if your
+XAMPP defaults are not writable).
+
 You need PHP 8 with `pdo_mysql`, and a local MySQL or MariaDB server (XAMPP works; see [Notes/XAMPP.md](Notes/XAMPP.md)).
 
 1. **Create a database and user** for development, then apply the schema:
