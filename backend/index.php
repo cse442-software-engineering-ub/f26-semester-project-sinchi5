@@ -11,6 +11,7 @@ header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
 define('NOTELY_INTERNAL', true);
 require_once __DIR__ . '/lib/bootstrap.php';
 require_once __DIR__ . '/lib/accounts.php';
+require_once __DIR__ . '/lib/profile-photos.php';
 require_once __DIR__ . '/lib/notes.php';
 require_once __DIR__ . '/lib/imports.php';
 require_once __DIR__ . '/lib/syllabus-ai.php';
@@ -22,12 +23,13 @@ try {
     }
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
     $route = $_GET['route'] ?? 'session';
-    $routes = ['session', 'register', 'login', 'logout', 'onboarding', 'profile', 'password', 'delete', 'reset-password', 'recovery-code', ...NOTE_ROUTES, ...IMPORT_ROUTES];
+    $routes = ['session', 'register', 'login', 'logout', 'onboarding', 'profile', 'profile-photo', 'profile-photo-remove', 'password', 'delete', 'reset-password', 'recovery-code', ...NOTE_ROUTES, ...IMPORT_ROUTES];
     if (!is_string($route) || !in_array($route, $routes, true)) {
         throw new HttpError(404, 'This action was not found.');
     }
     $expected = in_array($route, ['session', ...NOTE_READ_ROUTES, ...IMPORT_READ_ROUTES], true) ? 'GET' : 'POST';
-    if ($method !== $expected) {
+    $expected = $route === 'profile-photo' ? 'GET, POST' : $expected;
+    if (!in_array($method, explode(', ', $expected), true)) {
         header('Allow: ' . $expected);
         throw new HttpError(405, 'This request method is not supported.');
     }
@@ -40,17 +42,18 @@ try {
             throw new HttpError(415, 'Send requests as JSON.');
         }
         // Cap reads even when the client omits or lies about Content-Length.
-        // Syllabus files are the only large uploads (card 43), and a semester of reviewed classes is the
-        // only other request that won't fit in 8 KB (card 47).
+        // Only the named upload/import routes may exceed the usual 8 KB limit.
         $upload = $route === 'syllabus-upload';
         $limit = $upload ? SYLLABUS_MAX_BODY : ($route === 'import-confirm' ? IMPORT_CONFIRM_MAX_BODY : 8192);
+        if ($route === 'profile-photo') $limit = PROFILE_PHOTO_MAX_BODY;
         if ($upload) {
             // The body, its decoded JSON, and the file bytes are all in memory at once.
             ini_set('memory_limit', '256M');
         }
         $body = file_get_contents('php://input', false, null, 0, $limit + 1);
         if ($body === false || strlen($body) > $limit) {
-            throw new HttpError(413, $upload ? SYLLABUS_SIZE_ERROR : 'This request is too large.');
+            throw new HttpError(413, $route === 'profile-photo' ? PROFILE_PHOTO_SIZE_ERROR
+                : ($upload ? SYLLABUS_SIZE_ERROR : 'This request is too large.'));
         }
         try {
             $decoded = json_decode($body, false, 16, JSON_THROW_ON_ERROR);
@@ -66,7 +69,7 @@ try {
     // Never trust client-supplied forwarding headers for throttling.
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     $session = readSession($db, $config);
-    if (in_array($route, ['onboarding', 'profile', 'password', 'delete', 'recovery-code', ...NOTE_ROUTES, ...IMPORT_ROUTES], true)
+    if (in_array($route, ['onboarding', 'profile', 'profile-photo', 'profile-photo-remove', 'password', 'delete', 'recovery-code', ...NOTE_ROUTES, ...IMPORT_ROUTES], true)
         && (!$session || !$session['user_id'])) {
         throw new HttpError(401, 'Sign in to continue.');
     }
@@ -80,6 +83,10 @@ try {
             $session = newSession($db, $config, null);
         }
         $result = sessionResponse($db, $config, $session);
+    } elseif (in_array($route, ['profile-photo', 'profile-photo-remove'], true)) {
+        if ($method === 'GET') serveProfilePhoto($db, $session);
+        requireCsrf($session, $config);
+        $result = profilePhotoAction($db, $config, $session, $route, $input);
     } elseif (in_array($route, NOTE_ROUTES, true)) {
         if ($method === 'POST') requireCsrf($session, $config);
         $result = noteAction($db, $session, $route, $input, $config);

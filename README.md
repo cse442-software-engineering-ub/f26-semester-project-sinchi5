@@ -103,6 +103,50 @@ npm run preview    # Serve the production build locally
 
 ## Running the PHP service locally
 
+Card #160 profile photos: apply `backend/migrations/014_profile_photos.sql` to your
+isolated DEV database before using this backend. This migration number is reserved
+for the card; it does not require migrations 010–013. Apply the earlier migrations
+present in this repository first. Deployment to shared TEST/PROD needs review and
+approval; this task does not deploy or run shared migrations.
+
+Authenticated `POST profile-photo` accepts `{ "content": "<base64>" }` with the
+existing Origin and CSRF headers. It replaces only the signed-in user's photo and
+returns the usual session JSON. PNG, JPEG, and WebP signatures, readable dimensions
+from 32 through 4096 on each axis, and complete containers are required. Decoded
+images may be at most 2 MiB; only this route permits a JSON body up to 3 MiB. Other
+routes keep their existing limits. `GET profile-photo` returns original binary
+bytes with a validated image MIME, `nosniff`, inline disposition, and private,
+no-cache headers; a missing photo returns 404 `No profile photo yet.`. Authenticated
+`POST profile-photo-remove` requires CSRF and removes the caller's photo, including
+when none exists. Session `user.hasPhoto` is always a boolean. Account deletion
+removes its photo through a foreign key cascade. No route takes a client user ID.
+
+Card #160 tests (PowerShell, with the API on port 8081 and its private DEV config):
+
+```powershell
+$env:NOTELY_CONFIG = 'C:\private\notely-dev.php'
+$env:NOTELY_TEST_ISOLATED = '1'
+$env:NOTELY_TEST_URL = 'http://127.0.0.1:8081/api/index.php'
+# If PHP is not on PATH, also set NOTELY_TEST_PHP to its executable path.
+php backend/tests/profile-photos.php
+node backend/tests/profile-photo-http.mjs
+```
+
+Start the API in another terminal with the same `NOTELY_CONFIG` using
+`php -S 127.0.0.1:8081 backend/dev-router.php`. The HTTP suite only permits local
+hosts, creates unique temporary accounts, and removes them in `finally`. Its
+read-only PHP companion uses the same config to verify a single row after
+replacement and zero rows after account deletion. Fixtures in `backend/tests/data/`
+are real 64×64 PNG/JPEG/WebP images, a real 16×16 PNG, and plain text disguised as a
+PNG. No GD or intl extension is required by the application or tests.
+
+Configure PHP's `display_errors=Off` and `display_startup_errors=Off` at server
+startup, and use a writable `upload_tmp_dir`/`sys_temp_dir`. PHP may spool large
+request bodies before the API entry point runs; startup warnings must not enter
+HTTP responses. For a local CLI server, pass `-d display_errors=0
+-d display_startup_errors=0` before `-S` (and temporary-directory overrides if your
+XAMPP defaults are not writable).
+
 You need PHP 8 with `pdo_mysql`, and a local MySQL or MariaDB server (XAMPP works; see [Notes/XAMPP.md](Notes/XAMPP.md)).
 
 1. **Create a database and user** for development, then apply the schema:
