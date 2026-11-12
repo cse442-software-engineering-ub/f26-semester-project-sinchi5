@@ -153,7 +153,9 @@ function requireCsrf(?array $session, array $config): void
 
 function sessionResponse(PDO $db, array $config, array $session): array
 {
-    $user = $session['user_id'] ? query($db, 'SELECT id, name, email, onboarding_completed FROM notely_users WHERE id = ?', [$session['user_id']])->fetch() : null;
+    $user = $session['user_id'] ? query($db, 'SELECT id, name, email, onboarding_completed,
+        EXISTS(SELECT 1 FROM notely_profile_photos WHERE user_id = notely_users.id) AS has_photo
+        FROM notely_users WHERE id = ?', [$session['user_id']])->fetch() : null;
     return [
         'user' => $user ? publicUser($user) : null,
         'onboarding' => ['completed' => $user ? (bool) $user['onboarding_completed'] : false, 'step' => $user && $user['onboarding_completed'] ? 3 : 0],

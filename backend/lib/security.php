@@ -166,7 +166,8 @@ function hashPassword(string $password): string
 
 function publicUser(array $user): array
 {
-    return ['id' => (string) $user['id'], 'name' => $user['name'], 'email' => $user['email']];
+    return ['id' => (string) $user['id'], 'name' => $user['name'], 'email' => $user['email'],
+        'hasPhoto' => (bool) ($user['has_photo'] ?? false)];
 }
 
 function newRecoveryCode(): string
