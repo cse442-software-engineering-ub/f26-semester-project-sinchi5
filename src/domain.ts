@@ -217,3 +217,15 @@ export interface Repositories {
   imports: ImportRepository;
   reset(): Promise<void>;
 }
+// Card 154: a classmate in the friends list or a pending request. `id` is the friendship's id.
+export interface Friend {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+}
+export interface FriendLists {
+  friends: Friend[];
+  incoming: Friend[];
+  outgoing: Friend[];
+}
