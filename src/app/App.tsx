@@ -35,6 +35,7 @@ import { Onboarding } from "../features/onboarding";
 import { ImportDialog } from "../features/imports";
 import { BRAND, type UploadKind } from "../domain";
 import { AddCourseDialog } from "../features/course-dialog";
+import { Avatar } from "../shared/ui";
 import s from "./App.module.css";
 const nav = [
   { to: "/", label: "Today", icon: Sun },
@@ -121,7 +122,7 @@ export default function App() {
         </Link>
         {/* Keep workspace details non-interactive: there is no menu to open. */}
         <div className={s.workspace}>
-          <span className={s.avatar}>{state.user.name[0].toUpperCase()}</span>
+          <Avatar user={state.user} version={state.photoVersion} alt="" />
           <span>
             <strong>My workspace</strong>
             <small>A little room to think</small>
@@ -201,7 +202,6 @@ export default function App() {
         <div className={s.sideFooter}>
           <span>
             <strong>{state.user.name}</strong>
-            <small>Curious mind, always.</small>
           </span>
         </div>
       </aside>
@@ -269,7 +269,7 @@ export default function App() {
               </Menu.Portal>
             </Menu.Root>
             <Link className={s.avatar} to="/settings" aria-label="Your account">
-              {state.user.name[0].toUpperCase()}
+              <Avatar user={state.user} version={state.photoVersion} className={s.accountLinkAvatar} alt="Your profile photo" />
             </Link>
           </div>
         </header>

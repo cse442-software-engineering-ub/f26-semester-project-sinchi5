@@ -66,6 +66,18 @@
   flex-shrink: 0;
   font-size: 0.8rem;
   font-weight: 600;
+  overflow: hidden;
+}
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  display: block;
+}
+.accountLinkAvatar {
+  width: 100%;
+  height: 100%;
 }
 .navItem {
   display: flex;
@@ -2008,13 +2020,6 @@
   font-size: 0.9rem;
   flex-shrink: 0;
   overflow: hidden;
-}
-.accountSummary > .avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: inherit;
-  display: block;
 }
 .accountSummary > span:not(.avatar) {
   flex: 1 1 160px;

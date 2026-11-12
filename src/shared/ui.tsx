@@ -12,9 +12,27 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useRef, useState, type ReactNode } from "react";
-import type { Note, CourseEvent } from "../domain";
+import type { Note, CourseEvent, User } from "../domain";
 import { useApp } from "../app/context";
 import s from "../app/App.module.css";
+
+export function Avatar({ user, className = "", alt = "", version = 0 }: {
+  user: User;
+  className?: string;
+  alt?: string;
+  version?: number;
+}) {
+  const [failedPhoto, setFailedPhoto] = useState("");
+  // Stable between photo changes; account identity prevents reusing another user's image.
+  const photoUrl = `${import.meta.env.BASE_URL}api/index.php?route=profile-photo&v=${encodeURIComponent(`${user.id}-${version}`)}`;
+  const initial = [...(user.name.trim() || user.email.trim() || "?")][0].toUpperCase();
+  return <span className={`${s.avatar} ${className}`} aria-hidden={alt === "" ? true : undefined}>
+    {user.hasPhoto && failedPhoto !== photoUrl
+      ? <img src={photoUrl} alt={alt} onError={() => setFailedPhoto(photoUrl)} />
+      : initial}
+  </span>;
+}
+
 export function Modal({
   title,
   description,
