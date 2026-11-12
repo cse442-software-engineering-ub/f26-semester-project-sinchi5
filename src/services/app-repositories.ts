@@ -40,7 +40,7 @@ export function createAppRepositories(
     const next = createRepositories(adapter, nextUser, demo, notes, nextUser && !demo ? serverSyllabus() : undefined);
     workspace = next;
   }
-  const demoUser: User = { id: "student", name: "Erin", email: "demo@example.edu" };
+  const demoUser: User = { id: "student", name: "Erin", email: "demo@example.edu", hasPhoto: false };
   const leaveDemo = () => { generation++; demo = false; tabStorage.removeItem("notely-demo"); select(null); };
   const auth: AuthRepository = {
     async session() {
@@ -65,6 +65,14 @@ export function createAppRepositories(
     async completeOnboarding() { if (!demo) await serverAuth.completeOnboarding(); },
     async updateProfile(name, email, password) { const result = await serverAuth.updateProfile(name, email, password); select(result); return result; },
     async changePassword(currentPassword, password) { await serverAuth.changePassword(currentPassword, password); },
+    async uploadProfilePhoto(content) {
+      if (demo) throw new Error("Demo accounts cannot be changed.");
+      const result = await serverAuth.uploadProfilePhoto(content); select(result); return result;
+    },
+    async removeProfilePhoto() {
+      if (demo) throw new Error("Demo accounts cannot be changed.");
+      const result = await serverAuth.removeProfilePhoto(); select(result); return result;
+    },
     async resetPassword(email, recoveryCode, password) { leaveDemo(); const code = await serverAuth.resetPassword(email, recoveryCode, password); select(null); return code; },
     async replaceRecoveryCode(password) { return serverAuth.replaceRecoveryCode(password); },
     async deleteAccount(password) {

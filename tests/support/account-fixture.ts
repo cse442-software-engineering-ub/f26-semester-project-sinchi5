@@ -1,7 +1,8 @@
 // Browser wiring fixture only. PHP security is tested independently in backend/tests.
 import { test as base, expect } from "@playwright/test";
 const CODE = "ABCD-1234-ABCD-1234-ABCD-1234-ABCD-1234";
-type Account = { id: string; name: string; email: string; password: string; code: string; completed: boolean };
+type Account = { id: string; name: string; email: string; password: string; code: string; completed: boolean;
+  photo?: { content: string; mime: string } };
 type Note = {
   checklist: { text: string; done: boolean }[];
   id: string; ownerId: string; title: string; body: string; courseId: string; lectureDate: string; category: string;
@@ -49,7 +50,7 @@ export const test = base.extend<{ accountApi: void }>({
     let comments: { id: string; noteId: string; body: string; author: string; authorId: string; createdAt: string }[] = [];
     let nextId = 1;
     const now = () => new Date().toISOString();
-    const publicUser = (a: Account | null) => a && { id: a.id, name: a.name, email: a.email };
+    const publicUser = (a: Account | null) => a && { id: a.id, name: a.name, email: a.email, hasPhoto: !!a.photo };
     const role = (noteId: string) => {
       const note = notes.get(noteId);
       if (!note) throw new ApiError(404, "This note could not be found.");
@@ -257,6 +258,45 @@ export const test = base.extend<{ accountApi: void }>({
       const query = new URL(route.request().url()).searchParams;
       const action = query.get("route")!;
       const body = route.request().postDataJSON() || {};
+      if (action === "profile-photo" || action === "profile-photo-remove") {
+        try {
+          const method = route.request().method();
+          if (!(method === "POST" || (action === "profile-photo" && method === "GET"))) {
+            throw new ApiError(405, "This request method is not supported.");
+          }
+          if (!user) throw new ApiError(401, "Sign in to continue.");
+          if (method === "GET") {
+            if (!user.photo) throw new ApiError(404, "No profile photo yet.");
+            await route.fulfill({ contentType: user.photo.mime, body: Buffer.from(user.photo.content, "base64"),
+              headers: { "X-Content-Type-Options": "nosniff", "Content-Disposition": "inline", "Cache-Control": "private, no-cache" } });
+            return;
+          }
+          if (route.request().headers()["x-csrf-token"] !== "fixture-csrf") {
+            throw new ApiError(403, "Your session changed. Reload the page and try again.");
+          }
+          if (action === "profile-photo-remove") user.photo = undefined;
+          else {
+            if (typeof body.content !== "string" || !body.content || !/^[A-Za-z0-9+/]+={0,2}$/.test(body.content)) {
+              throw new ApiError(422, "This image could not be read. Try another file.");
+            }
+            const bytes = Buffer.from(body.content, "base64");
+            if (bytes.length > 2 * 1024 * 1024) throw new ApiError(413, "Profile pictures can be at most 2 MB.");
+            const mime = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ? "image/png"
+              : bytes.subarray(0, 3).equals(Buffer.from([255, 216, 255])) ? "image/jpeg"
+              : bytes.subarray(0, 4).toString() === "RIFF" && bytes.subarray(8, 12).toString() === "WEBP" ? "image/webp" : "";
+            if (!mime) throw new ApiError(422, "Choose a PNG, JPEG, or WebP image.");
+            if (bytes.length <= 24 || (mime === "image/png" && (bytes.readUInt32BE(16) < 32 || bytes.readUInt32BE(20) < 32))) {
+              throw new ApiError(422, "This image could not be read. Try another file.");
+            }
+            user.photo = { content: body.content, mime };
+          }
+          const completed = user.completed;
+          await route.fulfill({ json: { user: publicUser(user), onboarding: { completed, step: completed ? 3 : 0 }, csrfToken: "fixture-csrf" } });
+        } catch (e) {
+          await route.fulfill({ status: (e as ApiError).status ?? 500, json: { error: (e as Error).message } });
+        }
+        return;
+      }
       if (action.startsWith("note")) {
         try {
           await route.fulfill({ status: action === "note-create" ? 201 : 200, json: noteRoute(action, query, body) });

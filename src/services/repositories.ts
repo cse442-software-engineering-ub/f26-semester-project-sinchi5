@@ -161,11 +161,13 @@ export function createRepositories(
       async startDemo() {
         const email = "erin@example.edu";
         const name = "Erin";
-        db.user = { id: "student", email, name: name || email.split("@")[0] };
+        db.user = { id: "student", email, name: name || email.split("@")[0], hasPhoto: false };
         persist();
       },
       async signUp() { throw new Error("Use the PHP account service to create accounts."); },
       async updateProfile() { throw new Error("Demo accounts cannot be changed."); },
+      async uploadProfilePhoto() { throw new Error("Demo accounts cannot be changed."); },
+      async removeProfilePhoto() { throw new Error("Demo accounts cannot be changed."); },
       async changePassword() { throw new Error("Demo accounts cannot be changed."); },
       async resetPassword() { throw new Error("Use the PHP account service for recovery."); },
       async replaceRecoveryCode() { throw new Error("Demo accounts cannot be changed."); },

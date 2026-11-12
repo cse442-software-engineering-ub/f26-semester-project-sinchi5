@@ -1,10 +1,35 @@
 import { describe, expect, it, vi } from "vitest";
 import { createAuthRepository } from "./auth";
 const anonymous = { user: null, onboarding: { completed: false, step: 0 }, csrfToken: "csrf-before" };
-const user = { id: "42", name: "Jamie", email: "jamie@example.edu" };
+const user = { id: "42", name: "Jamie", email: "jamie@example.edu", hasPhoto: false };
 const signedIn = { ...anonymous, user, csrfToken: "csrf-after" };
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status });
 describe("PHP account adapter", () => {
+  it("uploads raw base64 and removes photos with session credentials and rotated CSRF", async () => {
+    const withPhoto = { ...user, hasPhoto: true };
+    const fetcher = vi.fn().mockResolvedValueOnce(json(signedIn))
+      .mockResolvedValueOnce(json({ ...signedIn, user: withPhoto, csrfToken: "photo-csrf" }))
+      .mockResolvedValueOnce(json(signedIn));
+    const repo = createAuthRepository("/class/api/index.php", fetcher);
+    expect(await repo.uploadProfilePhoto("iVBORw0KGgo=")).toEqual(withPhoto);
+    expect(fetcher.mock.calls[1][0]).toBe("/class/api/index.php?route=profile-photo");
+    expect(fetcher.mock.calls[1][1]).toMatchObject({ method: "POST", credentials: "same-origin",
+      headers: { "X-CSRF-Token": "csrf-after" }, body: JSON.stringify({ content: "iVBORw0KGgo=" }) });
+    expect(await repo.removeProfilePhoto()).toEqual(user);
+    expect(fetcher.mock.calls[2][0]).toBe("/class/api/index.php?route=profile-photo-remove");
+    expect(fetcher.mock.calls[2][1]).toMatchObject({ method: "POST", credentials: "same-origin",
+      headers: { "X-CSRF-Token": "photo-csrf" }, body: "{}" });
+  });
+  it("preserves specific photo errors and permits retrying with the current CSRF token", async () => {
+    const message = "This image could not be read. Try another file.";
+    const fetcher = vi.fn().mockResolvedValueOnce(json(signedIn))
+      .mockResolvedValueOnce(json({ error: message }, 422)).mockResolvedValueOnce(json({ ...signedIn, user: { ...user, hasPhoto: true } }));
+    const repo = createAuthRepository("/api/index.php", fetcher);
+    await expect(repo.uploadProfilePhoto("bad")).rejects.toMatchObject({ message, status: 422 });
+    expect((await repo.uploadProfilePhoto("retry")).hasPhoto).toBe(true);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(fetcher.mock.calls[2][1].headers["X-CSRF-Token"]).toBe("csrf-after");
+  });
   it("bootstraps CSRF before registration, sends passwords only in the body, and uses rotated CSRF", async () => {
     const fetcher = vi.fn().mockResolvedValueOnce(json(anonymous))
       .mockResolvedValueOnce(json({ ...signedIn, recoveryCode: "one-time-code" }))

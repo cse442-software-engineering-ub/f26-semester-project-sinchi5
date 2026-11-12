@@ -14,8 +14,23 @@ function fakeServer() {
     return stores.get(user.id)!;
   };
 }
-const alice = { id: "1", name: "Alice", email: "alice@example.edu" };
-const bob = { id: "2", name: "Bob", email: "bob@example.edu" };
+const alice = { id: "1", name: "Alice", email: "alice@example.edu", hasPhoto: false };
+const bob = { id: "2", name: "Bob", email: "bob@example.edu", hasPhoto: false };
+it("forwards account photo actions and rejects them in the demo", async () => {
+  const uploadProfilePhoto = vi.fn().mockResolvedValue({ ...alice, hasPhoto: true });
+  const removeProfilePhoto = vi.fn().mockResolvedValue({ ...alice, hasPhoto: false });
+  const auth = { session: async () => ({ ...alice }), uploadProfilePhoto, removeProfilePhoto } as unknown as AuthRepository;
+  const repo = createAppRepositories(memory(), memory(), auth, fakeServer());
+  await repo.auth.session();
+  expect((await repo.auth.uploadProfilePhoto("raw-base64")).hasPhoto).toBe(true);
+  expect(uploadProfilePhoto).toHaveBeenCalledWith("raw-base64");
+  expect((await repo.auth.removeProfilePhoto()).hasPhoto).toBe(false);
+  await repo.auth.startDemo();
+  await expect(repo.auth.uploadProfilePhoto("raw-base64")).rejects.toThrow("Demo accounts cannot be changed.");
+  await expect(repo.auth.removeProfilePhoto()).rejects.toThrow("Demo accounts cannot be changed.");
+  expect(uploadProfilePhoto).toHaveBeenCalledTimes(1);
+  expect(removeProfilePhoto).toHaveBeenCalledTimes(1);
+});
 it("rejects legacy localStorage identity and keeps demo independent of server accounts", async () => {
   const storage = memory(); const tab = memory();
   storage.setItem("notely-data-v1", JSON.stringify({ user: alice, completed: true, notes: [], courses: [] }));

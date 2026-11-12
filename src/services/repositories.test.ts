@@ -385,7 +385,7 @@ describe("repository contracts", () => {
   });
   it("allows an edit-level collaborator to save note changes", async () => {
     const storage = memory();
-    const owner = createRepositories(storage, { id: "owner", name: "Owner", email: "owner@example.edu" });
+    const owner = createRepositories(storage, { id: "owner", name: "Owner", email: "owner@example.edu", hasPhoto: false });
 
     const note = await owner.notes.create({
       title: "Shared Note",
@@ -393,7 +393,7 @@ describe("repository contracts", () => {
       visibility: "shared",
     });
     // Server authentication supplies the current user to the prototype workspace.
-    const r = createRepositories(storage, { id: "classmate-jamie", name: "Jamie", email: "jamie@example.edu" });
+    const r = createRepositories(storage, { id: "classmate-jamie", name: "Jamie", email: "jamie@example.edu", hasPhoto: false });
     expect(note.ownerId).not.toBe((await r.auth.session())?.id);
 
     await r.notes.inviteCollaborator(
@@ -417,14 +417,14 @@ describe("repository contracts", () => {
   });
   it("rejects edits from a view-level collaborator", async () => {
     const storage = memory();
-    const owner = createRepositories(storage, { id: "owner", name: "Owner", email: "owner@example.edu" });
+    const owner = createRepositories(storage, { id: "owner", name: "Owner", email: "owner@example.edu", hasPhoto: false });
 
     const note = await owner.notes.create({
       title: "Shared Note",
       body: "Original content",
       visibility: "shared",
     });
-    const r = createRepositories(storage, { id: "classmate-jamie", name: "Jamie", email: "jamie@example.edu" });
+    const r = createRepositories(storage, { id: "classmate-jamie", name: "Jamie", email: "jamie@example.edu", hasPhoto: false });
     expect(note.ownerId).not.toBe((await r.auth.session())?.id);
 
     await r.notes.inviteCollaborator(
@@ -528,7 +528,7 @@ describe("note pinning", () => {
 });
 
 describe("note deletion (task #115)", () => {
-  const student = { id: "student-a", name: "Student A", email: "a@example.edu" };
+  const student = { id: "student-a", name: "Student A", email: "a@example.edu", hasPhoto: false };
   const titles = async (r: Repositories) =>
     (await r.notes.list()).map((n) => n.title).sort();
 
@@ -609,11 +609,11 @@ describe("note deletion (task #115)", () => {
 });
 
 describe("owner-only note deletion (task #116)", () => {
-  const studentA = { id: "student-a", name: "Student A", email: "a@example.edu" };
+  const studentA = { id: "student-a", name: "Student A", email: "a@example.edu", hasPhoto: false };
   // The collaborator mock only knows Jamie, so Jamie plays Student B. Its
   // invitations are kept in memory per repository instance, so each signed-in
   // instance records the share itself, as in the edit-permission tests above.
-  const studentB = { id: "classmate-jamie", name: "Jamie", email: "jamie@example.edu" };
+  const studentB = { id: "classmate-jamie", name: "Jamie", email: "jamie@example.edu", hasPhoto: false };
 
   it("Test 1 - the owner can delete their own note", async () => {
     const r = createRepositories(memory(), studentA, false);

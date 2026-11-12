@@ -50,7 +50,50 @@ export function AccountSettings() {
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const photoInput = useRef<HTMLInputElement>(null);
+  const [photoVersion, setPhotoVersion] = useState(0);
+  const [failedPhoto, setFailedPhoto] = useState("");
   const isDemo = state.user?.id === "student";
+  const photoUrl = `${import.meta.env.BASE_URL}api/index.php?route=profile-photo&v=${encodeURIComponent(`${state.user?.id}-${photoVersion}`)}`;
+  async function changePhoto(file?: File) {
+    // An empty selection is a canceled picker, not a removal or validation error.
+    if (!file || pending.current) return;
+    pending.current = true; setBusy(true); setError(""); setMessage("Uploading photo…");
+    try {
+      if (file.size > 2 * 1024 * 1024) throw new Error("Profile pictures can be at most 2 MB.");
+      // Inspect bytes rather than trusting the extension or browser-supplied MIME.
+      const header = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+      const starts = (bytes: number[], offset = 0) => bytes.every((byte, i) => header[offset + i] === byte);
+      if (!(starts([137, 80, 78, 71, 13, 10, 26, 10]) || starts([255, 216, 255])
+        || (starts([82, 73, 70, 70]) && starts([87, 69, 66, 80], 8)))) {
+        throw new Error("Choose a PNG, JPEG, or WebP image.");
+      }
+      const content = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => typeof reader.result === "string"
+          ? resolve(reader.result.slice(reader.result.indexOf(",") + 1))
+          : reject(new Error("This image could not be read. Try another file."));
+        reader.onerror = reader.onabort = () => reject(new Error("This image could not be read. Try another file."));
+        reader.readAsDataURL(file);
+      });
+      await repo.auth.uploadProfilePhoto(content);
+      // A new URL also reloads a replacement when hasPhoto was already true.
+      setPhotoVersion(version => version + 1);
+      await refresh();
+      setMessage("Photo updated.");
+    } catch (e) { setMessage(""); setError((e as Error).message); }
+    finally { pending.current = false; setBusy(false); }
+  }
+  async function removePhoto() {
+    if (pending.current) return;
+    pending.current = true; setBusy(true); setError(""); setMessage("Removing photo…");
+    try {
+      await repo.auth.removeProfilePhoto();
+      await refresh();
+      setMessage("Photo removed.");
+    } catch (e) { setMessage(""); setError((e as Error).message); }
+    finally { pending.current = false; setBusy(false); }
+  }
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (pending.current) return;
@@ -75,20 +118,32 @@ export function AccountSettings() {
     } catch (e) { setError((e as Error).message); }
     finally { pending.current = false; setBusy(false); }
   }
-  const open = (next: NonNullable<typeof action>) => { setError(""); setMessage(""); setAction(next); };
+  const open = (next: NonNullable<typeof action>) => { if (pending.current) return; setError(""); setMessage(""); setAction(next); };
   const initials = (state.user?.name || state.user?.email || "?").trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase()).join("");
   return <section className={s.panel} aria-labelledby="account-heading">
     <div className={s.settingsHeading}>
       <h2 id="account-heading">Account</h2>
       <p className={s.muted}>Manage how you sign in and keep your account secure.</p>
     </div>
-    <div className={s.accountSummary}>
-      <span className={s.avatar} aria-hidden="true">{initials}</span>
+    <div className={s.accountSummary} role="group" aria-label="Account summary" aria-busy={busy}>
+      <span className={s.avatar} aria-hidden="true">{!isDemo && state.user?.hasPhoto && failedPhoto !== photoUrl
+        ? <img src={photoUrl} alt="" onError={() => setFailedPhoto(photoUrl)} /> : initials}</span>
       <span>
         <strong className={s.accountText}>{state.user?.name}</strong>
         <small className={`${s.muted} ${s.accountText}`}>{state.user?.email}</small>
       </span>
-      {!isDemo && <button className={s.secondary} onClick={() => open("profile")}>Edit account</button>}
+      {!isDemo && <>
+        <input ref={photoInput} type="file" accept=".png,.jpg,.jpeg,.webp" aria-label="Profile photo" hidden disabled={busy}
+          onChange={e => {
+            const file = e.currentTarget.files?.[0];
+            // Reset immediately so the same file can be selected again after a failure.
+            e.currentTarget.value = "";
+            void changePhoto(file);
+          }} />
+        <button type="button" className={s.secondary} disabled={busy} onClick={() => photoInput.current?.click()}>Change photo</button>
+        {state.user?.hasPhoto && <button type="button" className={s.secondary} disabled={busy} onClick={() => void removePhoto()}>Remove photo</button>}
+        <button className={s.secondary} disabled={busy} onClick={() => open("profile")}>Edit account</button>
+      </>}
     </div>
     {isDemo && <p className={s.muted}>You’re exploring a sample workspace. Sign out to create an account.</p>}
     <ul className={s.settingRows}>

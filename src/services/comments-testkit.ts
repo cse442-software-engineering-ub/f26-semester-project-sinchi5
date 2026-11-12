@@ -39,7 +39,7 @@ export function commentWorld(saved?: Saved) {
     repo,
     collaborators,
     signInAs(email: string, name: string) {
-      db.user = { id: "student", email, name };
+      db.user = { id: "student", email, name, hasPhoto: false };
     },
     signOut() {
       db.user = null;

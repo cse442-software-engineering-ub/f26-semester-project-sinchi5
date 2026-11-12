@@ -5,7 +5,7 @@ import { createRepositories } from "./repositories";
 import { NoteServiceError } from "./notes-http";
 import type { CourseEvent, Repositories } from "../domain";
 
-const student = { id: "student-173", name: "Event Deleter", email: "deleter@example.edu" };
+const student = { id: "student-173", name: "Event Deleter", email: "deleter@example.edu", hasPhoto: false };
 const storageMessage = "Your browser storage is full or unavailable. Changes could not be saved.";
 
 function memory() {

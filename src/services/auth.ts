@@ -67,6 +67,8 @@ export function createAuthRepository(
       return (await post("profile", { name, email, currentPassword })).user!;
     },
     async changePassword(currentPassword, password) { await post("password", { currentPassword, password }); },
+    async uploadProfilePhoto(content) { return (await post("profile-photo", { content })).user!; },
+    async removeProfilePhoto() { return (await post("profile-photo-remove")).user!; },
     async resetPassword(email, recoveryCode, password) {
       return (await post("reset-password", { email, recoveryCode, password })).recoveryCode!;
     },

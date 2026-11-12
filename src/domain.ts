@@ -8,6 +8,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  hasPhoto: boolean;
 }
 export interface OnboardingState {
   completed: boolean;
@@ -154,6 +155,8 @@ export interface AuthRepository {
   signOut(): Promise<void>;
   startDemo(): Promise<void>;
   updateProfile(name: string, email: string, currentPassword: string): Promise<User>;
+  uploadProfilePhoto(content: string): Promise<User>;
+  removeProfilePhoto(): Promise<User>;
   changePassword(currentPassword: string, password: string): Promise<void>;
   resetPassword(email: string, recoveryCode: string, password: string): Promise<string>;
   replaceRecoveryCode(currentPassword: string): Promise<string>;
