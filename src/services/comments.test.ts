@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createMockComments } from "./comments.mock";
 import type { Comment, Note, User } from "../domain";
 
-function setup(user: User | null = { id: "student-1", name: "Jamie", email: "jamie@example.edu" }) {
+function setup(user: User | null = { id: "student-1", name: "Jamie", email: "jamie@example.edu", hasPhoto: false }) {
   const notes: Note[] = [
     {
       id: "note-1",

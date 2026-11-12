@@ -1,7 +1,19 @@
 import { test, expect } from "./support/account-fixture";
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
 const password = "Sample meadow password 42!";
+const photo = (extension = "png") => ({ name: `photo.${extension}`, mimeType: extension === "jpg" ? "image/jpeg" : `image/${extension}`,
+  buffer: readFileSync(new URL(`../backend/tests/data/photo-64.${extension}`, import.meta.url)) });
+const summary = (page: Page) => page.getByRole("group", { name: "Account summary" });
+async function uploadPhoto(page: Page, extension = "png") {
+  const sent = page.waitForRequest(request => request.method() === "POST" && new URL(request.url()).searchParams.get("route") === "profile-photo");
+  await page.getByLabel("Profile photo", { exact: true }).setInputFiles(photo(extension));
+  const request = await sent;
+  await expect(page.getByRole("status")).toHaveText("Photo updated.");
+  await expect(summary(page).locator("img")).toHaveJSProperty("naturalWidth", 64);
+  return request;
+}
 async function register(page: Page) {
   await page.goto("/");
   await page.getByRole("button", { name: "Create your workspace" }).click();
@@ -155,4 +167,151 @@ test("signup explains emoji, hidden characters, and unsupported password charact
   await expect(page.getByLabel("Recovery code", { exact: true })).toBeVisible();
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
   expect(results.violations).toEqual([]);
+});
+
+test("change photo uploads image bytes and refreshes the Account Summary", async ({ page }) => {
+  await register(page);
+  await page.goto("/settings");
+  await expect(summary(page).getByText("J", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Change photo", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove photo", exact: true })).toHaveCount(0);
+  for (const extension of ["png", "jpg", "webp"]) {
+    const image = summary(page).locator("img");
+    const previous = await image.count() ? await image.getAttribute("src") : null;
+    const request = await uploadPhoto(page, extension);
+    expect(new URL(request.url()).pathname).toBe("/api/index.php");
+    expect(request.postDataJSON()).toEqual({ content: photo(extension).buffer.toString("base64") });
+    expect(request.headers()["x-csrf-token"]).toBe("fixture-csrf");
+    await expect(summary(page).locator("img")).not.toHaveAttribute("src", previous || "");
+    await expect(summary(page).getByText("J", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Remove photo", exact: true })).toBeVisible();
+  }
+  await page.reload();
+  await expect(summary(page).locator("img")).toHaveJSProperty("naturalWidth", 64);
+  await expect(summary(page).getByText("Jamie", { exact: true })).toBeVisible();
+});
+
+test("photo checks reject unsupported, disguised, and oversized files before requests", async ({ page }) => {
+  await register(page);
+  await page.goto("/settings");
+  await uploadPhoto(page);
+  const original = await summary(page).locator("img").getAttribute("src");
+  const uploads: string[] = [];
+  page.on("request", request => {
+    if (request.method() === "POST" && new URL(request.url()).searchParams.get("route") === "profile-photo") uploads.push(request.url());
+  });
+  const oversized = Buffer.alloc(2 * 1024 * 1024 + 1);
+  photo().buffer.copy(oversized);
+  for (const [file, message] of [
+    [{ name: "photo.txt", mimeType: "text/plain", buffer: Buffer.from("plain text") }, "Choose a PNG, JPEG, or WebP image."],
+    [{ name: "disguised.png", mimeType: "image/png", buffer: Buffer.from("not an image") }, "Choose a PNG, JPEG, or WebP image."],
+    [{ name: "large.png", mimeType: "image/png", buffer: oversized }, "Profile pictures can be at most 2 MB."],
+  ] as const) {
+    await page.getByLabel("Profile photo", { exact: true }).setInputFiles(file);
+    await expect(page.getByRole("alert")).toHaveText(message);
+    await expect(page.getByRole("button", { name: "Change photo", exact: true })).toBeEnabled();
+    await expect(summary(page).locator("img")).toHaveAttribute("src", original!);
+    await expect(summary(page).locator("img")).toHaveJSProperty("naturalWidth", 64);
+  }
+  expect(uploads).toEqual([]);
+});
+
+test("remove photo restores the initial and keeps account details", async ({ page }) => {
+  await register(page);
+  await page.goto("/settings");
+  await expect(page.getByRole("button", { name: "Remove photo", exact: true })).toHaveCount(0);
+  await uploadPhoto(page);
+  const sent = page.waitForRequest(request => request.method() === "POST" && new URL(request.url()).searchParams.get("route") === "profile-photo-remove");
+  await page.getByRole("button", { name: "Remove photo", exact: true }).click();
+  expect((await sent).headers()["x-csrf-token"]).toBe("fixture-csrf");
+  await expect(page.getByRole("status")).toHaveText("Photo removed.");
+  await expect(summary(page).getByText("J", { exact: true })).toBeVisible();
+  await expect(summary(page).locator("img")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Remove photo", exact: true })).toHaveCount(0);
+  await expect(summary(page).getByText("Jamie", { exact: true })).toBeVisible();
+  await expect(summary(page).getByText("jamie@example.edu", { exact: true })).toBeVisible();
+});
+
+test("photo keyboard picker cancellation and mobile targets", async ({ page }) => {
+  await register(page);
+  await page.goto("/settings");
+  const change = page.getByRole("button", { name: "Change photo", exact: true });
+  await expect(change).toBeVisible();
+  await expect(page.getByLabel("Profile photo", { exact: true })).toHaveAttribute("accept", ".png,.jpg,.jpeg,.webp");
+  for (let tabs = 0; tabs < 40 && !(await change.evaluate(element => element === document.activeElement)); tabs++) {
+    await page.keyboard.press("Tab");
+  }
+  await expect(change).toBeFocused();
+  const choosing = page.waitForEvent("filechooser");
+  await page.keyboard.press("Enter");
+  const chooser = await choosing;
+  // An empty native selection models closing the picker without choosing a file.
+  await chooser.setFiles([]);
+  await expect(summary(page).getByText("J", { exact: true })).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.getByRole("status")).toHaveCount(0);
+  expect((await change.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  for (const width of [320, 375, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+  await uploadPhoto(page);
+  await page.getByRole("button", { name: "Remove photo", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText("Photo removed.");
+  await page.screenshot({ path: "test-results/account-photo-mobile.png" });
+  const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+  expect(results.violations).toEqual([]);
+});
+
+test("photo failures preserve the image and allow retries without duplicate submissions", async ({ page }) => {
+  await register(page);
+  await page.goto("/settings");
+  await uploadPhoto(page);
+  const original = await summary(page).locator("img").getAttribute("src");
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  let attempts = 0;
+  await page.route(url => url.searchParams.get("route") === "profile-photo", async route => {
+    if (route.request().method() !== "POST") return route.fallback();
+    attempts++;
+    await held;
+    await route.fulfill({ status: 422, json: { error: "This image could not be read. Try another file." } });
+  });
+  await page.getByLabel("Profile photo", { exact: true }).setInputFiles(photo());
+  await expect(page.getByRole("status")).toHaveText("Uploading photo…");
+  await expect(page.getByRole("button", { name: "Change photo", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Remove photo", exact: true })).toBeDisabled();
+  release();
+  await expect(page.getByRole("alert")).toHaveText("This image could not be read. Try another file.");
+  expect(attempts).toBe(1);
+  await expect(summary(page).locator("img")).toHaveAttribute("src", original!);
+  await page.unrouteAll({ behavior: "wait" });
+  await uploadPhoto(page); // The same file can be selected again.
+  await page.route(url => url.searchParams.get("route") === "profile-photo-remove", route =>
+    route.fulfill({ status: 503, json: { error: "Please try removing your photo again." } }));
+  await page.getByRole("button", { name: "Remove photo", exact: true }).click();
+  await expect(page.getByRole("alert")).toHaveText("Please try removing your photo again.");
+  await expect(summary(page).locator("img")).toHaveJSProperty("naturalWidth", 64);
+  await expect(page.getByRole("status")).toHaveCount(0);
+  await page.unrouteAll({ behavior: "wait" });
+  await page.getByRole("button", { name: "Remove photo", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText("Photo removed.");
+});
+
+test("photo load failure falls back to initials and demo controls stay hidden", async ({ page }) => {
+  await register(page);
+  await page.goto("/settings");
+  await uploadPhoto(page);
+  await page.route(url => url.searchParams.get("route") === "profile-photo", route =>
+    route.request().method() === "GET" ? route.fulfill({ status: 404, json: { error: "No profile photo yet." } }) : route.fallback());
+  await page.reload();
+  await expect(summary(page).getByText("J", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove photo", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await page.goto("/");
+  await page.getByRole("button", { name: "Take a look around first" }).click();
+  await page.goto("/settings");
+  await expect(page.getByText("You’re exploring a sample workspace.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Change photo", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Remove photo", exact: true })).toHaveCount(0);
 });
