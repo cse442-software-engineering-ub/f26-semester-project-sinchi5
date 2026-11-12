@@ -93,7 +93,8 @@ check($code !== newRecoveryCode(), 'independent recovery codes');
 check(recoveryHash(strtolower(str_replace('-', ' ', $code))) === recoveryHash($code), 'recovery normalization');
 check(strlen(recoveryHash($code)) === 64 && recoveryHash($code) !== $code, 'only code hash stored');
 rejects(fn() => recoveryHash('0000'), 'invalid recovery code');
-check(publicUser(['id' => 42, 'name' => 'Jamie', 'email' => 'jamie@example.edu', 'password_hash' => $one, 'recovery_code_hash' => recoveryHash($code)]) === ['id' => '42', 'name' => 'Jamie', 'email' => 'jamie@example.edu'], 'public user excludes secrets');
+check(publicUser(['id' => 42, 'name' => 'Jamie', 'email' => 'jamie@example.edu', 'password_hash' => $one, 'recovery_code_hash' => recoveryHash($code)]) === ['id' => '42', 'name' => 'Jamie', 'email' => 'jamie@example.edu', 'hasPhoto' => false], 'public user excludes secrets');
+check(publicUser(['id' => 42, 'name' => 'Jamie', 'email' => 'jamie@example.edu', 'has_photo' => 1])['hasPhoto'] === true, 'public photo flag is a boolean');
 
 $config = ['app_key' => str_repeat('a', 64), 'cookie_path' => '/class/notely/'];
 $session = ['token' => str_repeat('b', 64)];

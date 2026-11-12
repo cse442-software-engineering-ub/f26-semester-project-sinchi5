@@ -33,9 +33,15 @@ function validatedProfilePhoto(array $input): array
     if ($mime === null) {
         throw new HttpError(422, 'Choose a PNG, JPEG, or WebP image.');
     }
+    // Header parsing alone can accept a truncated file. Require its container end too.
+    $complete = match ($mime) {
+        'image/png' => str_ends_with($data, "\x00\x00\x00\x00IEND\xae\x42\x60\x82"),
+        'image/jpeg' => str_ends_with($data, "\xff\xd9"),
+        'image/webp' => strlen($data) >= 12 && unpack('Vsize', substr($data, 4, 4))['size'] === strlen($data) - 8,
+    };
     // Malformed headers can emit warnings; never leak these into API responses.
     $image = @getimagesizefromstring($data);
-    if (!$image || ($image['mime'] ?? '') !== $mime
+    if (!$complete || !$image || ($image['mime'] ?? '') !== $mime
         || $image[0] < 32 || $image[0] > 4096 || $image[1] < 32 || $image[1] > 4096) {
         throw new HttpError(422, PROFILE_PHOTO_READ_ERROR);
     }
