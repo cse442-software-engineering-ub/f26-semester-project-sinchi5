@@ -21,6 +21,7 @@ import {
   Pin,
   X,
   Trash2,
+  Users,
 } from "lucide-react";
 import { useApp } from "../app/context";
 import { PageHeading, NoteCard, Empty, Modal, EventRow, DeleteNoteDialog } from "../shared/ui";
@@ -34,8 +35,11 @@ import type {
   Collaborator,
   HighlightColor ,
   NoteHighlight ,
+  CourseShare,
 } from "../domain";
 import s from "../app/App.module.css";
+import { createHttpNoteShares } from "../services/note-shares-http";
+import { ShareNotesDialog, sharedLabel } from "./share-notes";
 import { Collaborators } from "./collaborators";
 export function Notes() {
   const { repo, state, refresh } = useApp();
@@ -1378,9 +1382,18 @@ export function CoursePage() {
   const [params] = useSearchParams();
   const course = state.courses.find((c) => c.id === id);
   const [folders, setFolders] = useState<Record<string, Note[]>>({});
+  // Card 157: who this course's notes are shared with (card 156).
+  const [shares, setShares] = useState<CourseShare[]>();
+  const [shareError, setShareError] = useState("");
+  const [sharing, setSharing] = useState(false);
   useEffect(() => {
     void repo.courses.folders(id).then(setFolders);
   }, [id, state.notes]);
+  useEffect(() => {
+    setShares(undefined);
+    setShareError("");
+    createHttpNoteShares().shares(id).then(setShares, (e: Error) => setShareError(e.message));
+  }, [id]);
   if (!course)
     return (
       <Empty title="Course not found">
@@ -1395,11 +1408,23 @@ export function CoursePage() {
         title={course.name}
         description="Your lectures, notes, and next steps."
         actions={
-          <Link className={s.secondary} to={`/notes?course=${id}`}>
-            All course notes
-          </Link>
+          <>
+            <button className={s.secondary} onClick={() => setSharing(true)}>
+              <Users size={17} aria-hidden="true" /> Share notes with friends
+            </button>
+            <Link className={s.secondary} to={`/notes?course=${id}`}>
+              All course notes
+            </Link>
+          </>
         }
       />
+      <p className={`${s.muted} ${s.shareStatus}`} role="status">
+        {shareError || (shares && sharedLabel(shares))}
+      </p>
+      {sharing && (
+        <ShareNotesDialog course={course} shares={shares ?? []} onClose={() => setSharing(false)}
+          onSaved={(next) => { setShares(next); setShareError(""); setSharing(false); }} />
+      )}
       {selected && (
         <div className={s.notice}>
           Lecture notes for {selected} ·{" "}

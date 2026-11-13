@@ -231,6 +231,12 @@ export interface Friend {
   name: string;
   email: string;
 }
+// Card 157: a friend one course's notes are shared with (card 156).
+export interface CourseShare {
+  userId: string;
+  name: string;
+  email: string;
+}
 export interface FriendLists {
   friends: Friend[];
   incoming: Friend[];

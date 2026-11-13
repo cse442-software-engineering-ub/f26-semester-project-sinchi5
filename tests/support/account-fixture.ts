@@ -286,6 +286,8 @@ export const test = base.extend<{ accountApi: void }>({
         const row = friendships.find((f) => f.id === String(body.id) && f.accepted && mine(f));
         if (!row) throw new ApiError(404, "This friend request could not be found.");
         friendships = friendships.filter((f) => f !== row);
+        // Card 156: courses either of them shared with the other stop being shared.
+        courseShares = courseShares.filter((c) => !([c.owner, c.friend].includes(row.from) && [c.owner, c.friend].includes(row.to)));
       }
       const view = (f: (typeof friendships)[number]) => {
         const other = [...accounts.values()].find((a) => a.id === (f.from === me ? f.to : f.from))!;
@@ -298,10 +300,41 @@ export const test = base.extend<{ accountApi: void }>({
         outgoing: rows.filter((f) => !f.accepted && f.from === me).map(view),
       } };
     }
+    // In-memory stand-in for the card 156 course-sharing routes, following the PHP rules.
+    let courseShares: { owner: string; courseId: string; courseCode: string; friend: string }[] = [];
+    const FRIENDS_ONLY = "You can share notes only with friends.";
+    const areFriends = (a: string, b: string) =>
+      friendships.some((f) => f.accepted && ((f.from === a && f.to === b) || (f.from === b && f.to === a)));
+    function shareRoute(action: string, query: URLSearchParams, body: Record<string, unknown>) {
+      if (!user) throw new ApiError(401, "Sign in to continue.");
+      const me = user.id;
+      const courseId = String((action === "course-notes-shares" ? query.get("courseId") : body.courseId) ?? "");
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(courseId)) throw new ApiError(422, "Choose a valid course.");
+      const list = () => courseShares.filter((c) => c.owner === me && c.courseId === courseId && areFriends(me, c.friend))
+        .map((c) => [...accounts.values()].find((a) => a.id === c.friend)!)
+        .sort((a, b) => a.name.localeCompare(b.name)).map((a) => ({ userId: a.id, name: a.name, email: a.email }));
+      if (action === "course-notes-shares") return { shares: list() };
+      if (typeof body.courseCode !== "string" || !body.courseCode.trim()) throw new ApiError(422, "Choose a valid course.");
+      const ids = body.friendIds;
+      if (!Array.isArray(ids) || ids.some((id) => typeof id !== "string" || id === me || !areFriends(me, id))) {
+        throw new ApiError(422, FRIENDS_ONLY);
+      }
+      courseShares = courseShares.filter((c) => !(c.owner === me && c.courseId === courseId));
+      for (const friend of new Set(ids as string[])) courseShares.push({ owner: me, courseId, courseCode: body.courseCode.trim(), friend });
+      return { shares: list() };
+    }
     await context.route("**/api/index.php?route=*", async route => {
       const query = new URL(route.request().url()).searchParams;
       const action = query.get("route")!;
       const body = route.request().postDataJSON() || {};
+      if (action === "course-notes-share" || action === "course-notes-shares") {
+        try {
+          await route.fulfill({ json: shareRoute(action, query, body) });
+        } catch (e) {
+          await route.fulfill({ status: (e as ApiError).status ?? 500, json: { error: (e as Error).message } });
+        }
+        return;
+      }
       if (action.startsWith("friend")) {
         try {
           await route.fulfill(friendRoute(action, body));
@@ -388,6 +421,7 @@ export const test = base.extend<{ accountApi: void }>({
           savedEvents = savedEvents.filter((e) => e.ownerId !== user!.id);
           for (const list of editors.values()) list.delete(user.id);
           friendships = friendships.filter((f) => f.from !== user!.id && f.to !== user!.id);
+          courseShares = courseShares.filter((c) => c.owner !== user!.id && c.friend !== user!.id);
           accounts.delete(user.email); user = null;
         } else { user.code = "BEEF-5678-BEEF-5678-BEEF-5678-BEEF-5678"; recoveryCode = user.code; }
       } else if (action === "reset-password") {
