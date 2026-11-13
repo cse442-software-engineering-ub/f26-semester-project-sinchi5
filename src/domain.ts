@@ -81,6 +81,11 @@ export interface Comment {
 // real network layer to intercept, same purpose as ImportRepository's scenario.
 export type CommentScenario = "success" | "slow" | "failure";
 export const MAX_COMMENT_LENGTH = 2000;
+export interface RepeatRule {
+  every: 1 | 2;
+  days: number[];
+  until: string;
+}
 export interface CourseEvent {
   id: string;
   courseId: string;
@@ -93,6 +98,8 @@ export interface CourseEvent {
   source: "manual" | "imported";
   // Ties together the saved meetings of one weekly class from a syllabus (card 47).
   seriesId?: string | null;
+  repeat?: RepeatRule;
+  repeatOf?: string;
 }
 export interface DetectedMetadata {
   title: string;
