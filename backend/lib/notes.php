@@ -307,7 +307,23 @@ function commentJson(array $row): array
         'author' => $row['name'], 'authorId' => (string) $row['author_user_id'], 'createdAt' => isoTime($row['created_at'])];
 }
 
-// The caller's role on an existing note: 'owner', 'edit', 'view', or 'none'.
+// Card 156: joining the friendship table means a removed friend loses access even if a share row were left behind.
+const SHARE_FRIEND_JOIN = "JOIN notely_friendships f ON f.status = 'accepted'
+    AND f.user_low = LEAST(s.owner_user_id, s.friend_user_id) AND f.user_high = GREATEST(s.owner_user_id, s.friend_user_id)";
+
+// Card 156: who shared this note's course with the student, or null when it isn't shared with them.
+function courseShareFor(PDO $db, string $noteId, string $userId): ?array
+{
+    $row = query($db, 'SELECT u.id, u.name, s.course_code FROM notely_notes n
+        JOIN notely_course_note_shares s ON s.owner_user_id = n.owner_user_id AND s.course_id = n.course_id
+        ' . SHARE_FRIEND_JOIN . '
+        JOIN notely_users u ON u.id = n.owner_user_id
+        WHERE n.id = ? AND n.course_id <> \'\' AND s.friend_user_id = ?', [$noteId, $userId])->fetch();
+    return $row ? ['id' => (string) $row['id'], 'name' => $row['name'], 'courseCode' => $row['course_code']] : null;
+}
+
+// The caller's role on an existing note: 'owner', 'edit', 'view', 'friend' (a course shared with them,
+// read only), or 'none'.
 function noteRole(PDO $db, string $id, array $user, bool $lock): string
 {
     $row = query($db, 'SELECT n.owner_user_id, e.permission FROM notely_notes n
@@ -315,7 +331,8 @@ function noteRole(PDO $db, string $id, array $user, bool $lock): string
         WHERE n.id = ?' . ($lock ? ' FOR UPDATE' : ''), [$user['id'], $id])->fetch();
     if (!$row) throw new HttpError(404, 'This note could not be found.');
     if ((string) $row['owner_user_id'] === (string) $user['id']) return 'owner';
-    return $row['permission'] ?? 'none';
+    if ($row['permission']) return $row['permission'];
+    return courseShareFor($db, $id, (string) $user['id']) ? 'friend' : 'none';
 }
 
 function requireEditor(PDO $db, string $id, array $user): void
@@ -378,7 +395,13 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
     $id = noteId($read ? ($_GET['id'] ?? null) : ($input['id'] ?? null));
     if ($read) {
         // Notes the caller can't open look missing, so their existence isn't revealed.
-        if (noteRole($db, $id, $user, false) === 'none') throw new HttpError(404, 'This note could not be found.');
+        $role = noteRole($db, $id, $user, false);
+        // A friend with a shared course reads the note itself, not its history, comments, or collaborators.
+        if ($role === 'none' || ($role === 'friend' && $route !== 'note')) throw new HttpError(404, 'This note could not be found.');
+        if ($role === 'friend') {
+            return ['note' => loadNote($db, $id) + ['permission' => 'view',
+                'sharedBy' => courseShareFor($db, $id, (string) $user['id'])]];
+        }
         if ($route === 'note') return ['note' => loadNote($db, $id)];
         if ($route === 'note-versions') {
             $rows = query($db, 'SELECT id, note_id, title, body, author_name, created_at FROM notely_note_versions
@@ -477,7 +500,10 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
         $body = trimEdges($raw);
         if ($body === '') throw new HttpError(422, 'Write a comment first.');
         if (characterCount($body) > 2000) throw new HttpError(422, 'Comments can be at most 2000 characters.');
-        if (noteRole($db, $id, $user, true) === 'none') throw new HttpError(404, 'This note could not be found.');
+        $role = noteRole($db, $id, $user, true);
+        if ($role === 'none') throw new HttpError(404, 'This note could not be found.');
+        // Card 156: notes shared through a course are read only.
+        if ($role === 'friend') throw new HttpError(403, 'You do not have permission to edit this note.');
         $visibility = query($db, 'SELECT visibility FROM notely_notes WHERE id = ?', [$id])->fetchColumn();
         if ($visibility !== 'shared') throw new HttpError(422, 'Share this note before adding comments.');
         query($db, 'INSERT INTO notely_note_comments (note_id, author_user_id, body) VALUES (?, ?, ?)', [$id, $user['id'], $body]);
