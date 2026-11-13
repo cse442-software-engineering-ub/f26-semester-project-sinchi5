@@ -95,6 +95,9 @@ test("request errors from the server show under the field", async ({ page }) => 
     await expect(page.getByText("Request sent.")).toHaveCount(0);
     await page.unroute("**/api/index.php?route=friend-request");
   }
+  // A malformed address gets the same message as sign-up (story #152, Test 3 step 4).
+  await sendRequest(page, "not an email");
+  await expect(page.locator("#friend-email-error")).toHaveText("Email addresses can’t contain spaces.");
 });
 
 test("answer requests: Accept moves them to Your friends, Decline removes them", async ({ page }) => {

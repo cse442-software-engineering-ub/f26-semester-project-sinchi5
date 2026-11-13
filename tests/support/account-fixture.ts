@@ -263,7 +263,11 @@ export const test = base.extend<{ accountApi: void }>({
       let created = false;
       if (action === "friend-request") {
         const email = String(body.email ?? "").trim().toLowerCase();
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ApiError(422, "Enter a complete email address, like name@university.edu.");
+        // The common validEmail() messages from backend/lib/security.php.
+        if (!email) throw new ApiError(422, "Enter your email address.");
+        if (/\s/.test(email)) throw new ApiError(422, "Email addresses can’t contain spaces.");
+        if (email.split("@").length !== 2) throw new ApiError(422, "Email addresses need exactly one @, like name@university.edu.");
+        if (!/^[^@]+@[^@]+\.[^@]+$/.test(email)) throw new ApiError(422, "Enter a complete email address, like name@university.edu.");
         const them = accounts.get(email);
         if (!them) throw new ApiError(404, "No registered account was found for this email.");
         if (them.id === me) throw new ApiError(422, "You can’t add yourself as a friend.");
