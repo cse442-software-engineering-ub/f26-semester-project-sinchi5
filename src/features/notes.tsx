@@ -18,6 +18,7 @@ import {
   History,
   MessageCircle,
   Check,
+  CalendarClock,
   Pin,
   X,
   Trash2,
@@ -489,6 +490,17 @@ function sameNoteFields(a: Note, b: Note) {
     JSON.stringify(a.tags) === JSON.stringify(b.tags)
   );
 }
+
+function reminderFields(value: Date) {
+  const date = `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+  const time = `${String(value.getHours()).padStart(2, "0")}:${String(value.getMinutes()).padStart(2, "0")}`;
+  return { date, time };
+}
+
+function reminderLabel(remindAt: string) {
+  const value = new Date(remindAt);
+  return `${reminderFields(value).date} at ${value.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}`;
+}
 export function NoteWorkspace() {
   const { id } = useParams();
   // Task #78 / Story #19 AT1: isolate drafts and pending responses when switching notes.
@@ -533,6 +545,12 @@ function NoteEditor() {
   const pendingSave = useRef<Promise<Note>>();
   const [dirty, setDirty] = useState(false);
   const [pinning, setPinning] = useState(false);
+  const [reminderOpen, setReminderOpen] = useState(false);
+  const [reminderDate, setReminderDate] = useState("");
+  const [reminderTime, setReminderTime] = useState("");
+  const [reminderError, setReminderError] = useState("");
+  const [reminderNotice, setReminderNotice] = useState("");
+  const [reminderSaving, setReminderSaving] = useState(false);
   const noteRef = useRef<Note>();
   const dirtyRef = useRef(false);
   const generation = useRef(0);
@@ -907,6 +925,52 @@ function NoteEditor() {
       setPinning(false);
     }
   }
+  function openReminder() {
+    const value = note?.remindAt ? new Date(note.remindAt) : new Date(Date.now() + 5 * 60_000);
+    const fields = reminderFields(value);
+    setReminderDate(fields.date);
+    setReminderTime(fields.time);
+    setReminderError("");
+    setReminderOpen(true);
+  }
+  async function persistReminder(remindAt: string | null) {
+    if (!noteRef.current || reminderSaving) return;
+    setReminderSaving(true);
+    setReminderError("");
+    try {
+      await pendingSave.current;
+      const saved = await repo.notes.setReminder(id, remindAt);
+      const next = { ...noteRef.current, remindAt: saved.remindAt ?? null };
+      noteRef.current = next;
+      savedNote.current = savedNote.current ? { ...savedNote.current, remindAt: next.remindAt } : saved;
+      setNote(next);
+      await refresh();
+      setReminderOpen(false);
+    } catch (e) {
+      setReminderError((e as Error).message);
+    } finally {
+      setReminderSaving(false);
+    }
+  }
+  function setReminder(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const value = new Date(`${reminderDate}T${reminderTime}:00`);
+    if (!reminderDate || !reminderTime || !Number.isFinite(value.getTime()) || value.getTime() <= Date.now()) {
+      setReminderError("Choose a time in the future.");
+      return;
+    }
+    // Permission must be requested directly from this submit gesture.
+    if (typeof Notification === "undefined") {
+      setReminderNotice("This browser cannot show notifications. Your reminder is still saved.");
+    } else if (Notification.permission === "default") {
+      void Notification.requestPermission().then((permission) => {
+        setReminderNotice(permission === "granted" ? "" : "Allow browser notifications to receive this reminder.");
+      }).catch(() => setReminderNotice("Allow browser notifications to receive this reminder."));
+    } else {
+      setReminderNotice(Notification.permission === "granted" ? "" : "Allow browser notifications to receive this reminder.");
+    }
+    void persistReminder(value.toISOString());
+  }
   if (error && !note)
     return (
       <Empty title="We couldn’t open that note">
@@ -945,6 +1009,11 @@ function NoteEditor() {
         <span role="status" className={s.muted}>
           <Check size={14} /> {saving ? "Saving…" : hasDraftChanges ? "Unsaved changes" : status}
         </span>
+        {canEdit && (
+          <button className={s.secondary} type="button" onClick={openReminder} disabled={saving || reminderSaving}>
+            <CalendarClock size={18} aria-hidden="true" /> Reminder
+          </button>
+        )}
         <button
           className={note.pinned ? s.primary : s.secondary}
           aria-label={note.pinned ? "Unpin note" : "Pin note"}
@@ -965,10 +1034,33 @@ function NoteEditor() {
           </button>
         )}
       </div>
+      {note.remindAt && <p className={s.reminderSummary}>Reminder: {reminderLabel(note.remindAt)}</p>}
+      {reminderNotice && <p className={s.notice} role="status">{reminderNotice}</p>}
       {error && (
         <p role="alert" className={s.error}>
           {error}
         </p>
+      )}
+      {reminderOpen && (
+        <Modal title="Reminder" description="Choose when to be notified while this app is open."
+          onClose={() => setReminderOpen(false)} dismissible={!reminderSaving}>
+          <form className={s.form} onSubmit={setReminder}>
+            <div className={s.formRow}>
+              <label>Date<input type="date" required value={reminderDate}
+                onChange={(e) => setReminderDate(e.target.value)} /></label>
+              <label>Time<input type="time" required value={reminderTime}
+                onChange={(e) => setReminderTime(e.target.value)} /></label>
+            </div>
+            {reminderError && <p className={s.error} role="alert">{reminderError}</p>}
+            <div className={s.actions}>
+              <button type="submit" className={s.primary} disabled={reminderSaving}>Set reminder</button>
+              {note.remindAt && (
+                <button type="button" className={s.secondary} disabled={reminderSaving}
+                  onClick={() => void persistReminder(null)}>Remove reminder</button>
+              )}
+            </div>
+          </form>
+        </Modal>
       )}
       <div className={s.editorLayout}>
         <section className={s.editor}>
