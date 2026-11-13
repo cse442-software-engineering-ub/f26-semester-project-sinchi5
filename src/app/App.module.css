@@ -3360,3 +3360,7 @@
 .checklistRow input[type="checkbox"] { width: 1.25rem; height: 1.25rem; flex: 0 0 auto; }
 .checklistRow input[type="text"], .checklistRow input:not([type]) { flex: 1; min-width: 0; width: 0; }
 .checklistDone { text-decoration: line-through; }
+/* Card 154: a long name or email with no spaces wraps instead of widening the page. */
+.friendName {
+  overflow-wrap: anywhere;
+}

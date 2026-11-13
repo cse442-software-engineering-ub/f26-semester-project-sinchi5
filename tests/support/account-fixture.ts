@@ -254,10 +254,62 @@ export const test = base.extend<{ accountApi: void }>({
 
       return { job };
     }
+    // In-memory stand-in for the card 153 friend routes, following the PHP rules.
+    let friendships: { id: string; from: string; to: string; accepted: boolean }[] = [];
+    function friendRoute(action: string, body: Record<string, unknown>) {
+      if (!user) throw new ApiError(401, "Sign in to continue.");
+      const me = user.id;
+      const mine = (f: (typeof friendships)[number]) => f.from === me || f.to === me;
+      let created = false;
+      if (action === "friend-request") {
+        const email = String(body.email ?? "").trim().toLowerCase();
+        // The common validEmail() messages from backend/lib/security.php.
+        if (!email) throw new ApiError(422, "Enter your email address.");
+        if (/\s/.test(email)) throw new ApiError(422, "Email addresses can’t contain spaces.");
+        if (email.split("@").length !== 2) throw new ApiError(422, "Email addresses need exactly one @, like name@university.edu.");
+        if (!/^[^@]+@[^@]+\.[^@]+$/.test(email)) throw new ApiError(422, "Enter a complete email address, like name@university.edu.");
+        const them = accounts.get(email);
+        if (!them) throw new ApiError(404, "No registered account was found for this email.");
+        if (them.id === me) throw new ApiError(422, "You can’t add yourself as a friend.");
+        const row = friendships.find((f) => mine(f) && (f.from === them.id || f.to === them.id));
+        if (row?.accepted) throw new ApiError(409, "You’re already friends with this person.");
+        if (row?.from === me) throw new ApiError(409, "You already sent this person a friend request.");
+        if (row) row.accepted = true;
+        else { friendships.push({ id: String(nextId++), from: me, to: them.id, accepted: false }); created = true; }
+      } else if (action === "friend-respond") {
+        if (typeof body.accept !== "boolean") throw new ApiError(422, "Choose whether to accept this request.");
+        const row = friendships.find((f) => f.id === String(body.id) && f.to === me && !f.accepted);
+        if (!row) throw new ApiError(404, "This friend request could not be found.");
+        if (body.accept) row.accepted = true;
+        else friendships = friendships.filter((f) => f !== row);
+      } else if (action === "friend-remove") {
+        const row = friendships.find((f) => f.id === String(body.id) && f.accepted && mine(f));
+        if (!row) throw new ApiError(404, "This friend request could not be found.");
+        friendships = friendships.filter((f) => f !== row);
+      }
+      const view = (f: (typeof friendships)[number]) => {
+        const other = [...accounts.values()].find((a) => a.id === (f.from === me ? f.to : f.from))!;
+        return { id: f.id, userId: other.id, name: other.name, email: other.email };
+      };
+      const rows = friendships.filter(mine).sort((a, b) => view(a).name.localeCompare(view(b).name));
+      return { status: created ? 201 : 200, json: {
+        friends: rows.filter((f) => f.accepted).map(view),
+        incoming: rows.filter((f) => !f.accepted && f.to === me).map(view),
+        outgoing: rows.filter((f) => !f.accepted && f.from === me).map(view),
+      } };
+    }
     await context.route("**/api/index.php?route=*", async route => {
       const query = new URL(route.request().url()).searchParams;
       const action = query.get("route")!;
       const body = route.request().postDataJSON() || {};
+      if (action.startsWith("friend")) {
+        try {
+          await route.fulfill(friendRoute(action, body));
+        } catch (e) {
+          await route.fulfill({ status: (e as ApiError).status ?? 500, json: { error: (e as Error).message } });
+        }
+        return;
+      }
       if (action === "profile-photo" || action === "profile-photo-remove") {
         try {
           const method = route.request().method();
@@ -335,6 +387,7 @@ export const test = base.extend<{ accountApi: void }>({
           for (const note of [...notes.values()]) if (note.ownerId === user.id) removeNote(note.id);
           savedEvents = savedEvents.filter((e) => e.ownerId !== user!.id);
           for (const list of editors.values()) list.delete(user.id);
+          friendships = friendships.filter((f) => f.from !== user!.id && f.to !== user!.id);
           accounts.delete(user.email); user = null;
         } else { user.code = "BEEF-5678-BEEF-5678-BEEF-5678-BEEF-5678"; recoveryCode = user.code; }
       } else if (action === "reset-password") {

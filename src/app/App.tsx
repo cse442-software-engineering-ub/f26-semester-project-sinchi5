@@ -24,6 +24,7 @@ import {
   ArrowUpRight,
   X,
   LogOut,
+  Users,
 } from "lucide-react";
 import { useApp } from "./context";
 import { Dashboard } from "../features/dashboard";
@@ -31,6 +32,7 @@ import { Schedule, EventDialog } from "../features/schedule";
 import { Assignments } from "../features/assignments";
 import { Notes, NoteWorkspace, CoursePage } from "../features/notes";
 import { Settings } from "../features/settings";
+import { Friends } from "../features/friends";
 import { Onboarding } from "../features/onboarding";
 import { ImportDialog } from "../features/imports";
 import { BRAND, type UploadKind } from "../domain";
@@ -41,6 +43,7 @@ const nav = [
   { to: "/schedule", label: "Schedule", icon: CalendarDays },
   { to: "/assignments", label: "Assignments", icon: ClipboardList },
   { to: "/notes", label: "Notes", icon: Files },
+  { to: "/friends", label: "Friends", icon: Users },
 ];
 export default function App() {
   const { state, repo, refresh, setError } = useApp();
@@ -303,6 +306,7 @@ export default function App() {
             <Route path="/notes" element={<Notes />} />
             <Route path="/notes/:id" element={<NoteWorkspace />} />
             <Route path="/courses/:id" element={<CoursePage />} />
+            <Route path="/friends" element={<Friends />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
