@@ -60,6 +60,9 @@ export interface Note {
   createdAt: string;
   updatedAt: string;
   pinned: boolean;
+  // Card 158: set on a note a friend shared through a course (card 156); it is read only.
+  sharedBy?: { id: string; name: string; courseCode: string };
+  permission?: "view";
 }
 export interface NoteVersion {
   id: string;

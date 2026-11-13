@@ -156,3 +156,68 @@ test("share notes error is shown in the window", async ({ page }) => {
   await expect(dialog).toHaveCount(0);
   await expect(status(page)).toHaveText("Not shared with any friends.");
 });
+
+// Card 158: what a friend sees. Deck Owner writes notes in CSE 442 and shares the course with Deck Friend.
+async function shareCourseNotes(page: Page, titles: string[]) {
+  const courseId = await openCourse(page);
+  for (const title of titles) await call(page, "note-create", { title, body: `${title} text`, courseId });
+  const { friends } = await call(page, "friends");
+  const friendId = friends.find((f: { email: string }) => f.email === FRIEND).userId;
+  await call(page, "course-notes-share", { courseId, courseCode: "CSE 442", friendIds: [friendId] });
+}
+async function openNotesAs(page: Page, email: string) {
+  await call(page, "login", { email, password });
+  await page.goto("/notes");
+  await expect(page.getByRole("heading", { name: "Your notes", exact: true })).toBeVisible();
+}
+const sharedSection = (page: Page) => page.getByRole("region", { name: "Shared with me" });
+
+test("Shared with me lists shared notes", async ({ page }) => {
+  await setUp(page);
+  await shareCourseNotes(page, ["Week 9 summary"]);
+  await openNotesAs(page, FRIEND);
+  const section = sharedSection(page);
+  await expect(section.getByRole("heading", { name: "Shared with me" })).toBeVisible();
+  const item = section.getByRole("link", { name: /Week 9 summary/ });
+  await expect(item).toBeVisible();
+  await expect(item).toContainText("From Deck Owner · CSE 442");
+  // Not mixed into the friend's own notes.
+  await expect(page.getByRole("link", { name: /Week 9 summary/ })).toHaveCount(1);
+
+  // A friend who wasn't chosen sees no section at all.
+  await openNotesAs(page, OTHER);
+  await expect(page.getByRole("heading", { name: "Shared with me" })).toHaveCount(0);
+  await expect(page.getByText("Week 9 summary")).toHaveCount(0);
+});
+
+test("shared note is read-only", async ({ page }) => {
+  await setUp(page);
+  await shareCourseNotes(page, ["Week 9 summary"]);
+  await openNotesAs(page, FRIEND);
+  await sharedSection(page).getByRole("link", { name: /Week 9 summary/ }).click();
+  await expect(page.getByText("Shared by Deck Owner. You can read this note.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Week 9 summary", level: 1 })).toBeVisible();
+  await expect(page.getByText("Week 9 summary text")).toBeVisible();
+  // Nothing to type into, and none of the owner's controls.
+  await expect(page.getByLabel("Note title")).toHaveCount(0);
+  await expect(page.getByLabel("Note body")).toHaveCount(0);
+  for (const name of [/^Save/, /Pin note/, /Delete note/, /^Highlight$/, /Remove highlight/, /Add checklist/, /Add item/]) {
+    await expect(page.getByRole("button", { name })).toHaveCount(0);
+  }
+  await expect(page.getByRole("link", { name: "All notes" })).toBeVisible();
+});
+
+test("Shared with me wraps long titles on a phone", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile", "Phone-only check");
+  await setUp(page);
+  const long = "Lecture ".repeat(31) + "notes";
+  expect(long.length).toBe(253);
+  await shareCourseNotes(page, [long + "!!"]);
+  await openNotesAs(page, FRIEND);
+  const item = sharedSection(page).getByRole("link");
+  await expect(item).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  const box = (await item.boundingBox())!;
+  expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  expect(box.height, "44px tap target").toBeGreaterThanOrEqual(44);
+});
