@@ -7,7 +7,10 @@ import {
   Plus,
   ArrowUpRight,
 } from "lucide-react";
-import { checkRepeat } from "../services/recurrence";
+import {
+  checkRepeat,
+  expandRepeats,
+} from "../services/recurrence";
 import { useApp } from "../app/context";
 import {
   Modal,
@@ -33,6 +36,39 @@ const WEEKDAYS = [
   "Friday",
   "Saturday",
 ];
+
+const SHORT_WEEKDAYS = [
+  "Sun",
+  "Mon",
+  "Tue",
+  "Wed",
+  "Thu",
+  "Fri",
+  "Sat",
+];
+
+function repeatSummary(event: CourseEvent) {
+  if (!event.repeat) return "";
+
+  const frequency =
+    event.repeat.every === 1
+      ? "every week"
+      : "every 2 weeks";
+
+  const days = event.repeat.days
+    .map((day) => SHORT_WEEKDAYS[day])
+    .join(", ");
+
+  const until = new Date(
+    `${event.repeat.until}T12:00:00`,
+  ).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  return `Repeats ${frequency} on ${days} until ${until}`;
+}
 
 function weekdayOf(date: string) {
   const [year, month, day] = date.split("-").map(Number);
@@ -173,6 +209,12 @@ export function EventDialog({
             className={s.error}
           >
             {error}
+          </p>
+        )}
+
+        {event?.repeat && (
+          <p className={s.notice}>
+            {repeatSummary(event)}
           </p>
         )}
 
@@ -462,8 +504,14 @@ export function EventDialog({
         <DeleteEventDialog
           title={event.title}
           repeats={Boolean(
-            event.seriesId,
+            event.seriesId || event.repeat,
           )}
+          deleteAllOnly={Boolean(
+            event.repeat,
+          )}
+          repeatEvery={
+            event.repeat?.every
+          }
           onDelete={async (
             wholeSeries,
           ) => {
@@ -488,11 +536,15 @@ export function EventDialog({
 function DeleteEventDialog({
   title,
   repeats,
+  deleteAllOnly,
+  repeatEvery,
   onDelete,
   onClose,
 }: {
   title: string;
   repeats: boolean;
+  deleteAllOnly: boolean;
+  repeatEvery?: 1 | 2;
   onDelete: (
     wholeSeries: boolean,
   ) => Promise<void>;
@@ -540,9 +592,15 @@ function DeleteEventDialog({
     <Modal
       title="Delete this event?"
       description={
-        repeats
-          ? `${title} repeats every week. Delete just this one, or all of them?`
-          : `${title} will be removed from your schedule.`
+        deleteAllOnly
+          ? `${title} ${
+              repeatEvery === 2
+                ? "repeats every 2 weeks"
+                : "repeats every week"
+            }. Deleting it will remove the whole series.`
+          : repeats
+            ? `${title} repeats every week. Delete just this one, or all of them?`
+            : `${title} will be removed from your schedule.`
       }
       dismissible={!deleting}
       onClose={onClose}
@@ -566,7 +624,21 @@ function DeleteEventDialog({
           Cancel
         </Dialog.Close>
 
-        {repeats ? (
+        {deleteAllOnly ? (
+          <button
+            className={s.danger}
+            disabled={Boolean(
+              deleting,
+            )}
+            onClick={() =>
+              confirm(true)
+            }
+          >
+            {deleting === "all"
+              ? "Deleting…"
+              : "Delete all"}
+          </button>
+        ) : repeats ? (
           <>
             <button
               className={
@@ -687,11 +759,43 @@ export function Schedule() {
     },
   );
 
-  const dayEvents =
-    state.events.filter(
-      (e) =>
-        e.date === selected,
+  const visibleFrom = dateKey(days[0]);
+  const visibleTo = dateKey(
+    days[days.length - 1],
+  );
+
+  const visibleEvents =
+    state.events.flatMap((event) =>
+      expandRepeats(
+        event,
+        visibleFrom,
+        visibleTo,
+      ),
     );
+
+  const dayEvents =
+    visibleEvents.filter(
+      (event) =>
+        event.date === selected,
+    );
+
+  function openEvent(
+    occurrence: CourseEvent,
+  ) {
+    const originalId =
+      occurrence.repeatOf ??
+      occurrence.id;
+
+    const original =
+      state.events.find(
+        (event) =>
+          event.id === originalId,
+      );
+
+    setEvent(
+      original ?? occurrence,
+    );
+  }
 
   function month(
     delta: number,
@@ -832,7 +936,7 @@ export function Schedule() {
 
               // A square fits only two events, so exams and due items go ahead of classes (card 48).
               const events =
-                state.events
+                visibleEvents
                   .filter(
                     (e) =>
                       e.date ===
@@ -1003,11 +1107,9 @@ export function Schedule() {
             dayEvents.map(
               (e) => (
                 <EventRow
-                  key={e.id}
+                  key={`${e.id}-${e.date}`}
                   event={e}
-                  onClick={
-                    setEvent
-                  }
+                  onClick={openEvent}
                 />
               ),
             )
