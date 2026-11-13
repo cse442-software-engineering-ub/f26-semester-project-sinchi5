@@ -1,5 +1,5 @@
 // Card 77: real HTTP persistence, validation, and permissions for note reminders.
-// Use an isolated local DEV database with migrations 001-009, or aptitude TEST after deployment.
+// Use an isolated local DEV database with migrations through 010, or aptitude TEST after deployment.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
