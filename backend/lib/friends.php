@@ -47,13 +47,7 @@ function friendAction(PDO $db, array $config, array $session, string $route, arr
     $status = 200;
     $request = null;
     if ($route === 'friend-request') {
-        $email = field($input, 'email');
-        try {
-            $email = validEmail($email);
-        } catch (HttpError $e) {
-            // Looking up a classmate needs no sign-up advice; one plain message covers every malformed address.
-            throw new HttpError(422, 'Enter a complete email address, like name@university.edu.');
-        }
+        $email = validEmail(field($input, 'email'));
         $them = query($db, 'SELECT id, name, email FROM notely_users WHERE email = ?', [$email])->fetch();
         if (!$them) {
             throw new HttpError(404, 'No registered account was found for this email.');
