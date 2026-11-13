@@ -945,6 +945,7 @@ function NoteEditor() {
       savedNote.current = savedNote.current ? { ...savedNote.current, remindAt: next.remindAt } : saved;
       setNote(next);
       await refresh();
+      if (remindAt === null) setReminderNotice("");
       setReminderOpen(false);
     } catch (e) {
       setReminderError((e as Error).message);
