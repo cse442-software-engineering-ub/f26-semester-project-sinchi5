@@ -3384,3 +3384,41 @@
 .shareStatus {
   margin: -6px 0 22px;
 }
+/* Card 158: "Shared with me" on the Notes page and the read-only shared note. */
+.sharedList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sharedNote {
+  display: grid;
+  gap: 4px;
+  min-height: 44px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+.sharedNote small {
+  color: var(--muted);
+}
+.sharedReader {
+  max-width: 760px;
+  overflow-wrap: anywhere;
+}
+.sharedTitle {
+  margin: 8px 0 18px;
+  font-size: 2rem;
+  letter-spacing: -0.04em;
+}
+.sharedBody {
+  white-space: pre-wrap;
+  line-height: 1.95;
+}
+.sharedChecklist {
+  margin-top: 20px;
+  padding-left: 20px;
+}

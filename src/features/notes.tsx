@@ -55,6 +55,14 @@ export function Notes() {
   // Set when "New note" is chosen from an empty category, so the new note lands in that category.
   const [draftCategory, setDraftCategory] = useState<NoteCategory>();
   const [noteToDelete, setNoteToDelete] = useState<Note>();
+  // Card 158: notes friends shared with this student through a course (card 156).
+  const [shared, setShared] = useState<Note[]>([]);
+  useEffect(() => {
+    let active = true;
+    // The demo has no server account, so it never has shared notes.
+    createHttpNoteShares().sharedWithMe().then((list) => active && setShared(list), () => active && setShared([]));
+    return () => { active = false; };
+  }, [state.user?.id]);
   const location = useLocation();
   const navigate = useNavigate();
   // The editor sends the owner here after deleting, with a one-time message.
@@ -445,6 +453,21 @@ export function Notes() {
           Try another keyword or clear a filter to find your way back.
         </Empty>
       )}
+      {!!shared.length && (
+        <section className={s.categoryGroup} aria-labelledby="shared-with-me-heading">
+          <h2 id="shared-with-me-heading" className={s.categoryHeading}>Shared with me</h2>
+          <ul className={s.sharedList}>
+            {shared.map((n) => (
+              <li key={n.id}>
+                <Link to={`/notes/${n.id}`} className={s.sharedNote}>
+                  <strong>{n.title}</strong>
+                  <small>From {n.sharedBy?.name} · {n.sharedBy?.courseCode}</small>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {noteToDelete && (
         <DeleteNoteDialog
           title={noteToDelete.title}
@@ -528,11 +551,10 @@ function NoteEditor() {
     setStatus("All changes saved");
     generation.current++;
     setError("");
-    Promise.all([
-      repo.notes.get(id),
-      repo.notes.versions(id),
-      repo.notes.collaborators(id),
-    ])
+    repo.notes.get(id)
+      // Card 158: a note shared through a course has no history or collaborators to show its reader.
+      .then((n): Promise<[Note, NoteVersion[], Collaborator[]]> => n.sharedBy ? Promise.resolve([n, [], []])
+        : Promise.all([n, repo.notes.versions(id), repo.notes.collaborators(id)]))
       .then(([n, v, collaborators]) => {
         if (active) {
           setNote(n);
@@ -891,6 +913,7 @@ function NoteEditor() {
       </Empty>
     );
   if (!note) return <p role="status">Opening your note…</p>;
+  if (note.sharedBy) return <SharedNote note={note} />;
   const currentEmail = state.user?.email.trim().toLowerCase();
 
   const currentCollaborator = collaborators.find(
@@ -1376,6 +1399,35 @@ function NoteEditor() {
     </>
   );
 }
+// Card 158: a note a friend shared through a course. Read only: no save, pin, delete, highlight, or
+// checklist controls, and none of the owner's history or comments.
+function SharedNote({ note }: { note: Note }) {
+  return (
+    <>
+      <div className={s.editorTop}>
+        <Link className={s.textLink} to="/notes">
+          <ArrowLeft size={16} /> All notes
+        </Link>
+      </div>
+      <article className={s.sharedReader}>
+        <p className={s.notice}>Shared by {note.sharedBy!.name}. You can read this note.</p>
+        <p className={s.muted}>{note.sharedBy!.courseCode}{note.lectureDate ? ` · ${note.lectureDate}` : ""}</p>
+        <h1 className={s.sharedTitle}>{note.title}</h1>
+        <div className={s.sharedBody}>{note.body}</div>
+        {!!note.checklist?.length && (
+          <ul className={s.sharedChecklist} aria-label="Checklist">
+            {note.checklist.map((item, index) => (
+              <li key={index} className={item.done ? s.checklistDone : undefined}>
+                {item.text}{item.done && <span className={s.srOnly}> (done)</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </article>
+    </>
+  );
+}
+
 export function CoursePage() {
   const { id = "" } = useParams();
   const { state, repo } = useApp();

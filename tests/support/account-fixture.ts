@@ -55,9 +55,21 @@ export const test = base.extend<{ accountApi: void }>({
       const note = notes.get(noteId);
       if (!note) throw new ApiError(404, "This note could not be found.");
       if (note.ownerId === user!.id) return "owner";
-      return editors.get(noteId)?.get(user!.id) ?? "none";
+      return editors.get(noteId)?.get(user!.id) ?? (sharedBy(note) ? "friend" : "none");
     };
-    const readable = (noteId: string) => { if (role(noteId) === "none") throw new ApiError(404, "This note could not be found."); };
+    // Card 156: who shared this note's course with the signed-in student, if anyone.
+    const sharedBy = (note: Note) => {
+      const share = note.courseId && courseShares.find((c) => c.owner === note.ownerId && c.courseId === note.courseId
+        && c.friend === user!.id && areFriends(c.owner, c.friend));
+      if (!share) return undefined;
+      const owner = [...accounts.values()].find((a) => a.id === share.owner)!;
+      return { id: owner.id, name: owner.name, courseCode: share.courseCode };
+    };
+    // A friend reads the note itself; its history, comments, and collaborators look missing.
+    const readable = (noteId: string, notePage = false) => {
+      const r = role(noteId);
+      if (r === "none" || (r === "friend" && !notePage)) throw new ApiError(404, "This note could not be found.");
+    };
     const editable = (noteId: string) => {
       if (!["owner", "edit"].includes(role(noteId))) throw new ApiError(403, "You do not have permission to edit this note.");
     };
@@ -93,7 +105,11 @@ export const test = base.extend<{ accountApi: void }>({
         editors.set(note.id, new Map());
         return { note };
       }
-      if (action === "note") { readable(id); return { note: notes.get(id) }; }
+      if (action === "note") {
+        readable(id, true);
+        const note = notes.get(id)!;
+        return { note: role(id) === "friend" ? { ...note, permission: "view", sharedBy: sharedBy(note) } : note };
+      }
       if (action === "note-versions") { readable(id); return { versions: versions.filter((v) => v.noteId === id) }; }
       if (action === "note-comments") { readable(id); return { comments: comments.filter((c) => c.noteId === id) }; }
       if (action === "note-collaborators") {
@@ -123,7 +139,8 @@ export const test = base.extend<{ accountApi: void }>({
         return { note: { id } };
       }
       if (action === "note-comment") {
-        readable(id);
+        readable(id, true);
+        if (role(id) === "friend") throw new ApiError(403, "You do not have permission to edit this note.");
         if (notes.get(id)!.visibility !== "shared") throw new ApiError(422, "Share this note before adding comments.");
         const comment = { id: String(nextId++), noteId: id, body: String(body.body).trim(), author: user.name, authorId: user.id, createdAt: now() };
         comments.push(comment);
@@ -308,6 +325,11 @@ export const test = base.extend<{ accountApi: void }>({
     function shareRoute(action: string, query: URLSearchParams, body: Record<string, unknown>) {
       if (!user) throw new ApiError(401, "Sign in to continue.");
       const me = user.id;
+      if (action === "shared-notes") {
+        const list = [...notes.values()].filter((n) => n.ownerId !== me && sharedBy(n))
+          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        return { notes: list.map((n) => ({ ...n, permission: "view", sharedBy: sharedBy(n) })) };
+      }
       const courseId = String((action === "course-notes-shares" ? query.get("courseId") : body.courseId) ?? "");
       if (!/^[A-Za-z0-9_-]{1,64}$/.test(courseId)) throw new ApiError(422, "Choose a valid course.");
       const list = () => courseShares.filter((c) => c.owner === me && c.courseId === courseId && areFriends(me, c.friend))
@@ -327,7 +349,7 @@ export const test = base.extend<{ accountApi: void }>({
       const query = new URL(route.request().url()).searchParams;
       const action = query.get("route")!;
       const body = route.request().postDataJSON() || {};
-      if (action === "course-notes-share" || action === "course-notes-shares") {
+      if (["course-notes-share", "course-notes-shares", "shared-notes"].includes(action)) {
         try {
           await route.fulfill({ json: shareRoute(action, query, body) });
         } catch (e) {
