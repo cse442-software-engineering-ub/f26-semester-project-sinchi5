@@ -1,7 +1,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { Check, Circle } from "lucide-react";
 import { useApp } from "../app/context";
-import { Modal } from "../shared/ui";
+import { Avatar, Modal } from "../shared/ui";
 import s from "../app/App.module.css";
 import { PASSWORD_MAX, PASSWORD_MIN, emailError, nameError, passwordCharacterError, passwordError } from "../services/validation";
 
@@ -51,10 +51,7 @@ export function AccountSettings() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const photoInput = useRef<HTMLInputElement>(null);
-  const [photoVersion, setPhotoVersion] = useState(0);
-  const [failedPhoto, setFailedPhoto] = useState("");
   const isDemo = state.user?.id === "student";
-  const photoUrl = `${import.meta.env.BASE_URL}api/index.php?route=profile-photo&v=${encodeURIComponent(`${state.user?.id}-${photoVersion}`)}`;
   async function changePhoto(file?: File) {
     // An empty selection is a canceled picker, not a removal or validation error.
     if (!file || pending.current) return;
@@ -77,9 +74,7 @@ export function AccountSettings() {
         reader.readAsDataURL(file);
       });
       await repo.auth.uploadProfilePhoto(content);
-      // A new URL also reloads a replacement when hasPhoto was already true.
-      setPhotoVersion(version => version + 1);
-      await refresh();
+      await refresh({ photoChanged: true });
       setMessage("Photo updated.");
     } catch (e) { setMessage(""); setError((e as Error).message); }
     finally { pending.current = false; setBusy(false); }
@@ -89,7 +84,7 @@ export function AccountSettings() {
     pending.current = true; setBusy(true); setError(""); setMessage("Removing photo…");
     try {
       await repo.auth.removeProfilePhoto();
-      await refresh();
+      await refresh({ photoChanged: true });
       setMessage("Photo removed.");
     } catch (e) { setMessage(""); setError((e as Error).message); }
     finally { pending.current = false; setBusy(false); }
@@ -119,15 +114,13 @@ export function AccountSettings() {
     finally { pending.current = false; setBusy(false); }
   }
   const open = (next: NonNullable<typeof action>) => { if (pending.current) return; setError(""); setMessage(""); setAction(next); };
-  const initials = (state.user?.name || state.user?.email || "?").trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase()).join("");
   return <section className={s.panel} aria-labelledby="account-heading">
     <div className={s.settingsHeading}>
       <h2 id="account-heading">Account</h2>
       <p className={s.muted}>Manage how you sign in and keep your account secure.</p>
     </div>
     <div className={s.accountSummary} role="group" aria-label="Account summary" aria-busy={busy}>
-      <span className={s.avatar} aria-hidden="true">{!isDemo && state.user?.hasPhoto && failedPhoto !== photoUrl
-        ? <img src={photoUrl} alt="" onError={() => setFailedPhoto(photoUrl)} /> : initials}</span>
+      {state.user && <Avatar user={state.user} version={state.photoVersion} alt="" />}
       <span>
         <strong className={s.accountText}>{state.user?.name}</strong>
         <small className={`${s.muted} ${s.accountText}`}>{state.user?.email}</small>

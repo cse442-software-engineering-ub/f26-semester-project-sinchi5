@@ -25,7 +25,8 @@ test("left menu footer has no initial", async ({ page }) => {
     await page.setViewportSize(viewport);
     await expect(name).toBeVisible();
     await expect(name).toHaveText(userName);
-    await expect(footer.getByText("Curious mind, always.", { exact: true })).toBeVisible();
+    await expect(footer).toHaveText(userName);
+    await expect(footer.locator("small")).toHaveCount(0);
     await expect(footer.locator('[class*="avatar"]')).toHaveCount(0);
     expect(await name.evaluate((element) => {
       const bounds = element.getBoundingClientRect();

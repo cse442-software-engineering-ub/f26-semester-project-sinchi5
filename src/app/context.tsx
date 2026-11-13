@@ -11,6 +11,7 @@ import { createAppRepositories } from "../services/app-repositories";
 import type { User, Course, Note, CourseEvent, Repositories } from "../domain";
 type State = {
   user: User | null;
+  photoVersion: number;
   ready: boolean;
   completed: boolean;
   courses: Course[];
@@ -21,6 +22,7 @@ type State = {
 };
 const initial: State = {
   user: null,
+  photoVersion: 0,
   ready: false,
   completed: false,
   courses: [],
@@ -32,7 +34,7 @@ const initial: State = {
 const Context = createContext<{
   state: State;
   repo: Repositories;
-  refresh: () => Promise<void>;
+  refresh: (options?: { photoChanged?: boolean }) => Promise<void>;
   setTheme: (theme: string) => void;
   setError: (error: string) => void;
 }>(null!);
@@ -43,7 +45,10 @@ export function Provider({ children }: { children: ReactNode }) {
     initial,
   );
   const refreshVersion = useRef(0);
-  async function refresh() {
+  const photoVersion = useRef(0);
+  async function refresh({ photoChanged = false }: { photoChanged?: boolean } = {}) {
+    // Keep invalidation even if a newer focus/session refresh supersedes this request.
+    if (photoChanged) photoVersion.current++;
     const version = ++refreshVersion.current;
     try {
       const user = await repo.auth.session();
@@ -59,8 +64,10 @@ export function Provider({ children }: { children: ReactNode }) {
         repo.schedule.list(),
       ]);
       if (version !== refreshVersion.current) return;
+      // Publish the new user and photo revision together for every avatar instance.
       dispatch({
         user,
+        photoVersion: photoVersion.current,
         completed: onboarding.completed,
         courses,
         notes,
