@@ -443,5 +443,235 @@ test.describe("repeating event controls", () => {
     await expect(
       details.getByLabel("Ends on"),
     ).toHaveValue(endDate);
-  });
+    });
+
+    test("repeated events appear on each scheduled day", async ({ page }) => {
+    await openAddEvent(page);
+
+    const dialog = page.getByRole("dialog");
+
+    await dialog.getByLabel("Title").fill("Work shift");
+    await dialog.getByLabel("Date").fill("2026-11-16");
+    await dialog.getByLabel("Time").fill("10:00");
+
+    await dialog
+        .getByLabel("Repeats")
+        .selectOption("1");
+
+    await dialog
+        .getByRole("button", {
+        name: "Wednesday",
+        })
+        .click();
+
+    await dialog
+        .getByLabel("Ends on")
+        .fill("2026-11-30");
+
+    await dialog
+        .getByRole("button", {
+        name: "Create event",
+        })
+        .click();
+
+    for (const date of [
+        "2026-11-16",
+        "2026-11-18",
+        "2026-11-23",
+        "2026-11-25",
+        "2026-11-30",
+    ]) {
+        await page.goto(`/schedule?date=${date}`);
+
+        await expect(
+        page.getByText("Work shift", {
+            exact: true,
+        }),
+        ).toBeVisible();
+    }
+
+    await page.goto("/schedule?date=2026-12-02");
+
+    await expect(
+        page.getByText("Work shift", {
+        exact: true,
+        }),
+    ).toHaveCount(0);
+    });
+
+    test("editing one repeat updates the whole series", async ({ page }) => {
+    await openAddEvent(page);
+
+    const dialog = page.getByRole("dialog");
+
+    await dialog.getByLabel("Title").fill("Work shift");
+    await dialog.getByLabel("Date").fill("2026-11-16");
+
+    await dialog
+        .getByLabel("Repeats")
+        .selectOption("1");
+
+    await dialog
+        .getByRole("button", {
+        name: "Wednesday",
+        })
+        .click();
+
+    await dialog
+        .getByLabel("Ends on")
+        .fill("2026-11-30");
+
+    await dialog
+        .getByRole("button", {
+        name: "Create event",
+        })
+        .click();
+
+    await page.goto("/schedule?date=2026-11-25");
+
+    await page
+        .getByText("Work shift", {
+        exact: true,
+        })
+        .last()
+        .click();
+
+    const editDialog =
+        page.getByRole("dialog");
+
+    await editDialog
+        .getByLabel("Title")
+        .fill("Updated shift");
+
+    await editDialog
+        .getByRole("button", {
+        name: "Save changes",
+        })
+        .click();
+
+    await page.goto("/schedule?date=2026-11-16");
+
+    await expect(
+        page.getByText("Updated shift", {
+        exact: true,
+        }),
+    ).toBeVisible();
+
+    await page.goto("/schedule?date=2026-11-30");
+
+    await expect(
+        page.getByText("Updated shift", {
+        exact: true,
+        }),
+    ).toBeVisible();
+
+    await expect(
+        page.getByText("Work shift", {
+        exact: true,
+        }),
+    ).toHaveCount(0);
+    });
+
+    test("deleting one repeat deletes the whole series only", async ({ page }) => {
+    await openAddEvent(page);
+
+    let dialog = page.getByRole("dialog");
+
+    await dialog.getByLabel("Title").fill("Work shift");
+    await dialog.getByLabel("Date").fill("2026-11-16");
+
+    await dialog
+        .getByLabel("Repeats")
+        .selectOption("1");
+
+    await dialog
+        .getByLabel("Ends on")
+        .fill("2026-11-30");
+
+    await dialog
+        .getByRole("button", {
+        name: "Create event",
+        })
+        .click();
+
+    await page
+        .getByRole("button", {
+        name: "Add event",
+        exact: true,
+        })
+        .click();
+
+    dialog = page.getByRole("dialog");
+
+    await dialog
+        .getByLabel("Title")
+        .fill("Club meeting");
+
+    await dialog
+        .getByLabel("Date")
+        .fill("2026-11-16");
+
+    await dialog
+        .getByLabel("Repeats")
+        .selectOption("1");
+
+    await dialog
+        .getByLabel("Ends on")
+        .fill("2026-11-30");
+
+    await dialog
+        .getByRole("button", {
+        name: "Create event",
+        })
+        .click();
+
+    await page.goto("/schedule?date=2026-11-23");
+
+    await page
+        .getByText("Work shift", {
+        exact: true,
+        })
+        .last()
+        .click();
+
+    dialog = page.getByRole("dialog");
+
+    await dialog
+        .getByRole("button", {
+        name: "Delete event",
+        })
+        .click();
+
+    const deleteDialog =
+        page.getByRole("dialog", {
+        name: "Delete this event?",
+        });
+
+    await expect(
+        deleteDialog.getByRole("button", {
+        name: "Delete this one",
+        }),
+    ).toHaveCount(0);
+
+    await deleteDialog
+        .getByRole("button", {
+        name: "Delete all",
+        })
+        .click();
+
+    await page.goto("/schedule?date=2026-11-30");
+
+    await expect(
+        page.getByText("Work shift", {
+        exact: true,
+        }),
+    ).toHaveCount(0);
+
+    await expect(
+        page.getByText("Club meeting", {
+        exact: true,
+        }),
+    ).toBeVisible();
+    });
+
 });
