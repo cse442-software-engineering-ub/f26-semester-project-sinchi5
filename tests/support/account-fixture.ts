@@ -6,7 +6,7 @@ type Account = { id: string; name: string; email: string; password: string; code
 type Note = {
   checklist: { text: string; done: boolean }[];
   id: string; ownerId: string; title: string; body: string; courseId: string; lectureDate: string; category: string;
-  visibility: string; tags: string[]; pinned: boolean; createdAt: string; updatedAt: string;
+  visibility: string; tags: string[]; pinned: boolean; remindAt: string | null; createdAt: string; updatedAt: string;
 };
 class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
 const IMPORT_ROUTES = ["workspace-clear","syllabus-upload", "import-job", "import-extract", "import-confirm", "events", "event-delete", "event-save", "courses", "course-save", "course-delete"];
@@ -101,7 +101,7 @@ export const test = base.extend<{ accountApi: void }>({
         return { notes: [...notes.values()].filter((n) => n.ownerId === user!.id || editors.get(n.id)?.has(user!.id)) };
       }
       if (action === "note-create") {
-        const note = { id: String(nextId++), ownerId: user.id, pinned: false, createdAt: now(), updatedAt: now(), ...content({}) };
+        const note = { id: String(nextId++), ownerId: user.id, pinned: false, remindAt: null, createdAt: now(), updatedAt: now(), ...content({}) };
         notes.set(note.id, note);
         editors.set(note.id, new Map());
         return { note };
@@ -132,6 +132,18 @@ export const test = base.extend<{ accountApi: void }>({
       if (action === "note-pin") {
         editable(id);
         notes.set(id, { ...notes.get(id)!, pinned: body.pinned === true });
+        return { note: notes.get(id) };
+      }
+      if (action === "note-reminder") {
+        editable(id);
+        const remindAt = body.remindAt;
+        if (remindAt !== null && (typeof remindAt !== "string" || !Number.isFinite(Date.parse(remindAt)))) {
+          throw new ApiError(422, "Choose a valid reminder time.");
+        }
+        if (typeof remindAt === "string" && Date.parse(remindAt) <= Date.now()) {
+          throw new ApiError(422, "Choose a time in the future.");
+        }
+        notes.set(id, { ...notes.get(id)!, remindAt: remindAt as string | null, updatedAt: now() });
         return { note: notes.get(id) };
       }
       if (action === "note-delete") {

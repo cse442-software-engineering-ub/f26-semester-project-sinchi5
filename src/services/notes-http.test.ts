@@ -86,6 +86,20 @@ it("sends the session's CSRF token and refreshes it once after a new sign-in", a
   expect(api.calls[3].body).toEqual({ id: "7" });
 });
 
+it("sends a reminder time or null through the signed-in note route", async () => {
+  const remindAt = "2026-12-01T09:00:00.000Z";
+  const api = fakeApi((call) => call.route === "session"
+    ? { json: { csrfToken: "token" } }
+    : { json: { note: { id: "7", remindAt: call.body?.remindAt } } });
+  const notes = createHttpNotes(courses, "/api/index.php", api.fetcher);
+  expect((await notes.setReminder("7", remindAt)).remindAt).toBe(remindAt);
+  expect((await notes.setReminder("7", null)).remindAt).toBeNull();
+  expect(api.calls.slice(1)).toEqual([
+    { route: "note-reminder", method: "POST", csrf: "token", body: { id: "7", remindAt } },
+    { route: "note-reminder", method: "POST", csrf: "token", body: { id: "7", remindAt: null } },
+  ]);
+});
+
 it("reports the server's error, or a connection problem", async () => {
   const api = fakeApi(() => ({ status: 404, json: { error: "This note could not be found." } }));
   const error = await createHttpNotes(courses, "/api/index.php", api.fetcher).get("7").catch((e) => e);
