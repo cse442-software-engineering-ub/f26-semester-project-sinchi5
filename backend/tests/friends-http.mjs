@@ -92,8 +92,14 @@ try {
   expectError(await ana.call("friend-request", { email: ana.email }), 422, "You can’t add yourself as a friend.");
   expectError(await ana.call("friend-request", { email: bea.email }), 409, "You’re already friends with this person.");
   expectError(await bea.call("friend-request", { email: ana.email }), 409, "You’re already friends with this person.");
-  for (const email of ["not an email", "not-an-email", ""]) {
-    expectError(await ana.call("friend-request", { email }), 422, "Enter a complete email address, like name@university.edu.");
+  // The same messages as sign-up and account settings (validEmail).
+  for (const [email, message] of [
+    ["not an email", "Email addresses can’t contain spaces."],
+    ["not-an-email", "Email addresses need exactly one @, like name@university.edu."],
+    ["name@university", "Enter a complete email address, like name@university.edu."],
+    ["", "Enter your email address."],
+  ]) {
+    expectError(await ana.call("friend-request", { email }), 422, message);
   }
   expectError(await ana.call("friend-request", {}), 422, "Complete all required fields.");
   assert.equal((await ana.call("friend-request", { email: cal.email })).status, 201);
