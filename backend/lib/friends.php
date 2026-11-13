@@ -98,11 +98,16 @@ function friendAction(PDO $db, array $config, array $session, string $route, arr
             : 'DELETE FROM notely_friendships WHERE id = ?', [$id]);
     } else {
         $id = recordId($input['id'] ?? null, FRIEND_NOT_FOUND);
-        $removed = query($db, "DELETE FROM notely_friendships WHERE id = ? AND status = 'accepted'
-            AND (requester_id = ? OR addressee_id = ?)", [$id, $me, $me])->rowCount();
-        if ($removed !== 1) {
+        $row = query($db, "SELECT requester_id, addressee_id FROM notely_friendships WHERE id = ? AND status = 'accepted'
+            AND (requester_id = ? OR addressee_id = ?) FOR UPDATE", [$id, $me, $me])->fetch();
+        if (!$row) {
             throw new HttpError(404, FRIEND_NOT_FOUND);
         }
+        query($db, 'DELETE FROM notely_friendships WHERE id = ?', [$id]);
+        // Card 156: courses either of them shared with the other stop being shared.
+        query($db, 'DELETE FROM notely_course_note_shares WHERE (owner_user_id = ? AND friend_user_id = ?)
+            OR (owner_user_id = ? AND friend_user_id = ?)',
+            [$row['requester_id'], $row['addressee_id'], $row['addressee_id'], $row['requester_id']]);
     }
     $db->commit();
     http_response_code($status);

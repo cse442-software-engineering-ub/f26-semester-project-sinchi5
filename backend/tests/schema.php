@@ -9,6 +9,12 @@ $tables = [
         'mime' => ["enum('image/png','image/jpeg','image/webp')", 'NO'],
         'data' => ['mediumblob', 'NO'], 'updated_at' => ['timestamp', 'NO'],
     ],
+    // Card 156: one row per course a student shares with one friend.
+    'notely_course_note_shares' => [
+        'owner_user_id' => ['bigint unsigned', 'NO'], 'course_id' => ['varchar(64)', 'NO'],
+        'course_code' => ['varchar(64)', 'NO'], 'friend_user_id' => ['bigint unsigned', 'NO'],
+        'created_at' => ['datetime', 'NO'],
+    ],
     'notely_users' => [
         'id' => ['bigint unsigned', 'NO'], 'name' => ['varchar(100)', 'NO'],
         'email' => ['varchar(254)', 'NO'], 'password_hash' => ['varchar(255)', 'NO'],
@@ -78,7 +84,8 @@ $fk = query($db, "SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRA
 if ($fk !== 'CASCADE') { throw new RuntimeException('Missing session cascade'); }
 foreach (['notely_notes_owner_fk', 'notely_note_editors_note_fk', 'notely_note_editors_user_fk',
     'notely_note_versions_note_fk', 'notely_note_comments_note_fk', 'notely_note_comments_author_fk',
-    'notely_import_jobs_owner_fk', 'notely_events_owner_fk', 'notely_profile_photos_user_fk'] as $constraint) {
+    'notely_import_jobs_owner_fk', 'notely_events_owner_fk', 'notely_profile_photos_user_fk',
+    'notely_course_note_shares_owner_fk', 'notely_course_note_shares_friend_fk'] as $constraint) {
     $rule = query($db, 'SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS
         WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = ?', [$constraint])->fetchColumn();
     if ($rule !== 'CASCADE') { throw new RuntimeException('Missing note cascade: ' . $constraint); }
