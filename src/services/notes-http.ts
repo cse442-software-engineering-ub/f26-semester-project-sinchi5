@@ -80,6 +80,9 @@ export function createHttpNotes(
     async setPinned(noteId, pinned) {
       return (await send<{ note: Note }>("note-pin", { id: noteId, pinned })).note;
     },
+    async setReminder(noteId, remindAt) {
+      return (await send<{ note: Note }>("note-reminder", { id: noteId, remindAt })).note;
+    },
     async delete(noteId) {
       await send("note-delete", { id: noteId });
     },

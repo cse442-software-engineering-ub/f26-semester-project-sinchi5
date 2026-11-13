@@ -63,6 +63,7 @@ export interface Note {
   // Card 158: set on a note a friend shared through a course (card 156); it is read only.
   sharedBy?: { id: string; name: string; courseCode: string };
   permission?: "view";
+  remindAt?: string | null;
 }
 export interface NoteVersion {
   id: string;
@@ -191,6 +192,7 @@ export interface NoteRepository {
   get(id: string): Promise<Note>;
   save(note: Note): Promise<Note>;
   setPinned(id: string, pinned: boolean): Promise<Note>;
+  setReminder(id: string, remindAt: string | null): Promise<Note>;
   create(data: Partial<Note>): Promise<Note>;
   // Removes the note with its comments, versions, and collaborator entries.
   delete(id: string): Promise<void>;
