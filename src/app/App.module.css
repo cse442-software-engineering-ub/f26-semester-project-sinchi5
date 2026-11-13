@@ -3364,3 +3364,23 @@
 .friendName {
   overflow-wrap: anywhere;
 }
+/* Card 157: one checkbox row per friend in "Share your … notes". Each row is a 44px tap target. */
+.shareFriends {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  margin: 0 0 18px;
+  padding: 0;
+  border: 0;
+}
+.shareFriend {
+  align-items: center;
+  min-height: 44px;
+}
+.shareFriend .friendName {
+  display: grid;
+  min-width: 0;
+}
+.shareStatus {
+  margin: -6px 0 22px;
+}
