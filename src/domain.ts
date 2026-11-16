@@ -158,7 +158,12 @@ export interface NoteQuery {
   to?: string;
   sort?: string;
 }
+export type ThemeMode = "system" | "light" | "dark";
+export type ColorScheme = "sage" | "fjord" | "rose" | "mocha";
+export interface Preferences { mode: ThemeMode; scheme: ColorScheme }
 export interface AuthRepository {
+  preferences(): Preferences;
+  savePreferences(next: Preferences): Promise<Preferences>;
   session(): Promise<User | null>;
   signIn(email: string, password: string): Promise<User>;
   signUp(name: string, email: string, password: string): Promise<{ user: User; recoveryCode: string }>;

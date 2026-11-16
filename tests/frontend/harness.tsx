@@ -1,3 +1,4 @@
+import "../../src/app/tokens.css"; // every test page needs the color variables the app loads in main.tsx
 // Frontend test harness: real screen code, API replaced. No dependency beyond React, which the app already uses.
 // Pages import { page, test, expect } from "../../shared/runner.js" and the helpers below from "../harness".
 import type { ReactElement } from "react";
@@ -113,7 +114,7 @@ const ROLES: Record<string, string> = {
   listitem: "li, [role=listitem]",
 };
 
-// byRole("button", "Log In"): the first element with that role (and accessible name, exact text or RegExp), or null.
+// byRole("button", "Log in"): the first element with that role (and accessible name, exact text or RegExp), or null.
 export function byRole(role: string, name?: string | RegExp): HTMLElement | null {
   const found = all(ROLES[role] ?? `[role=${role}]`).filter((e) => name === undefined || same(nameOf(e), name));
   return (found[0] as HTMLElement) ?? null;

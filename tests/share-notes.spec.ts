@@ -18,7 +18,7 @@ function call(page: Page, route: string, body?: object) {
   }, [route, body] as const);
 }
 async function signUpOwner(page: Page) {
-  await page.getByRole("button", { name: "Create your workspace" }).click();
+  await page.getByRole("button", { name: "Create account" }).click();
   await page.getByLabel("Your name").fill("Deck Owner");
   await page.getByLabel("Email address").fill(OWNER);
   await page.getByLabel("Password", { exact: true }).fill(password);

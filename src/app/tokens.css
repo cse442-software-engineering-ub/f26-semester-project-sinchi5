@@ -1,0 +1,116 @@
+/* Color schemes. Fjord is built on Nord (MIT, Sven Greb), Rose on Rose Pine (MIT, Rose Pine contributors),
+   Mocha on Catppuccin Latte/Mocha (MIT, Catppuccin). Sage is the original Notely look and the default. */
+:root {
+  color-scheme: light;
+  --bg: #f8f9f6;
+  --surface: #fff;
+  --surface-soft: #f1f4ed;
+  --text: #304c58;
+  --muted: #5d6c63;
+  --line: #e5e9e1;
+  --primary: #8b5d33;
+  --primary-text: #fff;
+  --sage: #e5eddf;
+  --mint: #a7cdbd;
+  --nav: #edf1e8;
+  --shadow: 0 16px 64px #273c3020;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #19211e;
+  --surface: #212c27;
+  --surface-soft: #29362e;
+  --text: #dbe9e1;
+  --muted: #a7b8ac;
+  --line: #36453b;
+  --primary: #a7cdbd;
+  --primary-text: #192820;
+  --sage: #334638;
+  --mint: #a7cdbd;
+  --nav: #283a2d;
+  --shadow: 0 16px 64px #0005;
+}
+:root[data-scheme="fjord"] {
+  --bg: #eceff4;
+  --surface: #f8f9fb;
+  --surface-soft: #e5e9f0;
+  --text: #2e3440;
+  --muted: #4c566a;
+  --line: #d8dee9;
+  --primary: #496a92;
+  --primary-text: #ffffff;
+  --sage: #dbe6ee;
+  --mint: #8fbcbb;
+  --nav: #e5e9f0;
+  --shadow: 0 16px 64px #2e344020;
+}
+:root[data-scheme="fjord"][data-theme="dark"] {
+  --bg: #2e3440;
+  --surface: #3b4252;
+  --surface-soft: #434c5e;
+  --text: #eceff4;
+  --muted: #c5cedd;
+  --line: #4c566a;
+  --primary: #88c0d0;
+  --primary-text: #2e3440;
+  --sage: #434c5e;
+  --mint: #8fbcbb;
+  --nav: #3b4252;
+  --shadow: 0 16px 64px #0006;
+}
+:root[data-scheme="rose"] {
+  --bg: #faf4ed;
+  --surface: #fffaf3;
+  --surface-soft: #f2e9e1;
+  --text: #575279;
+  --muted: #6b6785;
+  --line: #dfdad9;
+  --primary: #286983;
+  --primary-text: #fffaf3;
+  --sage: #f2e9e1;
+  --mint: #56949f;
+  --nav: #f2e9e1;
+  --shadow: 0 16px 64px #57527920;
+}
+:root[data-scheme="rose"][data-theme="dark"] {
+  --bg: #232136;
+  --surface: #2a273f;
+  --surface-soft: #393552;
+  --text: #e0def4;
+  --muted: #a09cba;
+  --line: #44415a;
+  --primary: #ea9a97;
+  --primary-text: #232136;
+  --sage: #393552;
+  --mint: #9ccfd8;
+  --nav: #2a273f;
+  --shadow: 0 16px 64px #0006;
+}
+:root[data-scheme="mocha"] {
+  --bg: #eff1f5;
+  --surface: #ffffff;
+  --surface-soft: #e6e9ef;
+  --text: #4c4f69;
+  --muted: #5c5f77;
+  --line: #ccd0da;
+  --primary: #7a2fd6;
+  --primary-text: #ffffff;
+  --sage: #dce0e8;
+  --mint: #179299;
+  --nav: #e6e9ef;
+  --shadow: 0 16px 64px #4c4f6920;
+}
+:root[data-scheme="mocha"][data-theme="dark"] {
+  --bg: #1e1e2e;
+  --surface: #2a2b3c;
+  --surface-soft: #313244;
+  --text: #cdd6f4;
+  --muted: #a6adc8;
+  --line: #45475a;
+  --primary: #cba6f7;
+  --primary-text: #1e1e2e;
+  --sage: #313244;
+  --mint: #94e2d5;
+  --nav: #181825;
+  --shadow: 0 16px 64px #0006;
+}
