@@ -61,7 +61,6 @@ export function createAuthRepository(
       return { user: result.user!, recoveryCode: result.recoveryCode! };
     },
     async signOut() { await post("logout"); },
-    async startDemo() { throw new Error("Demo access is handled separately from accounts."); },
     async completeOnboarding() { await post("onboarding"); },
     async updateProfile(name, email, currentPassword) {
       return (await post("profile", { name, email, currentPassword })).user!;

@@ -163,7 +163,6 @@ export interface AuthRepository {
   signIn(email: string, password: string): Promise<User>;
   signUp(name: string, email: string, password: string): Promise<{ user: User; recoveryCode: string }>;
   signOut(): Promise<void>;
-  startDemo(): Promise<void>;
   updateProfile(name: string, email: string, currentPassword: string): Promise<User>;
   uploadProfilePhoto(content: string): Promise<User>;
   removeProfilePhoto(): Promise<User>;

@@ -57,27 +57,19 @@ export function Onboarding() {
     "aria-describedby": [shown(field) ? `${field}-error` : "", describedBy].filter(Boolean).join(" ") || undefined,
     onBlur: touch(field),
   });
-  async function enter(demo = false) {
+  async function enter() {
     if (pending.current) return;
     setError(""); setMessage("");
-    if (!demo) {
-      const first = (Object.keys(fieldErrors) as (keyof typeof fieldErrors)[]).find(f => fieldErrors[f]);
-      if (first) {
-        setSubmitted(true);
-        document.getElementById(`${first}-input`)?.focus();
-        return;
-      }
-      if (mode !== "signin" && password !== confirmation) { setError("Passwords do not match."); return; }
+    const first = (Object.keys(fieldErrors) as (keyof typeof fieldErrors)[]).find(f => fieldErrors[f]);
+    if (first) {
+      setSubmitted(true);
+      document.getElementById(`${first}-input`)?.focus();
+      return;
     }
+    if (mode !== "signin" && password !== confirmation) { setError("Passwords do not match."); return; }
     pending.current = true;
     setBusy(true);
     try {
-      if (demo) {
-        await repo.auth.startDemo();
-        await refresh();
-        navigate("/");
-        return;
-      }
       if (mode === "signup") {
         const result = await repo.auth.signUp(name, email, password);
         setRecoveryCode(result.recoveryCode);
@@ -173,13 +165,6 @@ export function Onboarding() {
                     onClick={() => changeMode("signin")}
                   >
                     I already have an account
-                  </button>
-                  <button
-                    className={s.textLink}
-                    disabled={busy}
-                    onClick={() => void enter(true)}
-                  >
-                    Take a look around first <ArrowRight size={15} />
                   </button>
                 </div>
               ) : (
