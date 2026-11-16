@@ -22,6 +22,12 @@ export interface ProposedEvent {
   source: string;
   // Set when the date is missing; the student must pick it.
   needsReview?: true;
+  // Card 233: what the syllabus gave instead of a day. A span of days, or a week number, and the kind of class
+  // the item belongs to. Only on an item with no date; syllabus-placement.ts turns them into a day.
+  rangeStart?: string;
+  rangeEnd?: string;
+  week?: number;
+  meeting?: ClassKind;
 }
 
 // A weekly class as the reader found it. days are numbers, with 0 for Sunday.
@@ -71,7 +77,12 @@ export function normalizeEvents(items: unknown): ProposedEvent[] {
     const date = realDate(raw.date);
     const time = clockTime(raw.time);
     const location = plainText(raw.location, 120);
-    const key = `${title.toLowerCase()}|${date}|${time}`;
+    // A span or week counts only for an item with no day of its own, and a span comes before a week.
+    const rangeStart = date ? "" : realDate(raw.rangeStart);
+    const rangeEnd = rangeStart && realDate(raw.rangeEnd) >= rangeStart ? realDate(raw.rangeEnd) : "";
+    const week = !date && !rangeEnd && Number.isInteger(raw.week) && (raw.week as number) >= 1 && (raw.week as number) <= 30 ? (raw.week as number) : 0;
+    // "Lab report" due in week 3 and again in week 4 are two items, not one listed twice.
+    const key = `${title.toLowerCase()}|${date}|${time}${rangeEnd || week ? `|${rangeStart}|${rangeEnd}|${week}` : ""}`;
     if (seen.has(key)) continue;
     seen.add(key);
     events.push({
@@ -82,6 +93,8 @@ export function normalizeEvents(items: unknown): ProposedEvent[] {
       ...(location ? { location } : {}),
       source: plainText(raw.source, 500),
       ...(date ? {} : { needsReview: true as const }),
+      ...(rangeEnd ? { rangeStart, rangeEnd } : week ? { week } : {}),
+      ...(CLASS_KINDS.includes(raw.meeting as ClassKind) ? { meeting: raw.meeting as ClassKind } : {}),
     });
   }
   return events;

@@ -95,4 +95,30 @@ describe("cleaning what the reader found (card 44)", () => {
     ]);
     expect(normalizeBreaks(undefined)).toEqual([]);
   });
+
+  it("Task test 10 (card 234) - a span, week, or class kind from the reader is lost, trusted when bad, or added to a dated item", () => {
+    const item = (title: string, extra: object) => ({ title, kind: "assignment", date: "", ...extra });
+    const kept = (title: string, extra: object) => ({ title, kind: "assignment", date: "", source: "", needsReview: true, ...extra });
+    expect(normalizeEvents([
+      item("Homework 3", { rangeStart: "2026-10-05", rangeEnd: "2026-10-09", meeting: "lecture" }),
+      item("Lab 3", { week: 5, meeting: "lab" }),
+      item("Both", { rangeStart: "2026-10-05", rangeEnd: "2026-10-09", week: 7 }),
+      item("Backwards", { rangeStart: "2026-10-09", rangeEnd: "2026-10-05" }),
+      item("No end", { rangeStart: "2026-10-05" }),
+      item("Bad day", { rangeStart: "2026-02-30", rangeEnd: "2026-03-02" }),
+      item("Week 0", { week: 0 }), item("Week 31", { week: 31 }), item("Week text", { week: "5" }), item("Week half", { week: 5.5 }),
+      item("Bad kind", { meeting: "none" }), item("Script kind", { meeting: "<script>" }),
+      { title: "Homework 1", kind: "assignment", date: "2026-09-28", rangeStart: "2026-09-28", rangeEnd: "2026-10-02", week: 6, meeting: "lecture" },
+    ])).toEqual([
+      kept("Homework 3", { rangeStart: "2026-10-05", rangeEnd: "2026-10-09", meeting: "lecture" }),
+      kept("Lab 3", { week: 5, meeting: "lab" }),
+      kept("Both", { rangeStart: "2026-10-05", rangeEnd: "2026-10-09" }),
+      ...["Backwards", "No end", "Bad day", "Week 0", "Week 31", "Week text", "Week half", "Bad kind", "Script kind"].map((title) => kept(title, {})),
+      { title: "Homework 1", kind: "assignment", date: "2026-09-28", source: "", meeting: "lecture" },
+    ]);
+    // The same title due in two different weeks or spans is two items; the same one listed twice is still one.
+    const report = item("Lab report", { week: 3 });
+    expect(normalizeEvents([report, item("Lab report", { week: 4 }), report])).toHaveLength(2);
+    expect(normalizeEvents([item("Lab report", {}), item("Lab report", {})])).toHaveLength(1);
+  });
 });

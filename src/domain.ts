@@ -116,6 +116,12 @@ export type UploadKind = "document" | "scan" | "syllabus";
 export interface DetectedEvent extends CourseEvent {
   needsReview?: boolean;
   include?: boolean;
+  // Card 233: the span of days or week number the syllabus gave instead of a day, and the kind of class the
+  // item belongs to. services/syllabus-placement.ts turns them into a day (card 234).
+  rangeStart?: string;
+  rangeEnd?: string;
+  week?: number;
+  meeting?: ClassKind;
 }
 // A weekly class found in a syllabus (card 44). days are numbers, with 0 for Sunday. It becomes one saved
 // event per meeting between starts and ends, skipping the job's noClassDates.
