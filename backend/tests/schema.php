@@ -70,6 +70,10 @@ $tables = [
         'name' => ['varchar(255)', 'NO'], 'color' => ['char(7)', 'NO'], 'term' => ['varchar(64)', 'NO'],
         'classes_start' => ['date', 'YES'], 'classes_end' => ['date', 'YES'], 'created_at' => ['datetime', 'NO'], 'updated_at' => ['datetime', 'NO'],
     ],
+    'notely_preferences' => [
+        'user_id' => ['bigint unsigned', 'NO'], 'mode' => ["enum('system','light','dark')", 'NO'],
+        'scheme' => ["enum('sage','fjord','rose','mocha')", 'NO'], 'updated_at' => ['datetime', 'NO'],
+    ],
 ];
 foreach ($tables as $table => $columns) {
     $rows = query($db, 'SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION', [$table])->fetchAll();
