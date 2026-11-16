@@ -71,6 +71,12 @@ function noteBody(array $input): string
     return $body;
 }
 
+// The browser measures highlight positions in UTF-16 units (selectionStart/selectionEnd), where an emoji counts 2.
+function utf16Length(string $text): int
+{
+    return characterCount($text) + (int) preg_match_all('/[\x{10000}-\x{10FFFF}]/u', $text);
+}
+
 // Task #86 / Story #31: save highlight ranges and allow only supported colors.
 function noteHighlights(mixed $value, string $body): string
 {
@@ -78,7 +84,7 @@ function noteHighlights(mixed $value, string $body): string
         throw new HttpError(422, 'Send highlights as a list.');
     }
 
-    $bodyLength = characterCount($body);
+    $bodyLength = utf16Length($body);
     $highlights = [];
 
     foreach ($value as $highlight) {
@@ -484,8 +490,10 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
         $version = query($db, 'SELECT title, body FROM notely_note_versions WHERE id = ? AND note_id = ?', [$versionId, $id])->fetch();
         if (!$version) throw new HttpError(404, 'Version not found.');
         keepVersion($db, $id, $user, $version['title'], $version['body']);
-        query($db, 'UPDATE notely_notes SET title = ?, body = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-            [$version['title'], $version['body'], $id]);
+        // Versions keep no highlights, so drop the ones that no longer fit the restored text.
+        $fit = array_values(array_filter(loadNote($db, $id)['highlights'], fn ($h) => $h['end'] <= utf16Length($version['body'])));
+        query($db, 'UPDATE notely_notes SET title = ?, body = ?, highlights = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            [$version['title'], $version['body'], json_encode($fit, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), $id]);
         return ['note' => loadNote($db, $id)];
     }
     if ($route === 'note-delete') {
