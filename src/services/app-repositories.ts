@@ -92,11 +92,7 @@ export function createAppRepositories(
     courses: proxy("courses"), notes: proxy("notes"), schedule: proxy("schedule"), imports: proxy("imports"),
     async reset() {
       if (!user || !workspace || !courses) throw new Error("Sign in to continue.");
-      // shortcut: one request per note, course and event; a later card sends a single workspace-clear.
-      for (const note of await workspace.notes.list()) if (note.ownerId === user.id) await workspace.notes.delete(note.id);
-      // Deleting a course also deletes its events on the server.
-      for (const course of await courses.list()) await courses.delete(course.id);
-      for (const event of await workspace.schedule.list()) await workspace.schedule.remove(event);
+      await courses.clearWorkspace();
     },
   };
 }

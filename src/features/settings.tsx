@@ -1,5 +1,5 @@
 import { AccountSettings } from "./account";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useApp } from "../app/context";
 import { Modal, PageHeading } from "../shared/ui";
 import s from "../app/App.module.css";
@@ -58,6 +58,8 @@ export function Settings() {
   const [reset, setReset] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const clearing = useRef(false); // set at once, so a double click cannot send a second request
   const isDemo = state.user?.id === "student";
   return (
     <>
@@ -79,7 +81,7 @@ export function Settings() {
           <div className={s.settingsHeading}>
             <h2 id="data-heading">Workspace data</h2>
             <p className={s.muted}>
-              Notes, courses, and events are saved in this browser.
+              Notes, courses, and events are saved to your account.
             </p>
           </div>
           <ul className={s.settingRows}>
@@ -89,7 +91,7 @@ export function Settings() {
                 <small>
                   {isDemo
                     ? "Start again with the original sample workspace."
-                    : "Remove every note, course, and event in this browser."}
+                    : "Remove every note, course, and event from your account."}
                 </small>
               </span>
               <button className={s.secondary} onClick={() => { setError(""); setConfirmText(""); setReset(true); }}>
@@ -109,7 +111,8 @@ export function Settings() {
           title="Start fresh?"
           description={isDemo
             ? "This removes notes, comments, and events you created in this browser. It cannot be undone."
-            : "This permanently deletes the notes you own, plus the courses and events saved in this browser. It cannot be undone."}
+            : "This permanently deletes your notes, courses and events from your account. It cannot be undone."}
+          dismissible={!busy}
           onClose={() => setReset(false)}
         >
           {/* The sample workspace only resets sample data, so it skips the typed confirmation. */}
@@ -133,18 +136,25 @@ export function Settings() {
           )}
           <button
             className={s.danger}
-            disabled={!isDemo && confirmText !== "CLEAR"}
+            disabled={busy || (!isDemo && confirmText !== "CLEAR")}
             onClick={async () => {
+              if (clearing.current) return;
+              clearing.current = true;
+              setBusy(true);
+              setError("");
               try {
                 await repo.reset();
-                await refresh();
                 setReset(false);
               } catch (e) {
                 setError((e as Error).message);
+              } finally {
+                clearing.current = false;
+                setBusy(false);
+                await refresh().catch(() => undefined);
               }
             }}
           >
-            {isDemo ? "Reset workspace" : "Clear workspace"}
+            {busy ? "Clearing…" : isDemo ? "Reset workspace" : "Clear workspace"}
           </button>
         </Modal>
       )}

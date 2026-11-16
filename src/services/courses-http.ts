@@ -21,6 +21,10 @@ export function createHttpCourses(endpoint = `${import.meta.env.BASE_URL}api/ind
     async delete(id: string) {
       await send("course-delete", { id });
     },
+    // One request removes this student's notes, courses and events on the server.
+    async clearWorkspace() {
+      await send("workspace-clear", { confirm: "CLEAR" });
+    },
     // No id: a new hand-made event. An id: the whole event (hand-made or imported) is replaced, so every field is sent.
     async saveEvent({ id, courseId, title, kind, date, time, location, description, repeat }: CourseEvent) {
       return (await send<{ event: CourseEvent }>("event-save", {

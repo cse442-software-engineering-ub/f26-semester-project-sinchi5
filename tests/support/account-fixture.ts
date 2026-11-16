@@ -9,7 +9,7 @@ type Note = {
   visibility: string; tags: string[]; pinned: boolean; createdAt: string; updatedAt: string;
 };
 class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
-const IMPORT_ROUTES = ["syllabus-upload", "import-job", "import-extract", "import-confirm", "events", "event-delete", "event-save", "courses", "course-save", "course-delete"];
+const IMPORT_ROUTES = ["workspace-clear","syllabus-upload", "import-job", "import-extract", "import-confirm", "events", "event-delete", "event-save", "courses", "course-save", "course-delete"];
 // What the fake server reader "finds" in any uploaded PDF, Word file, or image.
 export const SYLLABUS_PDF_EVENTS = [
   { title: "Reading response 1", kind: "assignment", date: "2026-09-21", time: "23:59", location: "", source: "Reading response 1 due Sept. 21" },
@@ -225,6 +225,13 @@ export const test = base.extend<{ accountApi: void }>({
         jobTexts.set(job.id, Buffer.from(String(body.content), "base64").toString());
 
         return { job };
+      }
+      if (action === "workspace-clear") {
+        if (body.confirm !== "CLEAR") throw new ApiError(422, "Type CLEAR to confirm.");
+        for (const note of [...notes.values()]) if (note.ownerId === user.id) removeNote(note.id);
+        savedCourses = savedCourses.filter((c) => c.ownerId !== user!.id);
+        savedEvents = savedEvents.filter((e) => e.ownerId !== user!.id);
+        return { cleared: true };
       }
       if (action === "events") {
         return { events: savedEvents.filter((e) => e.ownerId === user!.id).map(({ ownerId: _owner, ...e }) => e) };
