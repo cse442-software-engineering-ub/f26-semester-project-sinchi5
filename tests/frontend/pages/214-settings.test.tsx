@@ -1,0 +1,76 @@
+// Frontend test: the Settings page with the API replaced. Every request must be scripted.
+import "@fontsource-variable/inter";
+import "../../../src/app/tokens.css";
+import "../../../src/app/global.css";
+import "../../../src/app/App.module.css";
+import "../../../src/app/shell.module.css";
+import { MemoryRouter } from "react-router-dom";
+import { page, test, expect } from "../../shared/runner.js";
+import { mount, stubApi, byRole, click, waitFor, pageScrollWidth } from "../harness";
+import { Provider } from "../../../src/app/context";
+import App from "../../../src/app/App";
+
+page({ card: "214", title: "Frontend: Settings in Account, Appearance and Data", kind: "frontend" });
+
+const ada = { id: "1", name: "Ada Lovelace", email: "ada@example.edu", hasPhoto: false };
+const session = { user: ada, onboarding: { completed: true, step: 3 }, csrfToken: "test-token", preferences: { mode: "light", scheme: "sage" } };
+const routes = { session, notes: { notes: [] }, events: { events: [] }, courses: { courses: [] } };
+const SET = "src/features/settings.tsx → Settings";
+const ui = (at = "/settings", width?: number) => { stubApi(routes); return mount(<MemoryRouter initialEntries={[at]}><Provider><App /></Provider></MemoryRouter>, width ? { width } : {}); };
+const body = () => document.querySelector("main") ?? document.body;
+const h2s = () => [...body().querySelectorAll("h2")].map((h) => h.textContent);
+const nav = () => document.querySelector('nav[aria-label="Settings sections"]');
+const buttons = (root: Element) => [...root.querySelectorAll("button")].map((b) => b.textContent);
+
+await test("1. The sections are not Account, Appearance, Data, Delete account in that order", SET, async () => {
+  ui();
+  await waitFor(() => nav());
+  expect(h2s().filter((t) => ["Account", "Appearance", "Data", "Delete account"].includes(t!))).toEqual(["Account", "Appearance", "Data", "Delete account"]);
+});
+await test("2. The section list has more or fewer than Account, Appearance, Data, or marks none as current", SET + " (nav)", async () => {
+  ui();
+  const list = await waitFor(() => nav());
+  expect([...list.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("aria-current")])).toEqual([["Account", "true"], ["Appearance", null], ["Data", null]]);
+});
+await test("3. ?section=data does not open Data, and clicking Appearance does not mark it", SET + " (section from the address)", async () => {
+  ui("/settings?section=data");
+  const list = await waitFor(() => nav());
+  expect(list.querySelector('[aria-current="true"]')!.textContent).toBe("Data");
+  await click([...list.querySelectorAll("a")].find((a) => a.textContent === "Appearance") as HTMLElement);
+  await waitFor(() => list.querySelector('[aria-current="true"]')!.textContent === "Appearance");
+});
+await test("4. Delete account is before Data, or still inside Account's list of actions", "src/features/account.tsx → AccountSettings (danger)", async () => {
+  ui();
+  await waitFor(() => nav());
+  const account = body().querySelector('[aria-labelledby="account-heading"]')!;
+  const data = body().querySelector('[aria-labelledby="data-heading"]')!;
+  const del = byRole("button", "Delete account")!;
+  expect([account.contains(del), !!(data.compareDocumentPosition(del) & Node.DOCUMENT_POSITION_FOLLOWING)]).toEqual([false, true]);
+  expect(buttons(account)).toEqual(["Change photo", "Edit account", "Change password", "Replace recovery code"]);
+});
+await test("5. Sign out or a course list is still on Settings", "src/features/account.tsx → AccountSettings, src/features/settings.tsx", async () => {
+  ui();
+  await waitFor(() => nav());
+  const text = body().textContent!;
+  const exact = (re: RegExp) => [...body().querySelectorAll("button, a, strong")].some((e) => re.test(e.textContent!));
+  expect([exact(/^sign out$/i), exact(/^log out$/i), /courses?\b(?!,)/i.test(text.replace("Notes, courses, and events", "")), /prototype|sample workspace/i.test(text)]).toEqual([false, false, false, false]);
+});
+await test("6. Appearance lost the Mode or Color scheme groups", "src/features/settings.tsx → Appearance", async () => {
+  ui();
+  await waitFor(() => nav());
+  const legends = [...body().querySelectorAll("fieldset legend")].map((l) => l.textContent);
+  expect(legends).toEqual(["Mode", "Color scheme"]);
+});
+await test("7. Clear workspace does not open \"Start fresh?\", or the Data line is missing", SET + " (Data)", async () => {
+  ui();
+  await waitFor(() => nav());
+  expect(body().textContent!.includes("Notes, courses, and events are saved to your account.")).toBe(true);
+  await click(byRole("button", "Clear workspace"));
+  const dialog = await waitFor(() => document.querySelector('[role="dialog"]'));
+  expect(dialog.querySelector("h2, [id]")?.textContent).toContain("Start fresh?");
+});
+await test("8. Settings scrolls sideways at 320 px", "src/features/settings.module.css", async () => {
+  ui("/settings", 320);
+  await waitFor(() => document.querySelector("iframe")!.contentDocument!.querySelector('nav[aria-label="Settings sections"]'));
+  expect(pageScrollWidth() <= 320).toBe(true);
+});
