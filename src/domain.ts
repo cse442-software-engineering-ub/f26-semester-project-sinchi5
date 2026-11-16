@@ -116,6 +116,11 @@ export type UploadKind = "document" | "scan" | "syllabus";
 export interface DetectedEvent extends CourseEvent {
   needsReview?: boolean;
   include?: boolean;
+  // Set by the reader when the file gives a span or a week and no day (date is then ""); absent otherwise.
+  rangeStart?: string;
+  rangeEnd?: string;
+  week?: number;
+  meeting?: ClassKind;
 }
 // A weekly class found in a syllabus (card 44). days are numbers, with 0 for Sunday. It becomes one saved
 // event per meeting between starts and ends, skipping the job's noClassDates.
