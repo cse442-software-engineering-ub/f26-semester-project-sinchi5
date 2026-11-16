@@ -1,16 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createRepositories, filterNotes } from "./repositories";
 import { seedNotes, dateKey } from "./fixtures";
+import { fakeApi } from "./server-testkit";
 import type { Repositories } from "../domain";
-function memory() {
-  const data = new Map<string, string>();
-  return {
-    getItem: (k: string) => data.get(k) || null,
-    setItem: (k: string, v: string) => {
-      data.set(k, v);
-    },
-  };
-}
+// Card 142: the repositories run over the server's routes; fakeApi() stands in for them with the sample courses.
+const repos = (syllabus?: object) => createRepositories(fakeApi({ syllabus }));
 
 describe("repository contracts", () => {
   it("matches one complete tag and combines it with search, course, and sorting", async () => {
@@ -27,7 +21,7 @@ describe("repository contracts", () => {
     expect(filterNotes(notes, { tag: "exam", course: "cse442", q: "plan" })).toEqual([]);
     expect(filterNotes(notes, { tag: "exam", sort: "title" }).map((n) => n.title)).toEqual(["Exam 331 review", "Exam outline"]);
 
-    const repo = createRepositories(memory(), null, false);
+    const repo = repos();
     await repo.notes.create({ title: "Half done", tags: ["50%_done"] });
     await repo.notes.create({ title: "Fifty X", tags: ["50Xdone"] });
     expect((await repo.notes.list({ tag: "50%_done" })).map((n) => n.title)).toEqual(["Half done"]);
@@ -69,45 +63,8 @@ describe("repository contracts", () => {
     );
     expect(notes[0].id).toBe("note-1");
   });
-  it("persists notes, sessions and onboarding across repository instances", async () => {
-    const storage = memory();
-    const r = createRepositories(storage);
-    await r.auth.startDemo();
-    await r.auth.completeOnboarding();
-    const n = await r.notes.create({ title: "Persistent thought" });
-    const next = createRepositories(storage);
-    expect((await next.notes.get(n.id)).title).toBe("Persistent thought");
-    expect((await next.auth.session())?.name).toBe("Erin");
-    expect((await next.auth.onboarding()).completed).toBe(true);
-    await next.auth.signOut();
-    expect(await next.auth.session()).toBeNull();
-  });
-  it("keeps history when restoring and refuses private-note comments", async () => {
-    const r = createRepositories();
-    // Task #65 requires an authenticated user for every comment attempt,
-    // so this test now starts as the demo user first - it previously
-    // exercised commenting as no one at all, which the new permission gate
-    // no longer allows.
-    await r.auth.startDemo();
-    const n = await r.notes.create({ title: "Original", body: "first" });
-    await expect(r.notes.comment(n.id, "hello")).rejects.toThrow("Share");
-    await r.notes.save({
-      ...n,
-      title: "Changed",
-      body: "second",
-      visibility: "shared",
-    });
-    await r.notes.comment(n.id, "Useful!");
-    const versions = await r.notes.versions(n.id);
-    const restored = await r.notes.restore(n.id, versions[0].id);
-    expect(restored.body).toBe("first");
-    expect(
-      (await r.notes.versions(n.id)).some((v) => v.body === "second"),
-    ).toBe(true);
-    expect(await r.notes.comments(n.id)).toHaveLength(1);
-  });
   it("validates uploads, supports partial/failure states and confirms imports", async () => {
-    const r = createRepositories();
+    const r = repos();
     expect(
       r.imports.validate({ name: "bad.exe", size: 10 }, "document"),
     ).toBeTruthy();
@@ -128,16 +85,6 @@ describe("repository contracts", () => {
     expect(queued.state).toBe("queued");
     const failed = await r.imports.process(queued, "failure");
     await expect(r.imports.confirm(failed)).rejects.toThrow();
-    const syllabus = new File(["syllabus"], "syllabus.txt");
-    const job = await r.imports.process(await r.imports.start(syllabus, "syllabus"), "partial");
-    expect(job.state).toBe("partial");
-    job.events[0].title = "Reviewed assignment";
-    await r.imports.confirm(job);
-    expect(
-      (await r.schedule.list()).some(
-        (e) => e.title === "Reviewed assignment" && e.source === "imported",
-      ),
-    ).toBe(true);
   });
   it("sends every syllabus to the server's reader with the course term's year (card 45)", async () => {
     const calls: string[] = [];
@@ -152,7 +99,7 @@ describe("repository contracts", () => {
         ] };
       },
     } as never;
-    const r = createRepositories(undefined, undefined, true, undefined, server);
+    const r = repos(server);
     const file = new File(["CSE 442 Syllabus"], "cse442-syllabus.txt");
     const queued = await r.imports.start(file, "syllabus", "success", "cse442");
     expect([queued.id, queued.state, queued.metadata.courseId]).toEqual(["7", "queued", "cse442"]);
@@ -176,7 +123,7 @@ describe("repository contracts", () => {
       extract: async () => ({ isSyllabus: true, meetings: [lecture, section("A1"), section("A2"), { ...section("R1"), title: "Recitation", kind: "recitation" }],
         noClassDates: [{ from: "2026-11-25", to: "2026-11-27" }], events: [] }),
     } as never;
-    const r = createRepositories(undefined, undefined, true, undefined, server);
+    const r = repos(server);
     const course = await r.courses.create({ code: "CSE 442", name: "Software Engineering", color: "#000000", term: "Fall 2026", classesStart: "2026-08-31", classesEnd: "2026-12-11" });
     const file = new File(["syllabus"], "syllabus.txt");
     const job = await r.imports.process(await r.imports.start(file, "syllabus", "success", course.id));
@@ -195,7 +142,7 @@ describe("repository contracts", () => {
   it("reports when the reader says a file isn't a syllabus, or finds nothing (card 44)", async () => {
     let read: unknown = { isSyllabus: false, meetings: [], noClassDates: [], events: [] };
     const server = { upload: async () => ({ id: "9" }), extract: async () => read } as never;
-    const r = createRepositories(undefined, undefined, true, undefined, server);
+    const r = repos(server);
     const file = new File(["resume"], "resume.txt");
     const notSyllabus = await r.imports.process(await r.imports.start(file, "syllabus", "success", "cse442"));
     expect([notSyllabus.state, notSyllabus.isSyllabus, notSyllabus.events, notSyllabus.meetings]).toEqual(["review", false, [], []]);
@@ -214,18 +161,33 @@ describe("repository contracts", () => {
         { title: "Final project", kind: "deadline", date: "2026-12-04", time: "", location: "", source: "" },
       ] }),
       confirm: async (...args: unknown[]) => { confirmed.push(args); return { created: 1, skipped: 0 }; },
-      events: async () => [midterm],
-    } as never;
-    const r = createRepositories(undefined, undefined, false, undefined, server);
+    };
+    const api = fakeApi({ syllabus: server, events: [midterm] });
+    const r = createRepositories(api);
     const file = new File(["syllabus"], "cse442-syllabus.txt");
     const job = await r.imports.process(await r.imports.start(file, "syllabus", "success", "cse442"));
     job.events[1].include = false;
     expect(await r.imports.confirm(job)).toEqual({ created: 1, skipped: 0, first: "2026-09-28" });
     expect(confirmed).toEqual([["9", "cse442", [{ title: "Homework 1", kind: "assignment", date: "2026-09-28", time: "", location: "" }]]]);
     expect(await r.schedule.list("2026-10-01", "2026-10-31")).toEqual([midterm]);
-    // A local edit of an imported event replaces the server copy instead of showing both.
+    // Card 142: editing an imported event saves it over the server's copy (same id), with no browser copy.
     await r.schedule.save({ ...midterm, title: "Midterm exam (room 101)" });
-    expect((await r.schedule.list()).map((e) => e.title)).toEqual(["Midterm exam (room 101)"]);
+    expect(api.calls.filter((c) => c.route === "event-save")).toEqual([{ route: "event-save", body: { ...midterm, title: "Midterm exam (room 101)" } }]);
+    expect((await r.schedule.list()).map((e) => [e.id, e.title, e.source])).toEqual([["41", "Midterm exam (room 101)", "imported"]]);
+  });
+  it("creates a hand-made event without an id and edits it with its id, repeat and description included (card 142)", async () => {
+    const api = fakeApi();
+    const r = createRepositories(api);
+    const event = { id: "", courseId: "cse442", title: "Study group", kind: "other" as const, date: "2026-11-20", time: "14:30",
+      location: "Capen 1", description: "Bring notes", source: "manual" as const, repeat: { every: 2 as const, days: [1, 3], until: "2026-12-20" } };
+    const saved = await r.schedule.save(event);
+    expect(api.calls.at(-1)).toEqual({ route: "event-save", body: { ...event, id: undefined } });
+    expect(api.calls.at(-1)!.body).not.toHaveProperty("id");
+    await r.schedule.save({ ...saved, title: "Study group (moved)" });
+    expect(api.calls.at(-1)!.body).toMatchObject({ id: saved.id, title: "Study group (moved)", description: "Bring notes", repeat: event.repeat });
+    expect((await r.schedule.list()).map((e) => e.title)).toEqual(["Study group (moved)"]);
+    await r.schedule.remove(saved);
+    expect(await r.schedule.list()).toEqual([]);
   });
   it("saves each included weekly class as one event per meeting, tied together by a series (card 46)", async () => {
     const confirmed: unknown[][] = [];
@@ -236,7 +198,7 @@ describe("repository contracts", () => {
         meetings: [lecture, { ...lecture, title: "Lab", kind: "lab", section: "A1", days: [2] }, { ...lecture, title: "Lab", kind: "lab", section: "A2", days: [4] }] }),
       confirm: async (...args: unknown[]) => { confirmed.push(args); return { created: 1, skipped: 0 }; },
     } as never;
-    const r = createRepositories(undefined, undefined, false, undefined, server);
+    const r = repos(server);
     const course = await r.courses.create({ code: "CSE 442", name: "Software Engineering", color: "#000000", term: "Fall 2026" });
     const job = await r.imports.process(await r.imports.start(new File(["syllabus"], "s.txt"), "syllabus", "success", course.id));
     // The student picks lab A2 and leaves A1 out. Series numbers count only what's included.
@@ -251,41 +213,20 @@ describe("repository contracts", () => {
       ["CSE 442 Lab A2", "lab", "2026-08-27", "10:00", "Davis 101", 1],
     ]);
   });
-  it("adds the demo's sample class to the schedule in the browser (card 46)", async () => {
-    const r = createRepositories();
-    const job = await r.imports.process(await r.imports.start(new File(["syllabus"], "s.txt"), "syllabus", "success", "cse442"));
-    expect(job.meetings!.map((m) => [m.title, m.include])).toEqual([["Lecture", true]]);
-    job.events.forEach((e) => { e.include = false; });
-    const before = (await r.schedule.list()).length;
-    const saved = await r.imports.confirm(job);
-    const added = (await r.schedule.list()).filter((e) => e.seriesId);
-    expect(added.length).toBeGreaterThan(0);
-    expect(saved.created).toBe(added.length);
-    expect((await r.schedule.list()).length).toBe(before + added.length);
-    expect(new Set(added.map((e) => e.seriesId)).size).toBe(1);
-    expect(added.every((e) => e.title === "CSE 442 Lecture" && e.kind === "lecture" && e.source === "imported")).toBe(true);
-  });
   it("passes on the reader's reason when it can't read a file (card 45)", async () => {
     const server = {
       upload: async () => ({ id: "10" }),
       extract: async () => { throw new Error("You can read 10 syllabi automatically each day. Try again tomorrow."); },
     } as never;
-    const r = createRepositories(undefined, undefined, true, undefined, server);
+    const r = repos(server);
     const file = new File(["syllabus"], "syllabus.txt");
     const queued = await r.imports.start(file, "syllabus", "success", "cse442");
     await expect(r.imports.process(queued)).rejects.toThrow("You can read 10 syllabi automatically each day. Try again tomorrow.");
   });
-  it("shows sample events in the demo, which has no server to read a file (card 45)", async () => {
-    const r = createRepositories();
-    const file = new File(["syllabus"], "syllabus.txt");
-    const job = await r.imports.process(await r.imports.start(file, "syllabus"));
-    expect(job.notice).toBe("This preview shows sample events. Sign in to read your own syllabus.");
-    expect(job.events.map((e) => e.title)).toEqual(["Assignment 1", "Midterm exam"]);
-  });
   it("names what a renamed or damaged file really is, before uploading (card 45)", async () => {
     let uploads = 0;
     const server = { upload: async () => ({ id: String(++uploads) }) } as never;
-    const r = createRepositories(undefined, undefined, true, undefined, server);
+    const r = repos(server);
     const pdf = "%PDF-1.4\n1 0 obj <<>> endobj\ntrailer <<>>\n%%EOF\n";
     for (const [name, content, message] of [
       ["syllabus.docx", pdf, "This file is named .docx, but it is really a PDF. Rename it to end in .pdf, then choose it again."],
@@ -302,7 +243,7 @@ describe("repository contracts", () => {
     expect((await r.imports.start(good, "syllabus", "success", "cse442")).id).toBe("1");
   });
   it("groups lecture folders and resolves exact lecture links", async () => {
-    const r = createRepositories();
+    const r = repos();
     const event = {
       id: "",
       courseId: "cse442",
@@ -314,6 +255,7 @@ describe("repository contracts", () => {
       location: "",
       description: "",
     };
+    await r.notes.create({ title: "Today's lecture", courseId: "cse442", lectureDate: dateKey() });
     const saved = await r.schedule.save(event);
     expect(saved.id).toBeTruthy();
     expect(await r.schedule.lectureNotes(saved)).toHaveLength(1);
@@ -324,21 +266,21 @@ describe("repository contracts", () => {
     r.imports.process(await r.imports.start(file, "document"));
   const fake = (name: string, text?: () => Promise<string>) => ({ name, size: 10, text }) as unknown as File;
   it("extracts and persists uploaded content, course and lecture date across reloads", async () => {
-    const storage = memory();
-    const r = createRepositories(storage);
+    const api = fakeApi();
+    const r = createRepositories(api);
     const text = "Course: CSE 442\nLecture date: September 14, 2026\nSprint planning notes.";
     const job = await upload(r, new File([text], "Sprint planning.txt"));
     expect(job.state).toBe("review");
     expect((await r.courses.list()).find((c) => c.id === job.metadata.courseId)?.code).toBe("CSE 442");
     expect(job.metadata.lectureDate).toBe("2026-09-14");
     await r.imports.confirm(job);
-    const reloaded = createRepositories(storage);
+    const reloaded = createRepositories(api);
     const [note] = await reloaded.notes.list({ q: "Sprint planning" });
     expect(note).toMatchObject({ body: text, courseId: "cse442", lectureDate: "2026-09-14" });
     expect((await reloaded.courses.folders("cse442"))["2026-09-14"].some((n) => n.id === note.id)).toBe(true);
   });
   it("saves missing fields as empty and excludes undated notes from date filters", async () => {
-    const r = createRepositories();
+    const r = repos();
     const job = await upload(r, new File(["No metadata here."], "Unidentified.txt"));
     expect(job.state).toBe("partial");
     expect(job.metadata).toMatchObject({ courseId: "", lectureDate: "" });
@@ -349,7 +291,7 @@ describe("repository contracts", () => {
     expect(await r.notes.list({ q: "Unidentified", from: "2026-09-14" })).toEqual([]);
   });
   it("keeps independent fields and respects corrections at review", async () => {
-    const r = createRepositories();
+    const r = repos();
     const job = await upload(r, new File(["CSE 442"], "Course only.md"));
     expect(job.metadata).toMatchObject({ courseId: "cse442", lectureDate: "" });
     job.metadata.lectureDate = "2026-09-15";
@@ -360,7 +302,7 @@ describe("repository contracts", () => {
     expect(dated.metadata).toMatchObject({ courseId: "", lectureDate: "2026-09-14" });
   });
   it("uses filenames for binary uploads and never reads them as plain text", async () => {
-    const r = createRepositories();
+    const r = repos();
     for (const extension of ["pdf", "docx", "png"]) {
       const job = await upload(r, fake(`CSE442_2026-09-14.${extension}`, async () => { throw Error("Do not read binary text"); }));
       expect(job.metadata).toMatchObject({ courseId: "cse442", lectureDate: "2026-09-14" });
@@ -369,87 +311,10 @@ describe("repository contracts", () => {
     expect(unknown.metadata).toMatchObject({ courseId: "", lectureDate: "" });
   });
   it("reports text read failures without creating a note", async () => {
-    const r = createRepositories();
+    const r = repos();
     await expect(upload(r, fake("lecture.txt", async () => { throw Error("read failed"); }))).rejects.toThrow("could not be read");
-    expect(await r.notes.list()).toHaveLength(6);
+    expect(await r.notes.list()).toHaveLength(0);
   });
-  it("recovers corrupted storage and reports write failures", async () => {
-    const r = createRepositories({
-      getItem: () => "{invalid",
-      setItem: () => {
-        throw Error("quota");
-      },
-    });
-    expect(await r.notes.list()).toHaveLength(6);
-    await expect(r.notes.create({})).rejects.toThrow("storage");
-  });
-  it("allows an edit-level collaborator to save note changes", async () => {
-    const storage = memory();
-    const owner = createRepositories(storage, { id: "owner", name: "Owner", email: "owner@example.edu", hasPhoto: false });
-
-    const note = await owner.notes.create({
-      title: "Shared Note",
-      body: "Original content",
-      visibility: "shared",
-    });
-    // Server authentication supplies the current user to the prototype workspace.
-    const r = createRepositories(storage, { id: "classmate-jamie", name: "Jamie", email: "jamie@example.edu", hasPhoto: false });
-    expect(note.ownerId).not.toBe((await r.auth.session())?.id);
-
-    await r.notes.inviteCollaborator(
-      note.id,
-      "jamie@example.edu",
-    );
-
-    await r.notes.setCollaboratorPermission(
-      note.id,
-      "classmate-jamie",
-      "edit",
-    );
-
-    const saved = await r.notes.save({
-      ...note,
-      body: "Edited by Jamie",
-    });
-
-    expect(saved.body).toBe("Edited by Jamie");
-    expect((await r.notes.get(note.id)).body).toBe("Edited by Jamie");
-  });
-  it("rejects edits from a view-level collaborator", async () => {
-    const storage = memory();
-    const owner = createRepositories(storage, { id: "owner", name: "Owner", email: "owner@example.edu", hasPhoto: false });
-
-    const note = await owner.notes.create({
-      title: "Shared Note",
-      body: "Original content",
-      visibility: "shared",
-    });
-    const r = createRepositories(storage, { id: "classmate-jamie", name: "Jamie", email: "jamie@example.edu", hasPhoto: false });
-    expect(note.ownerId).not.toBe((await r.auth.session())?.id);
-
-    await r.notes.inviteCollaborator(
-      note.id,
-      "jamie@example.edu",
-    );
-
-    await r.notes.setCollaboratorPermission(
-      note.id,
-      "classmate-jamie",
-      "view",
-    );
-
-    await expect(
-      r.notes.save({
-        ...note,
-        body: "This should not be saved",
-      }),
-    ).rejects.toThrow("permission");
-
-    expect((await r.notes.get(note.id)).body).toBe(
-      "Original content",
-    );
-  });
-
 });
 
 describe("note pinning", () => {
@@ -473,191 +338,11 @@ describe("note pinning", () => {
     },
   );
 
-  it("persists pin and unpin without changing edit dates, history or normal order", async () => {
-    const storage = memory();
-    const r = createRepositories(storage);
-    const note = await r.notes.create({ title: "Test Note A", updatedAt: "2020-01-01T00:00:00.000Z" });
-    const originalOrder = (await r.notes.list()).map((n) => n.id);
-    const versions = await r.notes.versions(note.id);
-    expect(note.pinned).toBe(false);
-    await r.notes.setPinned(note.id, true);
-    const reopened = createRepositories(storage);
-    expect(await reopened.notes.get(note.id)).toEqual({ ...note, pinned: true });
-    await reopened.notes.setPinned(note.id, false);
-    const next = createRepositories(storage);
-    expect(await next.notes.get(note.id)).toEqual(note);
-    expect((await next.notes.list()).map((n) => n.id)).toEqual(originalOrder);
-    expect(await next.notes.versions(note.id)).toEqual(versions);
-  });
-
-  it("preserves pinning through edits and history restoration", async () => {
-    const r = createRepositories();
-    const n = await r.notes.create({ title: "Original", body: "first" });
-    const pinned = await r.notes.setPinned(n.id, true);
-    await r.notes.save({ ...pinned, body: "second" });
-    const [version] = await r.notes.versions(n.id);
-    expect((await r.notes.restore(n.id, version.id)).pinned).toBe(true);
-    expect((await r.notes.get(n.id)).body).toBe("first");
-  });
-
   it("treats older notes without a pinned field as unpinned", () => {
     const notes = seedNotes().map((n) => ({ ...n, pinned: false }));
     Reflect.deleteProperty(notes[0], "pinned");
     notes[2].pinned = true;
     expect(filterNotes(notes)[0].id).toBe(notes[2].id);
     expect(filterNotes(notes)[1].id).toBe(notes[0].id);
-  });
-
-  it("rolls back a failed pin write and rejects unknown notes", async () => {
-    const data = memory();
-    let fail = false;
-    const r = createRepositories({
-      getItem: data.getItem,
-      setItem: (key, value) => {
-        if (fail) throw Error("quota");
-        data.setItem(key, value);
-      },
-    });
-    const n = await r.notes.create({ title: "Test Note A" });
-    fail = true;
-    await expect(r.notes.setPinned(n.id, true)).rejects.toThrow("storage");
-    expect(await r.notes.get(n.id)).toEqual(n);
-    expect(await createRepositories(data).notes.get(n.id)).toEqual(n);
-    await expect(r.notes.setPinned("missing", true)).rejects.toThrow("found");
-  });
-});
-
-describe("note deletion (task #115)", () => {
-  const student = { id: "student-a", name: "Student A", email: "a@example.edu", hasPhoto: false };
-  const titles = async (r: Repositories) =>
-    (await r.notes.list()).map((n) => n.title).sort();
-
-  it("Test 1 - a deleted note is no longer listed or returned by ID", async () => {
-    const r = createRepositories(memory(), student, false);
-    const biology = await r.notes.create({ title: "Biology lab draft" });
-    await r.notes.create({ title: "Calculus review" });
-    await r.notes.create({ title: "Meeting agenda" });
-    await expect(r.notes.delete(biology.id)).resolves.toBeUndefined();
-    expect(await titles(r)).toEqual(["Calculus review", "Meeting agenda"]);
-    await expect(r.notes.get(biology.id)).rejects.toThrow("This note could not be found.");
-  });
-
-  it("Test 2 - removes the note's comments, versions, and collaborators and nothing else", async () => {
-    const storage = memory();
-    const stored = () => JSON.parse(storage.getItem("notely-data-v1")!);
-    const r = createRepositories(storage, student, false);
-    const shared = await r.notes.create({ title: "Group project plan", visibility: "shared" });
-    for (const body of ["Draft one", "Draft two", "Draft three"])
-      await r.notes.save({ ...(await r.notes.get(shared.id)), body });
-    await r.notes.comment(shared.id, "Looks good.");
-    await r.notes.comment(shared.id, "Added the timeline.");
-    await r.notes.inviteCollaborator(shared.id, "jamie@example.edu");
-    const other = await r.notes.create({ title: "Calculus review", visibility: "shared" });
-    await r.notes.save({ ...other, body: "Limits" });
-    await r.notes.comment(other.id, "Keep this one.");
-    const before = stored();
-    expect(before.comments.filter((c: { noteId: string }) => c.noteId === shared.id)).toHaveLength(2);
-    expect(await r.notes.versions(shared.id)).toHaveLength(3);
-    expect(await r.notes.collaborators(shared.id)).toHaveLength(1);
-
-    await r.notes.delete(shared.id);
-
-    const after = stored();
-    expect(JSON.stringify(after)).not.toContain(shared.id);
-    expect(await r.notes.collaborators(shared.id)).toEqual([]);
-    expect(after.comments).toEqual(before.comments.filter((c: { noteId: string }) => c.noteId === other.id));
-    expect(after.versions).toEqual(before.versions.filter((v: { noteId: string }) => v.noteId === other.id));
-    expect(after.comments).toHaveLength(1);
-    expect(after.versions).toHaveLength(1);
-  });
-
-  it("Test 3 - deleting a missing note rejects and leaves other notes alone", async () => {
-    const r = createRepositories(memory(), student, false);
-    await r.notes.create({ title: "Biology lab draft" });
-    await r.notes.create({ title: "Calculus review" });
-    await expect(r.notes.delete("missing-note")).rejects.toThrow("This note could not be found.");
-    expect(await titles(r)).toEqual(["Biology lab draft", "Calculus review"]);
-  });
-
-  it("Test 4 - a failed storage write keeps the note, its comment, and its version", async () => {
-    const data = memory();
-    let failNext = false;
-    const r = createRepositories({
-      getItem: data.getItem,
-      setItem: (key, value) => {
-        if (failNext) {
-          failNext = false;
-          throw Error("quota");
-        }
-        data.setItem(key, value);
-      },
-    }, student, false);
-    const note = await r.notes.create({ title: "Calculus review", visibility: "shared" });
-    await r.notes.save({ ...note, body: "Limits" });
-    await r.notes.comment(note.id, "Great summary.");
-    failNext = true;
-    await expect(r.notes.delete(note.id)).rejects.toThrow(
-      "Your browser storage is full or unavailable. Changes could not be saved.",
-    );
-    expect(await titles(r)).toEqual(["Calculus review"]);
-    expect(await r.notes.comments(note.id)).toHaveLength(1);
-    expect(await r.notes.versions(note.id)).toHaveLength(1);
-    const reloaded = createRepositories(data, student, false);
-    expect(await titles(reloaded)).toEqual(["Calculus review"]);
-    expect(await reloaded.notes.comments(note.id)).toHaveLength(1);
-  });
-});
-
-describe("owner-only note deletion (task #116)", () => {
-  const studentA = { id: "student-a", name: "Student A", email: "a@example.edu", hasPhoto: false };
-  // The collaborator mock only knows Jamie, so Jamie plays Student B. Its
-  // invitations are kept in memory per repository instance, so each signed-in
-  // instance records the share itself, as in the edit-permission tests above.
-  const studentB = { id: "classmate-jamie", name: "Jamie", email: "jamie@example.edu", hasPhoto: false };
-
-  it("Test 1 - the owner can delete their own note", async () => {
-    const r = createRepositories(memory(), studentA, false);
-    const note = await r.notes.create({ title: "Owner's note" });
-    await expect(r.notes.delete(note.id)).resolves.toBeUndefined();
-    expect((await r.notes.list()).map((n) => n.title)).not.toContain("Owner's note");
-  });
-
-  it("Test 2 - edit and view collaborators cannot delete a note they do not own", async () => {
-    const storage = memory();
-    const a = createRepositories(storage, studentA, false);
-    const note = await a.notes.create({ title: "Group project plan", body: "Milestones", visibility: "shared" });
-    await a.notes.comment(note.id, "Please review the timeline.");
-    await a.notes.inviteCollaborator(note.id, studentB.email);
-    await a.notes.setCollaboratorPermission(note.id, studentB.id, "edit");
-    const collaborators = await a.notes.collaborators(note.id);
-
-    const b = createRepositories(storage, studentB, false);
-    await b.notes.inviteCollaborator(note.id, studentB.email);
-    for (const permission of ["edit", "view"] as const) {
-      await b.notes.setCollaboratorPermission(note.id, studentB.id, permission);
-      await expect(b.notes.delete(note.id)).rejects.toThrow("Only the note's owner can delete it.");
-    }
-
-    const reloaded = createRepositories(storage, studentA, false);
-    expect(await reloaded.notes.get(note.id)).toEqual(note);
-    expect((await reloaded.notes.comments(note.id)).map((c) => c.body)).toEqual(["Please review the timeline."]);
-    expect(await a.notes.collaborators(note.id)).toEqual(collaborators);
-  });
-
-  it("Test 3 - signed-out and forged requests cannot delete a note", async () => {
-    const storage = memory();
-    const a = createRepositories(storage, studentA, false);
-    const note = await a.notes.create({ title: "Calculus review" });
-
-    const signedOut = createRepositories(storage, null, false);
-    await expect(signedOut.notes.delete(note.id)).rejects.toThrow("Sign in to continue.");
-
-    // delete(id) has no owner parameter; this cast smuggles one in anyway.
-    const b = createRepositories(storage, studentB, false);
-    const forged = b.notes.delete as unknown as (id: string, request: { ownerId: string }) => Promise<void>;
-    await expect(forged(note.id, { ownerId: studentA.id })).rejects.toThrow("Only the note's owner can delete it.");
-
-    const reloaded = createRepositories(storage, studentA, false);
-    expect((await reloaded.notes.list()).map((n) => n.title)).toEqual(["Calculus review"]);
   });
 });

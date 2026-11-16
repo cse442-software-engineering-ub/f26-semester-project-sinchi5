@@ -1,96 +1,84 @@
-import type { AuthRepository, Course, NoteRepository, Repositories, User } from "../domain";
+import type { AuthRepository, NoteRepository, Repositories, User } from "../domain";
 import { createAuthRepository } from "./auth";
 import { createHttpNotes } from "./notes-http";
 import { createHttpSyllabus, type SyllabusApi } from "./imports-http";
+import { createHttpCourses, type CoursesApi } from "./courses-http";
 import { createRepositories } from "./repositories";
+import { adoptBrowserWorkspace, workspaceKey } from "./adopt-browser-workspace";
 
+// Card 142: everything a signed-in student keeps is on the server; nothing is stored in this browser.
 export function createAppRepositories(
-  storage: Storage,
-  tabStorage: Storage,
   serverAuth = createAuthRepository(),
-  // Signed-in accounts keep notes on the server (task #120); tests pass a stand-in.
-  serverNotes: (user: User, courses: () => Promise<Course[]>) => NoteRepository = (_user, courses) => createHttpNotes(courses),
-  // Signed-in accounts upload syllabi to the server (card 45); tests pass a stand-in.
+  // Tests pass stand-ins for the server's notes (task #120), syllabus uploads (card 45) and courses and events (card 142).
+  serverNotes: (user: User) => NoteRepository = () => createHttpNotes(async () => []),
   serverSyllabus: () => SyllabusApi = () => createHttpSyllabus(),
+  serverCourses: () => CoursesApi = () => createHttpCourses(),
+  // Only read for the one-time adoption of old browser data.
+  storage?: Storage,
 ): Repositories {
-  let demo = tabStorage.getItem("notely-demo") === "true";
   let user: User | null = null;
-  let activeId = "";
   let generation = 0;
-  let workspace = createRepositories();
+  let workspace: ReturnType<typeof createRepositories> | undefined;
+  let courses: CoursesApi | undefined;
+  let adoption: { userId: string; done: Promise<void> } | undefined;
   function select(nextUser: User | null) {
     const previous = user;
     user = nextUser;
-    const id = demo ? "demo" : nextUser?.id || "";
-    if (id === activeId) {
-      if (previous && nextUser) { Object.assign(previous, nextUser); user = previous; }
-      return;
-    }
-    activeId = id;
-    // Prototype content is separated per account; it is not server-backed private storage.
-    const key = demo ? "notely-data-v1" : `notely-workspace-v1-${id}`;
-    const adapter = id ? {
-      getItem: () => storage.getItem(key),
-      setItem: (_key: string, value: string) => {
-        const { user: _user, completed: _completed, ...data } = JSON.parse(value);
-        storage.setItem(key, JSON.stringify(data));
-      },
-    } : undefined;
-    const notes = nextUser && !demo ? serverNotes(nextUser, () => next.courses.list()) : undefined;
-    const next = createRepositories(adapter, nextUser, demo, notes, nextUser && !demo ? serverSyllabus() : undefined);
-    workspace = next;
+    if (previous && nextUser && previous.id === nextUser.id) { Object.assign(previous, nextUser); user = previous; return; }
+    if (previous?.id === nextUser?.id) return;
+    const notes = nextUser ? serverNotes(nextUser) : undefined;
+    courses = notes ? serverCourses() : undefined;
+    workspace = notes && courses ? createRepositories({ notes, syllabus: serverSyllabus(), courses }) : undefined;
   }
-  const demoUser: User = { id: "student", name: "Erin", email: "demo@example.edu", hasPhoto: false };
-  const leaveDemo = () => { generation++; demo = false; tabStorage.removeItem("notely-demo"); select(null); };
+  // Runs once per page load for each account, before its courses and events are first listed.
+  function adopt(signedIn: User) {
+    if (adoption?.userId !== signedIn.id && courses) {
+      adoption = { userId: signedIn.id, done: adoptBrowserWorkspace(signedIn.id, courses, storage).catch(() => undefined) };
+    }
+    return adoption?.done;
+  }
+  const forget = () => { generation++; select(null); };
   const auth: AuthRepository = {
     async session() {
       const version = generation;
       try {
-        const result = demo ? demoUser : await serverAuth.session();
+        const result = await serverAuth.session();
         if (version === generation) select(result);
+        if (version === generation && user) await adopt(user);
         return user;
       } catch (error) {
         if (version !== generation) return user;
         select(null); throw error;
       }
     },
-    async onboarding() { return demo ? { completed: true, step: 3 } : serverAuth.onboarding(); },
-    async startDemo() {
-      generation++; demo = true; tabStorage.setItem("notely-demo", "true"); select(demoUser);
-      await workspace.auth.startDemo();
-    },
-    async signIn(email, password) { leaveDemo(); const result = await serverAuth.signIn(email, password); select(result); return result; },
-    async signUp(name, email, password) { leaveDemo(); const result = await serverAuth.signUp(name, email, password); select(result.user); return result; },
-    async signOut() { if (!demo) await serverAuth.signOut(); leaveDemo(); },
-    async completeOnboarding() { if (!demo) await serverAuth.completeOnboarding(); },
+    async onboarding() { return serverAuth.onboarding(); },
+    async signIn(email, password) { forget(); const result = await serverAuth.signIn(email, password); select(result); return result; },
+    async signUp(name, email, password) { forget(); const result = await serverAuth.signUp(name, email, password); select(result.user); return result; },
+    async signOut() { await serverAuth.signOut(); forget(); },
+    async completeOnboarding() { await serverAuth.completeOnboarding(); },
     async updateProfile(name, email, password) { const result = await serverAuth.updateProfile(name, email, password); select(result); return result; },
     async changePassword(currentPassword, password) { await serverAuth.changePassword(currentPassword, password); },
-    async uploadProfilePhoto(content) {
-      if (demo) throw new Error("Demo accounts cannot be changed.");
-      const result = await serverAuth.uploadProfilePhoto(content); select(result); return result;
-    },
-    async removeProfilePhoto() {
-      if (demo) throw new Error("Demo accounts cannot be changed.");
-      const result = await serverAuth.removeProfilePhoto(); select(result); return result;
-    },
-    async resetPassword(email, recoveryCode, password) { leaveDemo(); const code = await serverAuth.resetPassword(email, recoveryCode, password); select(null); return code; },
+    async uploadProfilePhoto(content) { const result = await serverAuth.uploadProfilePhoto(content); select(result); return result; },
+    async removeProfilePhoto() { const result = await serverAuth.removeProfilePhoto(); select(result); return result; },
+    async resetPassword(email, recoveryCode, password) { forget(); const code = await serverAuth.resetPassword(email, recoveryCode, password); select(null); return code; },
     async replaceRecoveryCode(password) { return serverAuth.replaceRecoveryCode(password); },
     async deleteAccount(password) {
       await serverAuth.deleteAccount(password);
-      const deletedUser = user;
-      select(null);
-      if (deletedUser) {
-        try { storage.removeItem(`notely-workspace-v1-${deletedUser.id}`); }
+      const deleted = user;
+      forget();
+      // Old browser data of a deleted account is never adopted, so it goes too.
+      if (deleted) {
+        try { (storage ?? localStorage).removeItem(workspaceKey(deleted.id)); }
         catch { /* The server account is already deleted; never leave it signed in. */ }
       }
     },
   };
-  // Each call uses the current workspace, never a repository left over from another account.
+  // Each call uses the current account's workspace, never one left over from another account.
   function proxy<K extends "courses" | "notes" | "schedule" | "imports">(key: K): Repositories[K] {
     return new Proxy({} as Repositories[K], {
       get(_target, method) {
         return (...args: unknown[]) => {
-          if (!activeId) return Promise.reject(new Error("Sign in to continue."));
+          if (!workspace) return Promise.reject(new Error("Sign in to continue."));
           const target = workspace[key] as unknown as Record<string | symbol, (...values: unknown[]) => unknown>;
           return target[method](...args);
         };
@@ -101,12 +89,12 @@ export function createAppRepositories(
     auth,
     courses: proxy("courses"), notes: proxy("notes"), schedule: proxy("schedule"), imports: proxy("imports"),
     async reset() {
-      // Clearing a signed-in workspace also deletes the notes this account owns on the server.
-      if (!demo && user) {
-        for (const note of await workspace.notes.list()) if (note.ownerId === user.id) await workspace.notes.delete(note.id);
-      }
-      await workspace.reset();
-      if (demo) leaveDemo();
+      if (!user || !workspace || !courses) throw new Error("Sign in to continue.");
+      // shortcut: one request per note, course and event; a later card sends a single workspace-clear.
+      for (const note of await workspace.notes.list()) if (note.ownerId === user.id) await workspace.notes.delete(note.id);
+      // Deleting a course also deletes its events on the server.
+      for (const course of await courses.list()) await courses.delete(course.id);
+      for (const event of await workspace.schedule.list()) await workspace.schedule.remove(event);
     },
   };
 }

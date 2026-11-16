@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { commentWorld } from "./comments-testkit";
-import { createRepositories } from "./repositories";
 import type { Comment } from "../domain";
 
 // Task #65: comment permission enforcement.
@@ -87,20 +86,5 @@ describe("comment permission enforcement", () => {
     const note = w.addNote({ ownerEmail: "owner@example.edu" });
     const posted = await w.repo.comment(note.id, "Note to self.");
     expect(posted.author).toBe("Owner Person");
-  });
-
-  it("Test 5 (extra) - a note created through the repository records its owner, who can comment on it", async () => {
-    // Uses the real repository wiring, signed in as the demo user - the one
-    // identity the mock repository still supports.
-    const r = createRepositories();
-    await r.auth.startDemo();
-    const note = await r.notes.create({
-      title: "Shared note",
-      body: "Original content",
-      visibility: "shared",
-    });
-    expect(note.ownerEmail).toBe("erin@example.edu");
-    const posted = await r.notes.comment(note.id, "Note to self.");
-    expect(posted.author).toBe("Erin");
   });
 });

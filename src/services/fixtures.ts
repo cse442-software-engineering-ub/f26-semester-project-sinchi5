@@ -1,4 +1,4 @@
-import type { Course, Note, CourseEvent, Comment } from "../domain";
+import type { Course, Note } from "../domain";
 export function dateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
@@ -82,91 +82,5 @@ export function seedNotes(): Note[] {
     createdAt: `${offsetDate(-i - 3)}T12:00:00`,
     updatedAt: `${offsetDate(-i)}T14:30:00`,
     pinned: i < 2,
-  }));
-}
-export function seedComments(): Comment[] {
-  return [
-    {
-      id: "comment-1",
-      noteId: "note-1",
-      author: "Jamie",
-      authorId: "classmate-jamie",
-      body: "This explanation helped me.",
-      createdAt: `${offsetDate(-2)}T09:15:00`,
-    },
-    {
-      id: "comment-2",
-      noteId: "note-1",
-      author: "Alex Morgan",
-      authorId: "classmate-alex",
-      body: "The distinction between a sprint review and retrospective finally clicked. Thanks for sharing!",
-      createdAt: `${offsetDate(-1)}T16:40:00`,
-    },
-  ];
-}
-export function seedEvents(): CourseEvent[] {
-  return [
-    {
-      title: "Software Engineering",
-      courseId: "cse442",
-      kind: "lecture",
-      date: offsetDate(0),
-      time: "10:00",
-      location: "Davis Hall · 101",
-    },
-    {
-      title: "Algorithms & Complexity",
-      courseId: "cse331",
-      kind: "lecture",
-      date: offsetDate(0),
-      time: "13:00",
-      location: "Norton Hall · 112",
-    },
-    {
-      title: "Sprint 1 · user stories",
-      courseId: "cse442",
-      kind: "assignment",
-      date: offsetDate(1),
-      time: "23:59",
-      location: "",
-    },
-    {
-      title: "Memory & cognition quiz",
-      courseId: "psy101",
-      kind: "quiz",
-      date: offsetDate(2),
-      time: "11:00",
-      location: "Capen Hall",
-    },
-    {
-      title: "Problem set 3",
-      courseId: "mth241",
-      kind: "deadline",
-      date: offsetDate(4),
-      time: "23:59",
-      location: "",
-    },
-    {
-      title: "Algorithms midterm",
-      courseId: "cse331",
-      kind: "exam",
-      date: offsetDate(7),
-      time: "13:00",
-      location: "Norton Hall",
-    },
-    {
-      title: "Software Engineering",
-      courseId: "cse442",
-      kind: "lecture",
-      date: offsetDate(3),
-      time: "10:00",
-      location: "Davis Hall · 101",
-    },
-  ].map((e, i) => ({
-    ...e,
-    kind: e.kind as CourseEvent["kind"],
-    id: `event-${i}`,
-    description: "Bring your notes and a curious mind.",
-    source: i > 1 ? "imported" : "manual",
   }));
 }

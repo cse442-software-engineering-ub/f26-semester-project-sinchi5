@@ -19,7 +19,7 @@ const SHELL = "src/app/App.tsx → App";
 const MENU_CSS = "src/app/shell.module.css → .sidebar, .tabbar, .fab, .menu";
 
 const ui = (path = "/") => <MemoryRouter initialEntries={[path]}><Provider><App /></Provider></MemoryRouter>;
-const routes = { session: signedIn, notes: { notes: [] }, events: { events: [] } };
+const routes = { session: signedIn, notes: { notes: [] }, events: { events: [] }, courses: { courses: [] } };
 const shown = (e: Element) => e.getClientRects().length > 0;
 // Elements of the shell that are on the screen (the shell keeps a desktop and a phone copy and hides one with CSS).
 const within = (root: ParentNode, sel: string) => [...root.querySelectorAll<HTMLElement>(sel)].filter(shown);
@@ -95,8 +95,7 @@ await test("8. Courses has no heading, Add course button or empty state", "src/f
   await waitFor(() => byRole("dialog", "Add a course"));
 });
 await test("9. A course does not appear as a card linking to its page", "src/features/courses.tsx → Courses", async () => {
-  stubApi(routes);
-  localStorage.setItem("notely-workspace-v1-1", JSON.stringify({ notes: [], events: [], courses: [{ id: "c1", code: "CSE 442", name: "Software Engineering", color: "#869D7A", term: "Fall 2026" }] }));
+  stubApi({ ...routes, courses: { courses: [{ id: "c1", code: "CSE 442", name: "Software Engineering", color: "#869D7A", term: "Fall 2026" }] } });
   const root = mount(ui("/courses"));
   const card = await waitFor(() => root.querySelector('main a[href="/courses/c1"]'));
   expect((card.textContent ?? "").includes("CSE 442")).toBe(true);

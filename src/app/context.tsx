@@ -39,7 +39,7 @@ const Context = createContext<{
   setError: (error: string) => void;
 }>(null!);
 export function Provider({ children }: { children: ReactNode }) {
-  const repo = useMemo(() => createAppRepositories(localStorage, sessionStorage), []);
+  const repo = useMemo(() => createAppRepositories(), []);
   const [state, dispatch] = useReducer(
     (s: State, a: Partial<State>) => ({ ...s, ...a }),
     initial,
@@ -84,7 +84,9 @@ export function Provider({ children }: { children: ReactNode }) {
     void refresh();
     const recheck = () => { if (document.visibilityState === "visible") void refresh(); };
     window.addEventListener("focus", recheck);
-    return () => window.removeEventListener("focus", recheck);
+    // Card 142: changes made on another device show up within 30 seconds while this tab is visible.
+    const timer = setInterval(recheck, 30000);
+    return () => { window.removeEventListener("focus", recheck); clearInterval(timer); };
   }, []);
   useEffect(() => {
     const media = matchMedia("(prefers-color-scheme: dark)");

@@ -9,7 +9,7 @@ type Note = {
   visibility: string; tags: string[]; pinned: boolean; createdAt: string; updatedAt: string;
 };
 class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
-const IMPORT_ROUTES = ["syllabus-upload", "import-job", "import-extract", "import-confirm", "events", "event-delete"];
+const IMPORT_ROUTES = ["syllabus-upload", "import-job", "import-extract", "import-confirm", "events", "event-delete", "event-save", "courses", "course-save", "course-delete"];
 // What the fake server reader "finds" in any uploaded PDF, Word file, or image.
 export const SYLLABUS_PDF_EVENTS = [
   { title: "Reading response 1", kind: "assignment", date: "2026-09-21", time: "23:59", location: "", source: "Reading response 1 due Sept. 21" },
@@ -167,6 +167,7 @@ export const test = base.extend<{ accountApi: void }>({
     const jobs = new Map<string, { id: string; ownerId: string; courseId: string; name: string; type: string; state: string; events: unknown[] }>();
     const jobTexts = new Map<string, string>();
     let savedEvents: Record<string, string>[] = [];
+    let savedCourses: Record<string, string>[] = [];
     function importRoute(action: string, query: URLSearchParams, body: Record<string, unknown>) {
       if (!user) throw new ApiError(401, "Sign in to continue.");
       if (action === "syllabus-upload") {
@@ -226,6 +227,37 @@ export const test = base.extend<{ accountApi: void }>({
       }
       if (action === "events") {
         return { events: savedEvents.filter((e) => e.ownerId === user!.id).map(({ ownerId: _owner, ...e }) => e) };
+      }
+      // Card 141 courses and hand-made events, kept in memory like the PHP routes.
+      if (action === "courses") return { courses: savedCourses.filter((c) => c.ownerId === user!.id).map(({ ownerId: _owner, ...c }) => c) };
+      if (action === "course-save") {
+        const { id, code, name, color, term, classesStart, classesEnd } = body as Record<string, string>;
+        const own = savedCourses.find((c) => c.id === id);
+        if (own && own.ownerId !== user.id) throw new ApiError(404, "This course could not be found.");
+        if (!code || !name || !term) throw new ApiError(422, "Fill in the course code, name and term.");
+        const course = { id: id || `c${nextId++}`, ownerId: user.id, code, name, color, term,
+          ...(classesStart ? { classesStart } : {}), ...(classesEnd ? { classesEnd } : {}) };
+        savedCourses = [...savedCourses.filter((c) => c.id !== course.id), course];
+        const { ownerId: _owner, ...json } = course;
+        return { course: json };
+      }
+      if (action === "course-delete") {
+        if (!savedCourses.some((c) => c.id === String(body.id) && c.ownerId === user!.id)) throw new ApiError(404, "This course could not be found.");
+        savedCourses = savedCourses.filter((c) => c.id !== String(body.id));
+        savedEvents = savedEvents.filter((e) => e.courseId !== String(body.id) || e.ownerId !== user!.id);
+        return { deleted: true };
+      }
+      if (action === "event-save") {
+        if (!/^[A-Za-z0-9_-]{1,64}$/.test(String(body.courseId ?? ""))) throw new ApiError(422, "Choose a course for this event.");
+        if (body.id !== undefined && !/^\d+$/.test(String(body.id))) throw new ApiError(422, "Choose a valid event.");
+        const old = body.id === undefined ? undefined : savedEvents.find((e) => e.id === String(body.id) && e.ownerId === user!.id);
+        if (body.id !== undefined && !old) throw new ApiError(404, "This event could not be found.");
+        const { repeat, ...fields } = body as Record<string, string>;
+        const event = { ...fields, id: old?.id ?? String(nextId++), ownerId: user.id, source: old?.source ?? "manual",
+          seriesId: old?.seriesId ?? null, ...(repeat ? { repeat } : {}) } as Record<string, string>;
+        savedEvents = [...savedEvents.filter((e) => e !== old), event];
+        const { ownerId: _owner, ...json } = event;
+        return { event: json };
       }
       // Like the PHP route (card 172): another student's event looks the same as a missing one.
       if (action === "event-delete") {

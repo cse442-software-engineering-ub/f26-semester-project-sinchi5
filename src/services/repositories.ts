@@ -1,67 +1,18 @@
-import { checklistPayload } from "./checklists";
 import type {
   Repositories,
   Note,
-  NoteVersion,
-  Comment,
-  CourseEvent,
   UploadJob,
-  User,
-  Course,
   NoteQuery,
-  Collaborator,
   NoteRepository,
   DetectedEvent,
   DetectedMeeting,
 } from "../domain";
 import type { SyllabusApi } from "./imports-http";
+import type { CoursesApi } from "./courses-http";
 import { meetingDates, normalizeBreaks, normalizeEvents, normalizeMeetings } from "./syllabus";
 import { fileTypeProblem } from "./syllabus-file";
-import { createMockCollaborators } from "./collaborators.mock";
-import { createMockComments } from "./comments.mock";
-import {
-  courses,
-  seedNotes,
-  seedEvents,
-  seedComments,
-  dateKey,
-  offsetDate,
-} from "./fixtures";
+import { dateKey } from "./fixtures";
 import { detectNoteMetadata } from "./noteMetadata";
-interface Store {
-  user: User | null;
-  completed: boolean;
-  courses: Course[];
-  notes: Note[];
-  events: CourseEvent[];
-  comments: Comment[];
-  versions: NoteVersion[];
-}
-const empty = (): Store => ({
-  user: null,
-  completed: false,
-  courses: [],
-  notes: [],
-  events: [],
-  comments: [],
-  versions: [],
-});
-const initial = (sample = true): Store => sample ? ({
-  user: null,
-  completed: false,
-  courses: [...courses],
-  notes: seedNotes(),
-  events: seedEvents(),
-  comments: seedComments(),
-  versions: seedNotes().map((n) => ({
-    id: `version-${n.id}`,
-    noteId: n.id,
-    title: n.title,
-    body: n.body.split("\n\n")[0],
-    author: "You",
-    createdAt: n.createdAt,
-  })),
-}) : empty();
 export function filterNotes(
   notes: Note[],
   query: NoteQuery = {},
@@ -91,108 +42,19 @@ export function filterNotes(
           : b.updatedAt.localeCompare(a.updatedAt)),
     );
 }
-export function createRepositories(
-  storage?: Pick<Storage, "getItem" | "setItem">,
-  authenticatedUser?: User | null,
-  // Sample content is for the demo; real accounts start with an empty workspace.
-  sample = true,
-  // Signed-in accounts keep notes on the server; courses and events stay here.
-  serverNotes?: NoteRepository,
-  // Signed-in accounts upload syllabi to the server (cards 43 and 45).
-  serverSyllabus?: SyllabusApi,
-): Repositories {
-  let db = initial(sample);
-  try {
-    const saved = storage?.getItem("notely-data-v1");
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed.notes) && Array.isArray(parsed.courses))
-        db = parsed;
-    }
-  } catch {
-    /* Recover from unavailable or corrupted storage. */
-  }
-  if (authenticatedUser !== undefined) db.user = authenticatedUser;
-  // Legacy prototype notes belong to the seeded student account.
-  db.notes = db.notes.map((note) => ({ ...note, ownerId: note.ownerId ?? authenticatedUser?.id ?? "student" }));
-  let committed = structuredClone(db);
-  const persist = () => {
-    try {
-      storage?.setItem("notely-data-v1", JSON.stringify(db));
-      committed = structuredClone(db);
-    } catch {
-      // Restore in place: the comment mock holds this same object.
-      Object.assign(db, structuredClone(committed));
-      throw new Error(
-        "Your browser storage is full or unavailable. Changes could not be saved.",
-      );
-    }
-  };
-  const id = () => crypto.randomUUID();
-  const now = () => new Date().toISOString();
-  const get = (noteId: string) => {
-    const n = db.notes.find((n) => n.id === noteId);
-    if (!n) throw new Error("This note could not be found.");
-    return n;
-  };
-  // Card 45: the server's reader (Gemini, card 127) reads every syllabus. When it can't, its message goes
-  // to the student. The demo has no server, so it shows sample results.
-  async function readSyllabus(jobId: string, year: number) {
-    if (!serverSyllabus) {
-      return { notice: "This preview shows sample events. Sign in to read your own syllabus.",
-        isSyllabus: true, noClassDates: [], meetings: [
-          { title: "Lecture", kind: "lecture", section: "", days: [1, 3], time: "10:00", location: "Room 101", firstDate: offsetDate(1), lastDate: offsetDate(30), source: "Detected from syllabus." },
-        ], events: [
-          { title: "Assignment 1", kind: "assignment", date: offsetDate(7), time: "23:59", source: "Detected from syllabus. Review before saving." },
-          { title: "Midterm exam", kind: "exam", date: offsetDate(21), time: "10:00", source: "Detected from syllabus." },
-        ] };
-    }
-    return serverSyllabus.extract(jobId, year);
-  }
-  let invitations = new Map<string, Collaborator[]>();
-  const repo: Repositories = {
-    auth: {
-      async session() {
-        return db.user;
-      },
-      async signIn() {
-        throw new Error("Use the PHP account service to sign in.");
-      },
-      async startDemo() {
-        const email = "erin@example.edu";
-        const name = "Erin";
-        db.user = { id: "student", email, name: name || email.split("@")[0], hasPhoto: false };
-        persist();
-      },
-      async signUp() { throw new Error("Use the PHP account service to create accounts."); },
-      async updateProfile() { throw new Error("Demo accounts cannot be changed."); },
-      async uploadProfilePhoto() { throw new Error("Demo accounts cannot be changed."); },
-      async removeProfilePhoto() { throw new Error("Demo accounts cannot be changed."); },
-      async changePassword() { throw new Error("Demo accounts cannot be changed."); },
-      async resetPassword() { throw new Error("Use the PHP account service for recovery."); },
-      async replaceRecoveryCode() { throw new Error("Demo accounts cannot be changed."); },
-      async deleteAccount() { throw new Error("Demo accounts cannot be changed."); },
-      async signOut() {
-        db.user = null;
-        persist();
-      },
-      async onboarding() {
-        return { completed: db.completed, step: db.completed ? 3 : 0 };
-      },
-      async completeOnboarding() {
-        db.completed = true;
-        persist();
-      },
-    },
+// Card 142: a signed-in student's courses, events and notes all live on the server; nothing is kept in the browser.
+export function createRepositories(server: {
+  notes: NoteRepository;
+  syllabus: SyllabusApi;
+  courses: CoursesApi;
+}): Omit<Repositories, "auth" | "reset"> {
+  const repo: Omit<Repositories, "auth" | "reset"> = {
     courses: {
       async list() {
-        return [...db.courses];
+        return server.courses.list();
       },
       async create(data) {
-        const c = { ...data, id: id() };
-        db.courses.push(c);
-        persist();
-        return c;
+        return server.courses.save(data);
       },
       async folders(courseId) {
         return (await repo.notes.list({ course: courseId }))
@@ -202,139 +64,25 @@ export function createRepositories(
           }, {});
       },
     },
-    notes: serverNotes ?? {
-      ...createMockCollaborators(invitations),
-      ...createMockComments(db, get, persist, (noteId) => repo.notes.collaborators(noteId)),
-      async list(q) {
-        return filterNotes(db.notes, q);
-      },
-      async get(noteId) {
-        return { ...get(noteId) };
-      },
-      async create(data) {
-        const n: Note = {
-          id: id(),
-          title: "Untitled note",
-          body: "",
-          courseId: "",
-          lectureDate: dateKey(),
-          category: "School",
-          visibility: "private",
-          tags: [],
-          pinned: false,
-          createdAt: now(),
-          updatedAt: now(),
-          ...data,
-          ownerId: db.user?.id ?? "student",
-          ownerEmail: db.user?.email,
-        };
-        db.notes.unshift(n);
-        persist();
-        return n;
-      },
-      async delete(noteId) {
-        // The owner comes from the signed-in session, never from the caller.
-        if (!db.user) throw new Error("Sign in to continue.");
-        const note = get(noteId);
-        const email = db.user.email.trim().toLowerCase();
-        const collaborators = await repo.notes.collaborators(noteId);
-        if (note.ownerId !== db.user.id || collaborators.some((c) => c.email.toLowerCase() === email))
-          throw new Error("Only the note's owner can delete it.");
-        db.notes = db.notes.filter((n) => n.id !== noteId);
-        db.comments = db.comments.filter((c) => c.noteId !== noteId);
-        db.versions = db.versions.filter((v) => v.noteId !== noteId);
-        // persist() restores every record if the write fails.
-        persist();
-        invitations.delete(noteId);
-      },
-      async save(note) {
-        const previous = get(note.id);
-
-        const currentEmail = db.user?.email.trim().toLowerCase();
-
-        if (currentEmail) {
-          const collaborators = await repo.notes.collaborators(note.id);
-
-          const collaborator = collaborators.find(
-            (entry) => entry.email.toLowerCase() === currentEmail,
-          );
-
-          if (collaborator && collaborator.permission !== "edit") {
-            throw new Error("You do not have permission to edit this note.");
-          }
-        }
-
-        if (previous.title !== note.title || previous.body !== note.body)
-          db.versions.unshift({
-            id: id(),
-            noteId: note.id,
-            title: previous.title,
-            body: previous.body,
-            author: db.user?.name || "You",
-            createdAt: previous.updatedAt,
-          });
-
-        // Task #78 / Story #19 AT3: demo storage follows the same blank-item contract as PHP.
-        const saved = { ...note, checklist: checklistPayload(note.checklist ?? previous.checklist ?? []), updatedAt: now() };
-        db.notes = db.notes.map((n) => (n.id === note.id ? saved : n));
-        persist();
-        return saved;
-      },
-      async setPinned(noteId, pinned) {
-        // Pinning changes list placement, not the note's edit date or history.
-        const saved = { ...get(noteId), pinned };
-        db.notes = db.notes.map((n) => (n.id === noteId ? saved : n));
-        persist();
-        return { ...saved };
-      },
-      async versions(noteId) {
-        return db.versions.filter((v) => v.noteId === noteId);
-      },
-      async restore(noteId, versionId) {
-        const v = db.versions.find(
-          (v) => v.id === versionId && v.noteId === noteId,
-        );
-        if (!v) throw new Error("Version not found.");
-        return repo.notes.save({
-          ...get(noteId),
-          title: v.title,
-          body: v.body,
-        });
-      },
-    },
+    notes: server.notes,
     schedule: {
       async list(from, to) {
-        // A signed-in student's imported events are on the server (card 48). Editing one saves a
-        // copy with the same ID in this browser, which then takes the server copy's place.
-        // ponytail: edits to imported events stay in this browser; add an event update route if
-        // they must follow the student to other devices.
-        const imported = serverSyllabus ? await serverSyllabus.events() : [];
-        return [...db.events, ...imported.filter((e) => !db.events.some((local) => local.id === e.id))]
+        // Hand-made and syllabus events together (cards 48 and 141).
+        return (await server.syllabus.events())
           .filter((e) => (!from || e.date >= from) && (!to || e.date <= to))
           .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
       },
       async save(event) {
-        const e = { ...event, id: event.id || id() };
-        db.events = [...db.events.filter((x) => x.id !== e.id), e];
-        persist();
-        return e;
+        // A new event has no id; an edited one, hand-made or imported, is replaced on the server in place.
+        return server.courses.saveEvent(event);
       },
       async remove(event, wholeSeries = false) {
-        // Card 173: a syllabus event is deleted on the server first, so a failure keeps it (and any
-        // edited copy saved here). One already gone from the server (404) only needs its copy removed.
-        let series = wholeSeries ? event.seriesId : undefined;
-        if (event.source === "imported" && serverSyllabus) {
-          try {
-            await serverSyllabus.deleteEvent(event.id, wholeSeries);
-          } catch (e) {
-            if ((e as { status?: number }).status !== 404) throw e;
-            // The server couldn't look up a class from a meeting that's gone, so the rest of it is still
-            // there, and so are the student's edits to it.
-            series = undefined;
-          }
+        // Card 173: a failure keeps the event. One already gone from the server (404) needs nothing more.
+        try {
+          await server.syllabus.deleteEvent(event.id, wholeSeries && Boolean(event.seriesId));
+        } catch (e) {
+          if ((e as { status?: number }).status !== 404) throw e;
         }
-        db.events = db.events.filter((x) => x.id !== event.id && !(series && x.seriesId === series));
-        persist();
       },
       async lectureNotes(event) {
         return repo.notes.list({ course: event.courseId, from: event.date, to: event.date });
@@ -354,37 +102,40 @@ export function createRepositories(
         if (!file.size) return "This file is empty. Please choose another.";
         return null;
       },
-      async start(file, kind, _scenario, courseId = db.courses[0]?.id || "") {
+      async start(file, kind, _scenario, courseId) {
         const error = repo.imports.validate(file, kind);
         if (error) throw new Error(error);
+        courseId ??= (await repo.courses.list())[0]?.id || "";
         const job = { kind, name: file.name, state: "queued" as const, events: [], metadata: {
           title: file.name.replace(/\.[^.]+$/, ""), courseId, lectureDate: dateKey(), category: "School",
         } };
         // A renamed file is caught here with a message that says how to fix it; the server checks again.
         const problem = kind === "syllabus" ? await fileTypeProblem(file) : null;
         if (problem) throw new Error(problem);
-        if (kind === "syllabus" && serverSyllabus) return { ...job, id: (await serverSyllabus.upload(file, courseId)).id };
+        if (kind === "syllabus") return { ...job, id: (await server.syllabus.upload(file, courseId)).id };
         // Card 35: TXT/Markdown text becomes the note body, and is where its course and lecture date are read from.
         let body: string | undefined;
-        if (kind !== "syllabus" && /\.(txt|md)$/i.test(file.name)) {
+        if (/\.(txt|md)$/i.test(file.name)) {
           try {
             body = await file.text();
           } catch {
             throw new Error("This file could not be read. Please choose it again.");
           }
         }
-        return { ...job, id: id(), ...(body === undefined ? {} : { body }) };
+        return { ...job, id: crypto.randomUUID(), ...(body === undefined ? {} : { body }) };
       },
       async process(job, scenario = "success") {
         // "Processing failed" in the prototype preview options shows the failure screen on purpose.
         if (scenario === "failure") return { ...job, state: "failed" };
+        const courses = await repo.courses.list();
         let events: DetectedEvent[] = [];
         let read: Partial<UploadJob> = {};
         if (job.kind === "syllabus") {
           const { courseId } = job.metadata;
-          const course = db.courses.find((c) => c.id === courseId);
+          const course = courses.find((c) => c.id === courseId);
           const year = Number(/\b(20\d\d)\b/.exec(course?.term ?? "")?.[1]) || new Date().getFullYear();
-          const result = await readSyllabus(job.id, year);
+          // Card 45: the server's reader (Gemini, card 127) reads every syllabus; its message goes to the student.
+          const result = await server.syllabus.extract(job.id, year);
           events = normalizeEvents(result.events).map(({ source, time, location, needsReview, ...event }) => ({
             ...event, id: "", courseId, time: time ?? "", location: location ?? "", description: source, source: "imported",
             // With no date posted it stays unchecked: the student sees it, and adds a date only if they want it.
@@ -398,14 +149,13 @@ export function createRepositories(
             // The syllabus's own dates come first; the course's are the fallback.
             starts: firstDate || (course?.classesStart ?? ""), ends: lastDate || (course?.classesEnd ?? ""),
           }));
-          read = { meetings, noClassDates: normalizeBreaks(result.noClassDates), isSyllabus: result.isSyllabus !== false,
-            ...("notice" in result ? { notice: result.notice } : {}) };
+          read = { meetings, noClassDates: normalizeBreaks(result.noClassDates), isSyllabus: result.isSyllabus !== false };
         }
         // Card 35: a note gets its course and lecture date from its TXT/Markdown text or its file name.
         // Anything not found stays empty for the student to fill in, rather than guessing.
         let note: Partial<Pick<UploadJob, "metadata">> = {};
         if (job.kind !== "syllabus")
-          note = { metadata: { ...job.metadata, ...detectNoteMetadata(job.body ?? "", job.name, db.courses) } };
+          note = { metadata: { ...job.metadata, ...detectNoteMetadata(job.body ?? "", job.name, courses) } };
         const missing = !!note.metadata && (!note.metadata.courseId || !note.metadata.lectureDate);
         const partial = scenario === "partial" || missing || events.some((e) => e.needsReview);
         return { ...job, ...note, state: partial ? "partial" : "review", events, ...read };
@@ -417,7 +167,7 @@ export function createRepositories(
           // Events the student left out are skipped, and review-only fields aren't saved (card 46).
           const included = job.events.filter((e) => e.include !== false);
           const { courseId } = job.metadata;
-          const code = db.courses.find((c) => c.id === courseId)?.code ?? "";
+          const code = (await repo.courses.list()).find((c) => c.id === courseId)?.code ?? "";
           // Each weekly class becomes one event per meeting, tied together by its series number.
           const classes = (job.meetings ?? []).filter((m) => m.include).flatMap((m, series) =>
             meetingDates(m, job.noClassDates).map((date) => ({
@@ -425,16 +175,9 @@ export function createRepositories(
               kind: m.kind, date, time: m.time, location: m.location, series,
             })));
           const first = [...included.map((e) => e.date), ...classes.map((c) => c.date)].sort()[0] ?? "";
-          // A signed-in student's events are saved on the server with the job (cards 47 and 48).
-          if (serverSyllabus) {
-            const saved = await serverSyllabus.confirm(job.id, courseId, [...included.map(({ title, kind, date, time, location }) => ({ title, kind, date, time, location })), ...classes]);
-            return { ...saved, first };
-          }
-          for (const { include: _include, needsReview: _needsReview, ...event } of included)
-            await repo.schedule.save({ ...event, courseId });
-          for (const { series, ...meeting } of classes)
-            await repo.schedule.save({ ...meeting, id: "", courseId, description: "", source: "imported", seriesId: `${job.id}-${series}` });
-          return { created: included.length + classes.length, skipped: 0, first };
+          // The events are saved on the server with the job (cards 47 and 48).
+          const saved = await server.syllabus.confirm(job.id, courseId, [...included.map(({ title, kind, date, time, location }) => ({ title, kind, date, time, location })), ...classes]);
+          return { ...saved, first };
         }
         await repo.notes.create({
           ...job.metadata,
@@ -442,17 +185,6 @@ export function createRepositories(
         });
         return { created: 0, skipped: 0, first: "" };
       },
-    },
-    async reset() {
-      db = initial(sample);
-      db.user = authenticatedUser ?? null;
-      db.notes = db.notes.map((note) => ({ ...note, ownerId: authenticatedUser?.id ?? "student" }));
-      if (!serverNotes) {
-        invitations = new Map();
-        Object.assign(repo.notes, createMockCollaborators(invitations));
-        Object.assign(repo.notes, createMockComments(db, get, persist, (noteId) => repo.notes.collaborators(noteId)));
-      }
-      persist();
     },
   };
   return repo;
