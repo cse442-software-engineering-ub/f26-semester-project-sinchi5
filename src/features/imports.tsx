@@ -174,7 +174,6 @@ export function ImportDialog({
   const [phase, setPhase] = useState(startingFile ? "queued" : "pick");
   const [importError, setImportError] = useState("");
   const [error, setError] = useState("");
-  const [scenario, setScenario] = useState("success");
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState({ created: 0, skipped: 0, first: "" });
   const [courseId, setCourseId] = useState(
@@ -191,7 +190,6 @@ export function ImportDialog({
   }, []);
   // Card 45: queued while the file is registered, processing while it is read, then review or failed.
   async function run(
-    result = scenario,
     sourceFile = file,
     targetCourseId = courseId,
   ) {
@@ -206,7 +204,7 @@ export function ImportDialog({
         repo.imports.start(
           sourceFile,
           kind,
-          result,
+          undefined,
           targetCourseId,
         ),
         wait(250),
@@ -218,7 +216,7 @@ export function ImportDialog({
       setPhase("processing");
 
       const [done] = await Promise.all([
-        repo.imports.process(queued, result),
+        repo.imports.process(queued),
         wait(900),
       ]);
 
@@ -242,7 +240,6 @@ export function ImportDialog({
     startedInitialFile.current = true;
 
     void run(
-      "success",
       startingFile,
       startingCourseId ?? courseId,
     );
@@ -416,24 +413,6 @@ export function ImportDialog({
               </ul>
             </details>
           )}
-          <details className={s.demoDetails}>
-            <summary>Prototype preview options</summary>
-            <p>
-              Preview how Notely handles results that need review, or a file
-              it can’t read.
-            </p>
-            <label>
-              Processing result
-              <select
-                value={scenario}
-                onChange={(e) => setScenario(e.target.value)}
-              >
-                <option value="success">Complete result</option>
-                <option value="partial">Needs a little review</option>
-                <option value="failure">Processing failed</option>
-              </select>
-            </label>
-          </details>
           <div className={s.actions}>
             <button
               className={s.primary}
@@ -485,8 +464,7 @@ export function ImportDialog({
             <button
               className={s.primary}
               onClick={() => {
-                setScenario("success");
-                void run("success");
+                void run();
               }}
             >
               Try again
