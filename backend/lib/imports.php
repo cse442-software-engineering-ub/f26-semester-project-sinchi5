@@ -9,13 +9,17 @@ if (PHP_SAPI !== 'cli' && !defined('NOTELY_INTERNAL')) {
 // Card 47: the student's reviewed events from a job are saved to their schedule.
 // Card 127: import-extract reads a job with the Gemini API (syllabus-ai.php).
 // Card 172: event-delete removes one of the student's own saved events.
+// Card 141: event-save creates a hand-made event, or edits one of the student's own (imported ones in place).
 // Needs notes.php for recordId() and isoTime().
 const IMPORT_READ_ROUTES = ['import-job', 'events'];
-const IMPORT_ROUTES = [...IMPORT_READ_ROUTES, 'syllabus-upload', 'import-confirm', 'import-extract', 'event-delete'];
+const IMPORT_ROUTES = [...IMPORT_READ_ROUTES, 'syllabus-upload', 'import-confirm', 'import-extract', 'event-delete', 'event-save'];
 const EVENT_KINDS = ['lecture', 'recitation', 'lab', 'assignment', 'quiz', 'exam', 'deadline', 'other'];
 const MAX_IMPORTED_EVENTS = 200;
 // Each weekly class is saved as one row per meeting, so a semester adds far more rows than due dates do.
 const MAX_SAVED_EVENTS = 600;
+// Hand-made events are typed one at a time, so far fewer fit in a semester than imported meetings.
+const MAX_MANUAL_EVENTS = 500;
+const EVENT_COLUMNS = 'id, course_id, title, kind, event_date, event_time, location, description, repeat_rule, series_id, source, import_job_id';
 const IMPORT_CONFIRM_MAX_BODY = 1024 * 1024;
 const SYLLABUS_MAX_BYTES = 20 * 1024 * 1024;
 // A 20 MB file is 27962028 characters of base64, plus room for the JSON fields around it.
@@ -195,11 +199,28 @@ function eventJson(array $row): array
         'date' => $row['event_date'],
         'time' => $row['event_time'] === null ? '' : substr($row['event_time'], 0, 5),
         'location' => $row['location'],
-        'description' => '',
+        'description' => $row['description'],
         'source' => $row['source'],
         'importJobId' => $row['import_job_id'] === null ? null : (string) $row['import_job_id'],
         'seriesId' => $row['series_id'],
-    ];
+    ] + ($row['repeat_rule'] === null ? [] : ['repeat' => json_decode($row['repeat_rule'], true, 8, JSON_THROW_ON_ERROR)]);
+}
+
+// A weekly repeat: every 1 or 2 weeks on the chosen days (0 is Sunday) until a date within a year of the start.
+function repeatRule(mixed $value, string $date): ?string
+{
+    if ($value === null) return null;
+    $rule = $value instanceof stdClass ? (array) $value : $value;
+    if (!is_array($rule)) throw new HttpError(422, 'Choose 1 or 2 weeks, at least one day, and an end date within a year of the start.');
+    $days = $rule['days'] ?? null;
+    $until = $rule['until'] ?? null;
+    if (!in_array($rule['every'] ?? null, [1, 2], true) || !is_array($days) || !array_is_list($days)
+        || count($days) < 1 || count($days) > 7 || count(array_unique($days)) !== count($days)
+        || array_filter($days, fn ($d) => !is_int($d) || $d < 0 || $d > 6) || !realDate($until)
+        || $until < $date || $until > (new DateTimeImmutable($date))->modify('+1 year')->format('Y-m-d')) {
+        throw new HttpError(422, 'Choose 1 or 2 weeks, at least one day, and an end date within a year of the start.');
+    }
+    return json_encode(['every' => $rule['every'], 'days' => $days, 'until' => $until], JSON_THROW_ON_ERROR);
 }
 
 // Reads a job's file into weekly classes and dated events to review. Every API read is capped per student
@@ -309,9 +330,38 @@ function importAction(PDO $db, array $config, array $session, string $route, arr
         $course = $_GET['courseId'] ?? '';
         $filter = $course === '' ? '' : ' AND course_id = ?';
         $values = $course === '' ? [$user['id']] : [$user['id'], courseId($course, 'Choose a valid course.')];
-        $rows = query($db, 'SELECT id, course_id, title, kind, event_date, event_time, location, series_id, source, import_job_id FROM notely_events
+        $rows = query($db, 'SELECT ' . EVENT_COLUMNS . ' FROM notely_events
             WHERE owner_user_id = ?' . $filter . ' ORDER BY event_date, event_time, id', $values)->fetchAll();
         return ['events' => array_map('eventJson', $rows)];
+    }
+    if ($route === 'event-save') {
+        $course = courseId($input['courseId'] ?? null, 'Choose a course for this event.');
+        [$title, $kind, $date, $time, $location] = reviewedEvents([$input])[0];
+        $description = $input['description'] ?? '';
+        if (!is_string($description) || !preg_match('//u', $description) || characterCount($description) > 2000 || preg_match(INVISIBLE_PATTERN, preg_replace('/[\r\n\t]/', '', $description))) {
+            throw new HttpError(422, 'Keep each description to 2000 visible characters.');
+        }
+        $repeat = repeatRule($input['repeat'] ?? null, $date);
+        $id = isset($input['id']) ? recordId($input['id'], 'Choose a valid event.') : null;
+        rateLimit($db, $config, 'data-write', (string) $session['user_id'], 1000);
+        $db->beginTransaction();
+        $user = requireUser($db, $session, true);
+        if ($id === null) {
+            $count = (int) query($db, "SELECT COUNT(*) FROM notely_events WHERE owner_user_id = ? AND source = 'manual'", [$user['id']])->fetchColumn();
+            if ($count >= MAX_MANUAL_EVENTS) throw new HttpError(422, 'You can add at most ' . MAX_MANUAL_EVENTS . ' events of your own.');
+            query($db, "INSERT INTO notely_events (owner_user_id, course_id, title, kind, event_date, event_time, location, description, repeat_rule, source)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')", [$user['id'], $course, $title, $kind, $date, $time, $location, $description, $repeat]);
+            $id = (string) $db->lastInsertId();
+            http_response_code(201);
+        } elseif (query($db, 'UPDATE notely_events SET course_id = ?, title = ?, kind = ?, event_date = ?, event_time = ?, location = ?, description = ?, repeat_rule = ?
+            WHERE id = ? AND owner_user_id = ?', [$course, $title, $kind, $date, $time, $location, $description, $repeat, $id, $user['id']])->rowCount() === 0
+            && !query($db, 'SELECT 1 FROM notely_events WHERE id = ? AND owner_user_id = ?', [$id, $user['id']])->fetchColumn()) {
+            // Another student's event gets the same answer as a missing one, so IDs can't be probed.
+            throw new HttpError(404, 'This event could not be found.');
+        }
+        $row = query($db, 'SELECT ' . EVENT_COLUMNS . ' FROM notely_events WHERE id = ?', [$id])->fetch();
+        $db->commit();
+        return ['event' => eventJson($row)];
     }
     if ($route === 'event-delete') {
         $id = recordId($input['id'] ?? null, 'Choose a valid event.');
