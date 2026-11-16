@@ -14,7 +14,7 @@ function countClears(page: Page) {
 
 async function register(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("button", { name: "Create your workspace" }).click();
   await page.getByLabel("Your name").fill("Clear Tester");
   await page.getByLabel("Email address").fill("notely-task167-442@example.edu");
   await page.getByLabel("Password", { exact: true }).fill(password);

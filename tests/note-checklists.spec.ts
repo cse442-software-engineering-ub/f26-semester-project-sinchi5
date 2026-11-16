@@ -25,7 +25,7 @@ async function add(page: Page, texts: string[]) {
 
 async function accountNote(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("button", { name: "Create your workspace" }).click();
   await page.getByLabel("Your name").fill("Jamie");
   await page.getByLabel("Email address").fill("checklists@example.edu");
   await page.getByLabel("Password", { exact: true }).fill("Sample meadow password 42!");

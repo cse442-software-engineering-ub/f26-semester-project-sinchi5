@@ -43,7 +43,7 @@ test("the left menu is navigation only and Settings lives in the account menu", 
 
 test("account and complete onboarding", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("button", { name: "Create your workspace" }).click();
   await page.getByLabel("Your name").fill("Jamie");
   await page.getByLabel("Email address").fill("jamie@example.edu");
   await page.getByLabel("Password", { exact: true }).fill("Sample meadow password 42!");

@@ -1,15 +1,13 @@
 import { AccountSettings } from "./account";
 import { useState } from "react";
-import { Sun, Moon, Monitor, Plus, BookOpen } from "lucide-react";
+import { Sun, Moon, Monitor } from "lucide-react";
 import { useApp } from "../app/context";
 import { Modal, PageHeading } from "../shared/ui";
-import { AddCourseDialog } from "./course-dialog";
 import s from "../app/App.module.css";
 export function Settings() {
   const { state, repo, refresh, setTheme } = useApp();
   const [reset, setReset] = useState(false);
   const [confirmText, setConfirmText] = useState("");
-  const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
   const isDemo = state.user?.id === "student";
   return (
@@ -47,43 +45,6 @@ export function Settings() {
             })}
           </div>
         </section>
-        <section className={s.panel} aria-labelledby="courses-heading">
-          <div className={s.settingsHeading}>
-            <span>
-              <h2 id="courses-heading">Courses</h2>
-              <p className={s.muted}>The classes you organize notes and events around.</p>
-            </span>
-            <button
-              className={s.secondary}
-              onClick={() => {
-                setError("");
-                setAdding(true);
-              }}
-            >
-              <Plus size={16} /> Add course
-            </button>
-          </div>
-          {state.courses.length ? (
-            <ul className={s.settingRows}>
-              {state.courses.map((c) => (
-                <li className={s.settingCourse} key={c.id}>
-                  <span className={s.courseDot} style={{ background: c.color }} />
-                  <span>
-                    <strong>{c.code}</strong>
-                    <small>{c.name}</small>
-                  </span>
-                  <small>{c.term}</small>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className={s.courseEmpty}>
-              <BookOpen size={22} aria-hidden="true" />
-              <strong>No courses yet</strong>
-              <span>Add a course to start organizing your notes by class.</span>
-            </div>
-          )}
-        </section>
         <section className={s.panel} aria-labelledby="data-heading">
           <div className={s.settingsHeading}>
             <h2 id="data-heading">Workspace data</h2>
@@ -106,7 +67,7 @@ export function Settings() {
               </button>
             </li>
           </ul>
-          {error && !adding && !reset && (
+          {error && !reset && (
             <p className={s.error} role="alert">
               {error}
             </p>
@@ -156,14 +117,6 @@ export function Settings() {
             {isDemo ? "Reset workspace" : "Clear workspace"}
           </button>
         </Modal>
-      )}
-      {adding && (
-        <AddCourseDialog
-          onClose={() => {
-            setAdding(false);
-            setError("");
-          }}
-        />
       )}
     </>
   );

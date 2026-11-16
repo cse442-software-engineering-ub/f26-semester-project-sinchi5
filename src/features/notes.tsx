@@ -40,6 +40,7 @@ import type {
 import s from "../app/App.module.css";
 import { createHttpNoteShares } from "../services/note-shares-http";
 import { ShareNotesDialog, sharedLabel } from "./share-notes";
+import { ImportDialog } from "./imports";
 import { Collaborators } from "./collaborators";
 export function Notes() {
   const { repo, state, refresh } = useApp();
@@ -1438,6 +1439,7 @@ export function CoursePage() {
   const [shares, setShares] = useState<CourseShare[]>();
   const [shareError, setShareError] = useState("");
   const [sharing, setSharing] = useState(false);
+  const [uploading, setUploading] = useState(false);
   useEffect(() => {
     void repo.courses.folders(id).then(setFolders);
   }, [id, state.notes]);
@@ -1461,6 +1463,9 @@ export function CoursePage() {
         description="Your lectures, notes, and next steps."
         actions={
           <>
+            <button className={s.secondary} onClick={() => setUploading(true)}>
+              Upload syllabus
+            </button>
             <button className={s.secondary} onClick={() => setSharing(true)}>
               <Users size={17} aria-hidden="true" /> Share notes with friends
             </button>
@@ -1473,6 +1478,7 @@ export function CoursePage() {
       <p className={`${s.muted} ${s.shareStatus}`} role="status">
         {shareError || (shares && sharedLabel(shares))}
       </p>
+      {uploading && <ImportDialog kind="syllabus" startingCourseId={id} onClose={() => setUploading(false)} />}
       {sharing && (
         <ShareNotesDialog course={course} shares={shares ?? []} onClose={() => setSharing(false)}
           onSaved={(next) => { setShares(next); setShareError(""); setSharing(false); }} />

@@ -1,9 +1,19 @@
 .header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: clamp(20px, 2.5vw, 32px);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.card strong,
+.card span {
+  overflow-wrap: anywhere;
 }
 .grid {
   list-style: none;

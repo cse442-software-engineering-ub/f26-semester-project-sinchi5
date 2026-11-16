@@ -113,7 +113,7 @@ const ROLES: Record<string, string> = {
   listitem: "li, [role=listitem]",
 };
 
-// byRole("button", "Log in"): the first element with that role (and accessible name, exact text or RegExp), or null.
+// byRole("button", "Log In"): the first element with that role (and accessible name, exact text or RegExp), or null.
 export function byRole(role: string, name?: string | RegExp): HTMLElement | null {
   const found = all(ROLES[role] ?? `[role=${role}]`).filter((e) => name === undefined || same(nameOf(e), name));
   return (found[0] as HTMLElement) ?? null;

@@ -17,7 +17,7 @@ async function uploadPhoto(page: Page, extension = "png") {
 }
 async function register(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("button", { name: "Create your workspace" }).click();
   await page.getByLabel("Your name").fill("Jamie");
   await page.getByLabel("Email address").fill("jamie@example.edu");
   await page.getByLabel("Password", { exact: true }).fill(password);
@@ -72,7 +72,7 @@ test("account changes, invalid current password, recovery rotation and deletion"
   await expect(page.getByRole("status")).toContainText("Password changed");
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Good to see you again." })).toBeVisible();
-  await page.getByRole("button", { name: "Forgot password?" }).click();
+  await page.getByRole("button", { name: "Forgot your password?" }).click();
   await page.getByLabel("Email address").fill("jamie@example.edu");
   await page.getByLabel("Recovery code", { exact: true }).fill("invalid-code");
   await page.getByLabel("New password", { exact: true }).fill("Recovered meadow password 44!");
@@ -90,7 +90,7 @@ test("account changes, invalid current password, recovery rotation and deletion"
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Password reset");
   await page.getByLabel("Password", { exact: true }).fill("Recovered meadow password 44!");
-  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  await page.getByRole("button", { name: "Log In", exact: true }).click();
   await page.goto("/settings");
   await page.getByRole("button", { name: "Delete account", exact: true }).click();
   await page.getByLabel("Current password").fill("Recovered meadow password 44!");
@@ -100,7 +100,7 @@ test("account changes, invalid current password, recovery rotation and deletion"
 });
 test("account forms fit narrow screens, report mismatches, and recovery code remains visible until saved", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("button", { name: "Create your workspace" }).click();
   await page.getByLabel("Your name").fill("Jamie");
   await page.getByLabel("Email address").fill("jamie@example.edu");
   await page.getByLabel("Password", { exact: true }).fill(password);
@@ -135,7 +135,7 @@ test("signup explains emoji, hidden characters, and unsupported password charact
   const requests: string[] = [];
   page.on("request", r => { if (r.method() === "POST") requests.push(r.url()); });
   await page.goto("/");
-  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("button", { name: "Create your workspace" }).click();
   const name = page.getByLabel("Your name");
   await name.fill("Jamie 😀");
   await name.blur();

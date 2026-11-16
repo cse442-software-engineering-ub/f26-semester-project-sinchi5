@@ -2,7 +2,7 @@ import { test, expect } from "./support/account-fixture";
 
 test("a student's notes search matches title and body, clears, and survives reload", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("button", { name: "Create your workspace" }).click();
   await page.getByLabel("Your name").fill("Search Student");
   await page.getByLabel("Email address").fill("notely-search-442@example.edu");
   await page.getByLabel("Password", { exact: true }).fill("TestPassword2026!");
@@ -64,7 +64,7 @@ test("a student's notes search matches title and body, clears, and survives relo
 
 test("card 54 search flow and account cleanup", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("button", { name: "Create your workspace" }).click();
   await page.getByLabel("Your name").fill("Task Tester");
   await page.getByLabel("Email address").fill("notely-task54-442@example.edu");
   await page.getByLabel("Password", { exact: true }).fill("Sample river password 42!");

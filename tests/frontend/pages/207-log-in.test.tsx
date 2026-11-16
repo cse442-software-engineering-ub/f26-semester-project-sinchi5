@@ -24,14 +24,14 @@ await test("1. The log in form is missing a field or its button", LOGIN, async (
   await waitFor(() => byRole("heading", "Good to see you again."));
   expect(byLabel("Email address") !== null).toBe(true);
   expect(byLabel("Password") !== null).toBe(true);
-  expect(byRole("button", "Log in") !== null).toBe(true);
+  expect(byRole("button", "Log In") !== null).toBe(true);
 });
 await test("2. Correct details send no login request, or the wrong email", LOGIN, async () => {
   const api = stubApi({ session: signedOut, login: { ...signedOut, user: ada } });
   mount(ui);
   await type(await waitFor(() => byLabel("Email address")), "ada@example.edu");
   await type(byLabel("Password"), "TestPassword2026!");
-  await click(byRole("button", "Log in"));
+  await click(byRole("button", "Log In"));
   await waitFor(() => logins(api).length > 0);
   expect(logins(api).length).toBe(1);
   expect(logins(api)[0].body).toEqual({ email: "ada@example.edu", password: "TestPassword2026!" });
@@ -42,7 +42,7 @@ await test("3. A wrong password shows no reason, or a different one", "src/servi
   mount(ui);
   await type(await waitFor(() => byLabel("Email address")), "ada@example.edu");
   await type(byLabel("Password"), "WrongPassword2026!");
-  await click(byRole("button", "Log in"));
+  await click(byRole("button", "Log In"));
   await waitFor(() => byText("Email or password is incorrect."));
 });
 await test("4. A request nobody scripted goes unnoticed", "tests/frontend/harness.tsx → stubApi", async () => {
@@ -50,7 +50,7 @@ await test("4. A request nobody scripted goes unnoticed", "tests/frontend/harnes
   mount(ui);
   await type(await waitFor(() => byLabel("Email address")), "ada@example.edu");
   await type(byLabel("Password"), "TestPassword2026!");
-  await click(byRole("button", "Log in"));
+  await click(byRole("button", "Log In"));
   await waitFor(() => api.unexpected.length > 0);
   expect(api.unexpected).toEqual(["login"]);
   api.unexpected.length = 0;                             // caught: clear it so this case itself passes
@@ -58,7 +58,7 @@ await test("4. A request nobody scripted goes unnoticed", "tests/frontend/harnes
 await test("5. The log in screen scrolls sideways on a 320 px phone", "src/app/App.module.css → .onboarding, .onboardingMain", async () => {
   stubApi({ session: signedOut });
   mount(ui, { width: 320 });
-  await waitFor(() => byRole("button", "Log in"));
+  await waitFor(() => byRole("button", "Log In"));
   expect(pageScrollWidth() <= 320).toBe(true);
 });
 await test("6. The form can't be sent with the keyboard alone", LOGIN, async () => {

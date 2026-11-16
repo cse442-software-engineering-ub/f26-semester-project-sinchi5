@@ -75,10 +75,10 @@ try {
       assert.equal((await page.reload()).status(), 200);
       await expect(page.getByRole("heading", { name: "Welcome to your space." })).toBeVisible();
 
-      await page.getByRole("button", { name: "Log in" }).click();
+      await page.getByRole("button", { name: "I already have an account" }).click();
       await page.getByLabel("Email address").fill("routes@example.edu");
       await page.getByLabel("Password", { exact: true }).fill("Routing fixture password 42!");
-      await page.getByRole("button", { name: "Log in", exact: true }).click();
+      await page.getByRole("button", { name: "Log In", exact: true }).click();
       // Returning users who finished onboarding land on their notes library.
       await expect(page.getByRole("heading", { name: "Your notes", exact: true })).toBeVisible();
       assert.equal(new URL(page.url()).pathname, base);

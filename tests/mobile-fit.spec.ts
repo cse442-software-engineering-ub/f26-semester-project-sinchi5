@@ -45,12 +45,12 @@ function metadataBoxes(page: Page) {
 test("fields are at least 16px on a phone", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "Phone-only check");
   await page.goto("/");
-  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("button", { name: "Create your workspace" }).click();
   await expect(page.getByLabel("Your name")).toBeVisible();
-  expect(await smallFields(page), "Create account").toEqual([]);
+  expect(await smallFields(page), "Create your workspace").toEqual([]);
 
   await page.goto("/");
-  await page.getByRole("button", { name: "Log in" }).click();
+  await page.getByRole("button", { name: "I already have an account" }).click();
   await expect(page.getByLabel("Email address")).toBeVisible();
   expect(await smallFields(page), "sign-in").toEqual([]);
 

@@ -20,7 +20,7 @@ async function expectTitles(page: Page, expected: string[]) {
 
 async function setup(page: Page, notes: Seed[] = taskNotes) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("button", { name: "Create your workspace" }).click();
   await page.getByLabel("Your name").fill("Tag Filter Tester");
   await page.getByLabel("Email address").fill("notely-task176-442@example.edu");
   await page.getByLabel("Password", { exact: true }).fill(password);

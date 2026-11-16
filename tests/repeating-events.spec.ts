@@ -57,7 +57,7 @@ async function openAddEvent(page: Page) {
 
   await page
     .getByRole("button", {
-      name: "Create account",
+      name: "Create your workspace",
     })
     .click();
 

@@ -9,7 +9,7 @@ const password = "Sample river password 42!";
 
 async function signUp(page: Page, name: string, email: string, course?: string) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("button", { name: "Create your workspace" }).click();
   await page.getByLabel("Your name").fill(name);
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
@@ -34,15 +34,15 @@ async function signUp(page: Page, name: string, email: string, course?: string) 
 async function logOut(page: Page) {
   await logOutShell(page);
   // Logging out shows either the welcome choices or the sign-in form.
-  await expect(page.getByRole("button", { name: /^(Log in|Log in)$/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^(Log In|I already have an account)$/ })).toBeVisible();
 }
 
 async function logIn(page: Page, email: string) {
-  const choose = page.getByRole("button", { name: "Log in" });
+  const choose = page.getByRole("button", { name: "I already have an account" });
   if (await choose.isVisible()) await choose.click();
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  await page.getByRole("button", { name: "Log In", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Your notes", exact: true })).toBeVisible();
 }
 

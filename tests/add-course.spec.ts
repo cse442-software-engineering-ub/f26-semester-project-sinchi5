@@ -9,7 +9,7 @@ async function register(page: Page) {
   await page.goto("/");
 
   await page
-    .getByRole("button", { name: "Create account" })
+    .getByRole("button", { name: "Create your workspace" })
     .click();
 
   await page.getByLabel("Your name").fill("Course Tester");

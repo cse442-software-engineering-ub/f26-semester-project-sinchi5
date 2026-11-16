@@ -7,7 +7,7 @@ const password = "Sample meadow password 42!";
 
 async function register(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("button", { name: "Create your workspace" }).click();
   await page.getByLabel("Your name").fill("Jamie");
   await page.getByLabel("Email address").fill("jamie@example.edu");
   await page.getByLabel("Password", { exact: true }).fill(password);
