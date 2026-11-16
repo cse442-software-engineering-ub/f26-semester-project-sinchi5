@@ -1,3 +1,4 @@
+import "../../src/app/tokens.css"; // every test page needs the color variables the app loads in main.tsx
 // Frontend test harness: real screen code, API replaced. No dependency beyond React, which the app already uses.
 // Pages import { page, test, expect } from "../../shared/runner.js" and the helpers below from "../harness".
 import type { ReactElement } from "react";
