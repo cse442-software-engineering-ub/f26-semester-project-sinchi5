@@ -1,15 +1,7 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  ArrowRight,
-  BookOpen,
-  Check,
-  Plus,
-  Sparkles,
-  UploadCloud,
-} from "lucide-react";
+import { ArrowRight, BookOpen } from "lucide-react";
 import { useApp } from "../app/context";
-import { ImportDialog } from "./imports";
 import { FieldError, PasswordRequirements, RecoveryCode } from "./account";
 import { PASSWORD_MIN, emailError, nameError, passwordCharacterError, passwordError, recoveryCodeError } from "../services/validation";
 import { BRAND } from "../domain";
@@ -19,7 +11,6 @@ export function Onboarding() {
   const { state, repo, refresh } = useApp();
   const navigate = useNavigate();
   const [mode, setMode] = useState("signin");
-  const [step, setStep] = useState(state.user ? 1 : 0);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,14 +21,6 @@ export function Onboarding() {
   const [recoveryInput, setRecoveryInput] = useState("");
   const [recoveryCode, setRecoveryCode] = useState("");
   const [message, setMessage] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [code, setCode] = useState("");
-  const [courseName, setCourseName] = useState("");
-  const [color, setColor] = useState("#869D7A");
-  const [term, setTerm] = useState("Fall 2026");
-  const [classesStart, setClassesStart] = useState("");
-  const [classesEnd, setClassesEnd] = useState("");
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitted, setSubmitted] = useState(false);
   const fieldErrors = {
@@ -73,14 +56,14 @@ export function Onboarding() {
       if (mode === "signup") {
         const result = await repo.auth.signUp(name, email, password);
         setRecoveryCode(result.recoveryCode);
+        // Keeps this screen up until Continue, even though the new account is already signed in.
+        navigate("/welcome", { replace: true, state: { newAccount: true } });
       } else if (mode === "recover") {
         setRecoveryCode(await repo.auth.resetPassword(email, recoveryInput, password));
       } else {
         await repo.auth.signIn(email, password);
-        if ((await repo.auth.onboarding()).completed) {
-          navigate("/welcome", { replace: true, state: { returningLogin: true } });
-        }
-        setStep(1);
+        // An account left mid-setup is finished in the background by App.
+        navigate("/welcome", { replace: true, state: { returningLogin: true } });
       }
       setPassword(""); setConfirmation(""); setRecoveryInput("");
       await refresh();
@@ -133,11 +116,20 @@ export function Onboarding() {
       </aside>
       <main className={s.onboardingMain}>
         <div className={`${s.onboardingContent} ${o.enter}`}>
-          {recoveryCode ? <RecoveryCode code={recoveryCode} onDone={() => {
-            setRecoveryCode("");
-            if (mode === "signup") setStep(1);
-            else { setStep(0); changeMode("signin"); setMessage("Password reset. Log in with your new password."); }
-          }} /> : step === 0 ? (
+          {recoveryCode ? <RecoveryCode code={recoveryCode} onDone={async () => {
+            if (pending.current) return;
+            setError("");
+            if (mode === "signup") {
+              pending.current = true;
+              try {
+                await repo.auth.completeOnboarding();
+                await refresh();
+                setRecoveryCode("");
+                navigate("/", { replace: true });
+              } catch (e) { setError((e as Error).message); }
+              finally { pending.current = false; }
+            } else { setRecoveryCode(""); changeMode("signin"); setMessage("Password reset. Log in with your new password."); }
+          }} /> : (
             <>
               <span className={s.eyebrow}>Your next chapter</span>
               <h2>
@@ -235,182 +227,6 @@ export function Onboarding() {
                   </fieldset>
                 </form>
             </>
-          ) : step === 1 ? (
-            <>
-              <span className={s.eyebrow}>01 / 03 · Your semester</span>
-              <h2>What are you learning?</h2>
-              <p className={s.muted}>
-                Add the courses you’re taking this term. You can always add
-                more later in Courses.
-              </p>
-              {state.courses.length === 0 && !adding && (
-                <div className={s.courseEmpty}>
-                  <BookOpen size={22} aria-hidden="true" />
-                  <strong>No courses yet</strong>
-                  <span>Your courses will appear here as you add them.</span>
-                </div>
-              )}
-              <div className={s.courseSetup}>
-                {state.courses.map((c) => (
-                  <div key={c.id}>
-                    <span
-                      className={s.courseDot}
-                      style={{ background: c.color }}
-                    />
-                    <span>
-                      <strong>{c.code}</strong>
-                      <small>{c.name}</small>
-                    </span>
-                    <Check size={16} />
-                  </div>
-                ))}
-              </div>
-              {adding ? (
-                <form
-                  className={s.form}
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    setError("");
-                    if (classesStart && classesEnd && classesEnd <= classesStart) {
-                      setError("Choose a class end date after the start date.");
-                      return;
-                    }
-                    try {
-                      await repo.courses.create({
-                        code,
-                        name: courseName,
-                        color,
-                        term,
-                        ...(classesStart ? { classesStart } : {}),
-                        ...(classesEnd ? { classesEnd } : {}),
-                      });
-                      await refresh();
-                      setAdding(false);
-                      setCode("");
-                      setCourseName("");
-                      setClassesStart("");
-                      setClassesEnd("");
-                    } catch (e) {
-                      setError((e as Error).message);
-                    }
-                  }}
-                >
-                  <div className={s.formRow}>
-                    <label>
-                      Course code
-                      <input
-                        required
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        placeholder="CSE 250"
-                      />
-                    </label>
-                    <label>
-                      Term
-                      <input
-                        required
-                        value={term}
-                        onChange={(e) => setTerm(e.target.value)}
-                      />
-                    </label>
-                  </div>
-                  <label>
-                    Course name
-                    <input
-                      required
-                      value={courseName}
-                      onChange={(e) => setCourseName(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Course color
-                    <input
-                      type="color"
-                      value={color}
-                      onChange={(e) => setColor(e.target.value)}
-                    />
-                  </label>
-                  {/* Card 46: fills in a weekly class's dates when its syllabus doesn't give them. */}
-                  <div className={s.formRow}>
-                    <label>
-                      <span>Classes start <span className={s.hint}>(optional)</span></span>
-                      <input type="date" value={classesStart} onChange={(e) => setClassesStart(e.target.value)} />
-                    </label>
-                    <label>
-                      <span>Classes end <span className={s.hint}>(optional)</span></span>
-                      <input type="date" value={classesEnd} onChange={(e) => setClassesEnd(e.target.value)} />
-                    </label>
-                  </div>
-                  <div className={s.actions}>
-                    <button className={s.primary}>Add course</button>
-                    <button
-                      className={s.secondary}
-                      type="button"
-                      onClick={() => setAdding(false)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <button className={s.textLink} onClick={() => setAdding(true)}>
-                  <Plus size={16} /> Add course
-                </button>
-              )}
-              <button className={s.primary} onClick={() => { setAdding(false); setError(""); setStep(2); }}>
-                {state.courses.length ? "Continue" : "Skip for now"} <ArrowRight size={16} />
-              </button>
-            </>
-          ) : step === 2 ? (
-            <>
-              <span className={s.eyebrow}>02 / 03 · Save a little time</span>
-              <h2>Let your syllabus do the work.</h2>
-              <p className={s.muted}>
-                Turn assignments, exams, and due dates into a schedule you can
-                actually use.
-              </p>
-              <button className={s.dropzone} onClick={() => setImporting(true)}>
-                <UploadCloud size={38} />
-                <strong>Upload syllabus</strong>
-                <span>Review the dates. We’ll take it from there.</span>
-              </button>
-              <button className={s.primary} onClick={() => setStep(3)}>
-                Continue <ArrowRight size={16} />
-              </button>
-              <button className={s.textLink} onClick={() => setStep(3)}>
-                I’ll do this later
-              </button>
-            </>
-          ) : (
-            <>
-              <span className={s.successIcon}>
-                <Sparkles size={30} />
-              </span>
-              <span className={s.eyebrow}>03 / 03 · All yours</span>
-              <h2>
-                Room to think.
-                <br />
-                Space to grow.
-              </h2>
-              <p className={s.muted}>
-                Your account is ready, {state.user?.name}. Let’s make this
-                semester a little lighter.
-              </p>
-              <button
-                className={s.primary}
-                onClick={async () => {
-                  try {
-                    await repo.auth.completeOnboarding();
-                    await refresh();
-                    navigate("/");
-                  } catch (e) {
-                    setError((e as Error).message);
-                  }
-                }}
-              >
-                Let’s begin <ArrowRight size={17} />
-              </button>
-            </>
           )}
           {message && <p role="status">{message}</p>}
           {(error || state.error) && (
@@ -419,20 +235,12 @@ export function Onboarding() {
             </p>
           )}
           {state.user && !recoveryCode && <button className={s.textLink} disabled={busy} onClick={async () => {
-            try { await repo.auth.signOut(); setStep(0); changeMode("signin"); await refresh(); }
+            try { await repo.auth.signOut(); changeMode("signin"); await refresh(); }
             catch (e) { setError((e as Error).message); }
           }}>Log out</button>}
-          {step > 1 && step < 3 && (
-            <button className={s.textLink} onClick={() => setStep(step - 1)}>
-              Back
-            </button>
-          )}
         </div>
         <footer>Made for your mind. Designed for your day.</footer>
       </main>
-      {importing && (
-        <ImportDialog kind="syllabus" onClose={() => setImporting(false)} />
-      )}
     </div>
   );
 }

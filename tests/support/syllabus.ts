@@ -35,18 +35,15 @@ export async function signUpWithCourse(page: Page, email = "notely-syllabus-442@
   await page.getByRole("button", { name: "Create account", exact: true }).click();
   await page.getByLabel("I saved my recovery code").check();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "Add course" }).click();
-  await page.getByLabel("Course code").fill("CSE 442");
-  await page.getByLabel("Term").fill("Fall 2026");
-  await page.getByLabel("Course name").fill("Software Engineering");
+  await openNew(page, "Course");
+  await page.getByRole("dialog").getByLabel("Course code").fill("CSE 442");
+  await page.getByRole("dialog").getByLabel("Term").fill("Fall 2026");
+  await page.getByRole("dialog").getByLabel("Course name").fill("Software Engineering");
   if (classes) {
-    await page.getByLabel("Classes start").fill(classes.start);
-    await page.getByLabel("Classes end").fill(classes.end);
+    await page.getByRole("dialog").getByLabel("Classes start").fill(classes.start);
+    await page.getByRole("dialog").getByLabel("Classes end").fill(classes.end);
   }
-  await page.getByRole("button", { name: "Add course" }).click();
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "I’ll do this later" }).click();
-  await page.getByRole("button", { name: "Let’s begin" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Add course", exact: true }).click();
 }
 
 export async function openUpload(page: Page) {

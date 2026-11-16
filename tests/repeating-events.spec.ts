@@ -99,24 +99,6 @@ async function openAddEvent(page: Page) {
     })
     .click();
 
-  await page
-    .getByRole("button", {
-      name: "Skip for now",
-    })
-    .click();
-
-  await page
-    .getByRole("button", {
-      name: "I’ll do this later",
-    })
-    .click();
-
-  await page
-    .getByRole("button", {
-      name: "Let’s begin",
-    })
-    .click();
-
   await page.goto("/schedule");
 
   await expect(

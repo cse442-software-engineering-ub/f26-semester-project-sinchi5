@@ -19,9 +19,6 @@ async function signUp(page: Page, name: string, email: string) {
   await page.getByRole("button", { name: "Create account", exact: true }).click();
   await page.getByLabel("I saved my recovery code").check();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "Skip for now" }).click();
-  await page.getByRole("button", { name: "I’ll do this later" }).click();
-  await page.getByRole("button", { name: "Let’s begin" }).click();
   await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening)/ })).toBeVisible();
 }
 async function logOut(page: Page) {

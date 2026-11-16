@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { test, expect } from "./support/account-fixture";
+import { openNew } from "./support/shell";
 
 // Card 176 and story 174. The API fixture isolates each browser case; the real
 // PHP tag and access contract is covered by backend/tests/note-tag-filter-http.mjs.
@@ -28,14 +29,11 @@ async function setup(page: Page, notes: Seed[] = taskNotes) {
   await page.getByRole("button", { name: "Create account", exact: true }).click();
   await page.getByLabel("I saved my recovery code").check();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "Add course" }).click();
-  await page.getByLabel("Course code").fill("CSE 442");
-  await page.getByLabel("Term").fill("Fall 2026");
-  await page.getByLabel("Course name").fill("Software Engineering");
-  await page.getByRole("button", { name: "Add course", exact: true }).click();
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "I’ll do this later" }).click();
-  await page.getByRole("button", { name: "Let’s begin" }).click();
+  await openNew(page, "Course");
+  await page.getByRole("dialog").getByLabel("Course code").fill("CSE 442");
+  await page.getByRole("dialog").getByLabel("Term").fill("Fall 2026");
+  await page.getByRole("dialog").getByLabel("Course name").fill("Software Engineering");
+  await page.getByRole("dialog").getByRole("button", { name: "Add course", exact: true }).click();
   await page.goto("/notes");
 
   for (const note of notes) {

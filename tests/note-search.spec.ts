@@ -10,9 +10,6 @@ test("a student's notes search matches title and body, clears, and survives relo
   await page.getByRole("button", { name: "Create account", exact: true }).click();
   await page.getByLabel("I saved my recovery code").check();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "Skip for now" }).click();
-  await page.getByRole("button", { name: "I’ll do this later" }).click();
-  await page.getByRole("button", { name: "Let’s begin" }).click();
   await page.goto("/notes");
 
   for (const [title, body] of [
@@ -72,9 +69,6 @@ test("card 54 search flow and account cleanup", async ({ page }) => {
   await page.getByRole("button", { name: "Create account", exact: true }).click();
   await page.getByLabel("I saved my recovery code").check();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "Skip for now" }).click();
-  await page.getByRole("button", { name: "I’ll do this later" }).click();
-  await page.getByRole("button", { name: "Let’s begin" }).click();
 
   await page.goto("/notes");
   for (const title of ["Math Homework", "Biology Review", "Class Notes"]) {
