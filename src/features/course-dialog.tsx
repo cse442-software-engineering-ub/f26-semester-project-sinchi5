@@ -2,7 +2,7 @@
 import { useApp } from "../app/context";
 import { Modal } from "../shared/ui";
 import { ImportDialog } from "./imports";
-import s from "../app/App.module.css";
+import s from "../shared/ui.module.css";
 
 
 export function AddCourseDialog({

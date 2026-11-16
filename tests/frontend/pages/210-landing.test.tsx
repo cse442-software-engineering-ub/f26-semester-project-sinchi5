@@ -82,7 +82,7 @@ await test("8. \"Forgot password?\" does not open the reset form", "src/features
   await waitFor(() => byRole("heading", "Recover your account."));
   expect(byLabel("Recovery code") !== null).toBe(true);
 });
-await test("9. The landing page scrolls sideways on a 320 px phone", "src/features/onboarding.module.css → .switch, src/app/App.module.css → .onboarding", async () => {
+await test("9. The landing page scrolls sideways on a 320 px phone", "src/features/onboarding.module.css → .switch, src/features/onboarding.module.css → .onboarding", async () => {
   stubApi({ session: signedOut });
   mount(ui, { width: 320 });
   await waitFor(() => byRole("button", "Log in"));

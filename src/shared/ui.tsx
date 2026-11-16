@@ -14,7 +14,7 @@ import { Link } from "react-router-dom";
 import { useRef, useState, type ReactNode } from "react";
 import type { Note, CourseEvent, User } from "../domain";
 import { useApp } from "../app/context";
-import s from "../app/App.module.css";
+import s from "./ui.module.css";
 
 export function Avatar({ user, className = "", alt = "", version = 0 }: {
   user: User;

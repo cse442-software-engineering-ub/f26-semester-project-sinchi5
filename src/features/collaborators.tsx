@@ -2,7 +2,10 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Dialog } from "@base-ui/react/dialog";
 import type { Collaborator, NoteRepository } from "../domain";
 import { Modal } from "../shared/ui";
-import s from "../app/App.module.css";
+import css from "./note-editor.module.css";
+import s from "../shared/ui.module.css";
+// Shared classes this screen's own rules also name (see note-editor.module.css), applied together.
+const both = { muted: `${s.muted} ${css.muted}` };
 
 export function Collaborators({ noteId, isOwner, repository }: {
   noteId: string;
@@ -98,12 +101,12 @@ export function Collaborators({ noteId, isOwner, repository }: {
   }
 
   return (
-    <section aria-label="Collaborators" className={s.collaborators}>
+    <section aria-label="Collaborators" className={css.collaborators}>
       <h3>Collaborators</h3>
       {loading && <p role="status">Loading collaborators...</p>}
       {listError && <p role="alert" className={s.error}>{listError}</p>}
-      {!loading && !listError && !entries.length && <p className={s.muted}>No collaborators yet.</p>}
-    <ul className={s.collaboratorList}>
+      {!loading && !listError && !entries.length && <p className={both.muted}>No collaborators yet.</p>}
+    <ul className={css.collaboratorList}>
       {entries.map((entry) => (
         <li key={entry.id}>
           <strong>{entry.name}</strong>

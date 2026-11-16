@@ -2,7 +2,7 @@
 import "@fontsource-variable/inter";
 import "../../../src/app/global.css";
 // Load the shell styles up front so the phone-width iframe copies them.
-import "../../../src/app/App.module.css";
+import "../styles";
 import "../../../src/app/shell.module.css";
 import { MemoryRouter } from "react-router-dom";
 import { page, test, expect } from "../../shared/runner.js";

@@ -1,0 +1,925 @@
+.avatar {
+  position: relative;
+  height: 33px;
+  width: 33px;
+  border-radius: 50%;
+  background: var(--tint-a);
+  color: var(--tint-a-ink);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  overflow: hidden;
+}
+.avatar img {
+  /* Intrinsic portrait dimensions must not enlarge the avatar's grid track. */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  display: block;
+}
+.pageHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 29px;
+}
+.eyebrow {
+  display: block;
+  color: var(--muted);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
+  font-weight: 450;
+}
+.pageHeading h1 {
+  margin-bottom: 10px;
+}
+.pageHeading p {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.primary,
+.secondary,
+.danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 7px;
+  min-height: 44px;
+  padding: 11px 17px;
+  font-size: 0.76rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.primary {
+  background: var(--primary);
+  color: var(--primary-text);
+  box-shadow: var(--shadow-button);
+}
+.secondary {
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.danger {
+  background: var(--danger-solid);
+  color: var(--danger-solid-text);
+}
+.iconButton {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--muted);
+}
+.textLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.71rem;
+  font-weight: 500;
+  min-height: 44px;
+  color: var(--text);
+  padding: 0;
+}
+.section {
+  margin-bottom: 31px;
+}
+.sectionHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.sectionHeading p {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-top: 5px;
+}
+.sectionHeading h2 {
+  font-size: 1rem;
+}
+.quickNotes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 13px;
+}
+.noteCard {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 17px 16px 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 9px;
+  min-height: 210px;
+  min-width: 0;
+}
+.cardTop {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  color: var(--muted);
+}
+.pinnedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.65rem;
+}
+.courseBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.55rem;
+  letter-spacing: 0.01em;
+  font-weight: 500;
+}
+.courseBadge > i {
+  height: 6px;
+  width: 6px;
+  border-radius: 2px;
+  background: var(--course-color);
+}
+.noteCard h3 {
+  overflow-wrap: anywhere;
+  font-size: 0.83rem;
+  line-height: 1.5;
+  letter-spacing: -0.025em;
+  margin-bottom: 10px;
+  font-weight: 550;
+}
+.excerpt {
+  font-size: 0.65rem;
+  line-height: 1.7;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-line;
+  margin-bottom: 17px;
+}
+.cardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  border-top: 1px solid var(--line);
+  font-size: 0.53rem;
+  color: var(--muted);
+  padding: 12px 0;
+  margin-top: auto;
+}
+.cardFooter > span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.panel {
+  padding: 21px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  min-width: 0;
+}
+.dashboardAside .panel {
+  margin-bottom: 18px;
+}
+.dashboardAside h2 {
+  font-size: 0.86rem;
+}
+.dashboardAside .sectionHeading {
+  margin-bottom: 13px;
+}
+.dashboardAside .sectionHeading .iconButton {
+  min-width: 24px;
+  min-height: 24px;
+}
+.eventRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  min-height: 76px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.eventRow:last-of-type {
+  border-bottom: none;
+}
+.eventTime {
+  font-size: 0.62rem;
+  color: var(--muted);
+  width: 34px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.eventBar {
+  width: 3px;
+  min-height: 32px;
+  border-radius: 4px;
+  align-self: stretch;
+  margin: 8px 0;
+  flex-shrink: 0;
+}
+.eventText {
+  flex: 1;
+  min-width: 0;
+}
+.eventText strong {
+  display: block;
+  font-size: 0.7rem;
+  line-height: 1.6;
+  font-weight: 550;
+}
+.eventText small {
+  font-size: 0.55rem;
+  color: var(--muted);
+  display: block;
+  text-transform: capitalize;
+  margin-top: 2px;
+}
+.eventRow > svg {
+  color: var(--muted);
+  width: 12px;
+}
+.dashboardAside .textLink {
+  font-size: 0.64rem;
+  margin-top: 8px;
+}
+.segment > button {
+  min-width: 44px;
+  min-height: 44px;
+}
+.muted {
+  color: var(--muted);
+  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.error {
+  border: 1px solid var(--danger-line);
+  color: var(--danger);
+  background: var(--danger-soft);
+  padding: 12px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  margin-bottom: 16px;
+}
+.notice {
+  padding: 12px 14px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.7;
+  margin-bottom: 14px;
+}
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.empty h3 {
+  color: var(--text);
+}
+.empty p {
+  font-size: 0.8rem;
+  max-width: 340px;
+}
+.empty a {
+  text-decoration: underline;
+}
+.empty a.primary {
+  text-decoration: none;
+}
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  backdrop-filter: blur(3px);
+  z-index: 40;
+  transition: opacity 250ms var(--ease-out);
+}
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  width: min(540px, calc(100vw - 32px));
+  max-height: calc(100dvh - 64px);
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 28px;
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  z-index: 50;
+  transition:
+    opacity 250ms var(--ease-out),
+    transform 250ms var(--ease-out);
+}
+.modal[data-starting-style],
+.modal[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.96);
+}
+.backdrop[data-starting-style],
+.backdrop[data-ending-style] {
+  opacity: 0;
+}
+.wide {
+  width: min(800px, calc(100vw - 32px));
+}
+.modalHeading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.modalHeading h2 {
+  font-size: 1.4rem;
+  margin: 0 0 8px;
+}
+.modalHeading p {
+  font-size: 0.76rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.modalHeading .iconButton {
+  margin: -10px -12px 0 0;
+  align-self: flex-start;
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+}
+.formRow {
+  display: grid;
+  /* minmax(0, ...) lets a date box shrink, so 16px phone text can't push it past the edge. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.form > .primary {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+.demoDetails {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-bottom: 20px;
+}
+.demoDetails summary {
+  cursor: pointer;
+  min-height: 32px;
+}
+.demoDetails p {
+  margin-bottom: 10px;
+}
+.segment {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  padding: 3px;
+  border-radius: 8px;
+  gap: 2px;
+}
+.segment > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 38px;
+  min-height: 38px;
+  padding: 8px;
+  font-size: 0.7rem;
+  border-radius: 5px;
+  color: var(--muted);
+}
+.activeButton {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  box-shadow: var(--shadow-pop);
+}
+.noteGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.noteGrid .noteCard {
+  min-height: 230px;
+  padding: 22px 22px 0;
+}
+.noteGrid .noteCard h3 {
+  font-size: 1rem;
+}
+.noteGrid .excerpt {
+  font-size: 0.75rem;
+}
+.noteGrid .cardFooter {
+  font-size: 0.63rem;
+  padding: 15px 0;
+}
+.noteGrid .courseBadge {
+  font-size: 0.65rem;
+}
+.noteItem {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+/* Leave room for the action in grid and list views; narrow cards wrap whole items. */
+.noteItem .noteCard .cardFooter {
+  padding-right: 76px;
+  flex-wrap: wrap;
+}
+.noteItem .cardFooter > span {
+  white-space: nowrap;
+}
+.cardAction {
+  position: absolute;
+  right: 8px;
+  bottom: 0;
+  min-height: 44px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 8px;
+  font-size: 0.63rem;
+  font-weight: 500;
+  color: var(--danger);
+}
+.cardAction:hover {
+  background: var(--danger-soft);
+}
+.noteList {
+  grid-template-columns: 1fr;
+}
+.noteList .cardAction {
+  top: 50%;
+  bottom: auto;
+  translate: 0 -50%;
+}
+.noteList .noteCard {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 120px 1fr 200px;
+  gap: 20px;
+  padding: 18px 22px;
+  align-items: center;
+}
+.noteList .cardTop,
+.noteList h3,
+.noteList .excerpt {
+  margin: 0;
+}
+.noteList .excerpt {
+  display: none;
+}
+.noteList .cardFooter {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+.agenda {
+  align-self: start;
+}
+.agenda .textLink {
+  font-size: 0.65rem;
+}
+.settingsHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0 16px;
+  margin-bottom: 18px;
+}
+.settingsHeading > h2,
+.settingsHeading > p {
+  flex-basis: 100%;
+}
+.settingsHeading > span {
+  flex: 1 1 240px;
+}
+.settingsHeading h2 {
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+.settingsHeading p {
+  font-size: 0.72rem;
+}
+.accountSummary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  background: var(--surface-soft);
+  flex-wrap: wrap;
+}
+.accountSummary > .avatar {
+  height: 44px;
+  width: 44px;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.accountSummary > span:not(.avatar) {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.accountSummary + p {
+  margin: 12px 0 4px;
+  font-size: 0.72rem;
+}
+.accountSummary strong,
+.accountSummary small {
+  display: block;
+}
+.accountSummary strong {
+  font-size: 0.85rem;
+}
+.accountSummary small {
+  font-size: 0.7rem;
+  margin-top: 3px;
+}
+.settingRows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.settingRows > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+.settingRows > li:first-child {
+  border-top: 0;
+}
+.settingRows > li:last-child {
+  padding-bottom: 0;
+}
+.settingRows > li:not(.settingCourse) > span:first-child {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.settingRows strong {
+  display: block;
+  font-size: 0.78rem;
+}
+.settingRows small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.68rem;
+  margin-top: 4px;
+  line-height: 1.5;
+}
+.dangerOutline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 11px 17px;
+  border-radius: 7px;
+  border: 1px solid var(--danger-line);
+  background: var(--surface);
+  color: var(--danger);
+  font-size: 0.76rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.dangerOutline:hover {
+  background: var(--danger-soft);
+}
+.accountFields input[aria-invalid="true"] {
+  border-color: var(--danger-field);
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.settingRows > .settingCourse {
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  padding: 13px 0;
+}
+@media (hover: hover) and (pointer: fine) {
+  .noteCard:hover {
+      border-color: var(--hover-line);
+      box-shadow: var(--shadow-card-hover);
+    }
+  .iconButton:hover {
+      background: var(--nav);
+    }
+  .textLink:hover {
+      text-decoration: underline;
+    }
+  .primary:hover {
+      filter: brightness(1.05);
+    }
+}
+@media (max-width: 1250px) {
+  .quickNotes {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  .quickNotes > .noteCard:nth-child(3) {
+      display: none;
+    }
+  .noteGrid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (max-width: 1023px) {
+  .dashboardAside {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+  .quickNotes {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  .quickNotes > .noteCard:nth-child(3) {
+      display: flex;
+    }
+  .pageHeading {
+      align-items: flex-start;
+    }
+  .pageHeading .primary {
+      font-size: 0.68rem;
+      padding: 10px 12px;
+    }
+  .agenda {
+      width: 100%;
+    }
+  .noteList .noteCard {
+      grid-template-columns: 90px 1fr;
+    }
+  .noteList .cardFooter {
+      grid-column: 2;
+    }
+  .noteList .cardAction {
+      top: auto;
+      bottom: 0;
+      translate: none;
+    }
+}
+@media (max-width: 767px) {
+  .pageHeading {
+      gap: 14px;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+  .pageHeading h1 {
+      font-size: 1.75rem;
+      letter-spacing: -0.06em;
+    }
+  .pageHeading p {
+      font-size: 0.7rem;
+      max-width: 260px;
+    }
+  .eyebrow {
+      font-size: 0.57rem;
+      margin-bottom: 10px;
+    }
+  .pageHeading .actions .primary {
+      font-size: 0;
+      padding: 10px;
+      min-width: 44px;
+    }
+  .pageHeading .actions .primary > svg {
+      width: 20px;
+      height: 20px;
+    }
+  .quickNotes {
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+  .quickNotes > .noteCard:nth-child(3) {
+      display: none;
+    }
+  .noteCard {
+      padding: 15px 14px 0;
+      min-height: 206px;
+    }
+  .noteCard h3 {
+      font-size: 0.8rem;
+    }
+  .cardTop {
+      margin-bottom: 15px;
+    }
+  .cardFooter {
+      font-size: 0.5rem;
+    }
+  .sectionHeading h2 {
+      font-size: 0.95rem;
+    }
+  .sectionHeading p {
+      font-size: 0.65rem;
+    }
+  .sectionHeading .textLink {
+      font-size: 0.64rem;
+    }
+  .dashboardAside {
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
+  .dashboardAside .panel {
+      margin-bottom: 18px;
+    }
+  .dashboardAside .panel h2 {
+      font-size: 1rem;
+    }
+  .dashboardAside .eventText strong {
+      font-size: 0.8rem;
+    }
+  .dashboardAside .eventText small {
+      font-size: 0.65rem;
+    }
+  .dashboardAside .eventTime {
+      font-size: 0.72rem;
+      width: 45px;
+    }
+  .noteGrid {
+      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+    }
+  .noteGrid .noteCard {
+      padding: 15px 14px 0;
+      min-height: 220px;
+    }
+  .noteGrid .noteCard h3 {
+      font-size: 0.85rem;
+    }
+  .noteGrid .excerpt {
+      font-size: 0.64rem;
+    }
+  .noteGrid .courseBadge {
+      font-size: 0.53rem;
+    }
+  .noteGrid .cardFooter {
+      font-size: 0.5rem;
+    }
+  .noteList .noteCard {
+      display: flex;
+      gap: 10px;
+      min-height: 0;
+      padding-bottom: 14px;
+    }
+  .noteList .cardTop,
+  .noteList h3,
+  .noteList .cardFooter {
+      width: 100%;
+    }
+  .noteList .cardFooter {
+      margin-top: 4px;
+    }
+  .agenda .eventText strong {
+      font-size: 0.8rem;
+    }
+  .agenda .eventText small {
+      font-size: 0.65rem;
+    }
+  .modal {
+      top: auto;
+      bottom: 0;
+      left: 0;
+      translate: none;
+      width: 100%;
+      max-height: 92dvh;
+      border-radius: 18px 18px 0 0;
+      padding: 25px 22px max(25px, env(safe-area-inset-bottom));
+      transition:
+        transform 250ms var(--ease-drawer),
+        opacity 200ms var(--ease-out);
+    }
+  .modal[data-starting-style],
+  .modal[data-ending-style] {
+      transform: translateY(100%);
+      opacity: 1;
+    }
+  .modalHeading h2 {
+      font-size: 1.25rem;
+    }
+  .formRow {
+      gap: 10px;
+    }
+}
+@media (max-width: 360px) {
+  .cardFooter {
+      flex-wrap: wrap;
+    }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .backdrop {
+      backdrop-filter: none;
+      background: var(--overlay-strong);
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal[data-starting-style],
+  .modal[data-ending-style] {
+      transform: none;
+      opacity: 0;
+    }
+}
+.dashboardAside .sectionHeading .iconButton {
+  min-width: 44px;
+  min-height: 44px;
+}
+.accountFields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.hint {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.dayToggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dayToggles button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.dayToggles button[aria-pressed="true"] {
+  border: 2px solid var(--primary);
+  background: var(--sage);
+  font-weight: 600;
+}
+.checkLabel {
+  display: flex !important;
+  align-items: flex-start;
+  flex-direction: row !important;
+  gap: 10px;
+}
+.checkLabel input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  /* Text fields are at least 44px tall; a checkbox isn't, or it sits below its words. The whole
+     label stays the click target. */
+  min-height: 0;
+  padding: 0;
+  margin: 2px 0 0;
+}

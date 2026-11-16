@@ -1,7 +1,7 @@
 // Frontend test: the real Courses page, Settings and a course page with the API replaced. Every request must be scripted.
 import "@fontsource-variable/inter";
 import "../../../src/app/global.css";
-import "../../../src/app/App.module.css";
+import "../styles";
 import "../../../src/app/shell.module.css";
 import { MemoryRouter } from "react-router-dom";
 import { page, test, expect } from "../../shared/runner.js";
@@ -80,7 +80,7 @@ await test("7. Settings still lists courses or offers Add course", "src/features
   expect(inMain(root, "Add course") === null).toBe(true);
   expect(byText("Software Engineering") === null).toBe(true);
 });
-await test("8. A course page has no Upload syllabus button", "src/features/notes.tsx → CoursePage", async () => {
+await test("8. A course page has no Upload syllabus button", "src/features/course-page.tsx → CoursePage", async () => {
   stubApi(routes([cse442]));
   const root = mount(ui("/courses/c1"));
   await waitFor(() => inMain(root, "Upload syllabus"));

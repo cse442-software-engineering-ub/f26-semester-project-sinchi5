@@ -1,0 +1,138 @@
+.mobileOnly {
+  display: none;
+}
+.scheduleLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 22px;
+}
+.calendarPanel {
+  padding: 23px;
+}
+.calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.weekday {
+  text-align: center;
+  font-size: 0.6rem;
+  color: var(--muted);
+  padding: 14px 0;
+}
+.day {
+  min-height: 100px;
+  min-width: 0;
+  overflow: hidden;
+  border-top: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  padding: 9px 6px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.day:nth-child(7n) {
+  border-right: 0;
+}
+.day > span {
+  font-size: 0.7rem;
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+}
+.day small {
+  font-size: 0.48rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  background: var(--surface-soft);
+  border-radius: 3px;
+  padding: 4px 3px;
+}
+.day small i {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  margin-right: 3px;
+}
+.outside {
+  opacity: 0.35;
+}
+.selectedDay {
+  background: var(--nav);
+}
+.todayNumber {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+@media (max-width: 1250px) {
+  .scheduleLayout {
+      grid-template-columns: minmax(0, 1fr) 260px;
+      gap: 16px;
+    }
+  .calendarPanel {
+      padding: 16px;
+    }
+  .calendarPanel .sectionHeading {
+      flex-wrap: wrap;
+    }
+}
+@media (max-width: 1023px) {
+  .scheduleLayout {
+      grid-template-columns: 1fr;
+    }
+  .calendarPanel .sectionHeading {
+      flex-wrap: nowrap;
+    }
+}
+@media (max-width: 767px) {
+  .mobileOnly {
+      display: flex;
+    }
+  .mobileHide {
+      display: none;
+    }
+  .calendarPanel {
+      padding: 14px;
+    }
+  .calendarPanel .sectionHeading {
+      flex-wrap: wrap;
+    }
+  .calendarPanel .actions {
+      gap: 0;
+    }
+  .day {
+      min-height: 66px;
+      padding: 6px 3px;
+    }
+  .day small {
+      font-size: 0;
+      padding: 0;
+      height: 4px;
+      background: transparent;
+    }
+  .day small > i {
+      width: 5px;
+      height: 5px;
+    }
+  .day > span {
+      font-size: 0.65rem;
+    }
+  .weekday {
+      font-size: 0.55rem;
+    }
+  .scheduleLayout {
+      gap: 16px;
+    }
+  .agenda .mobileOnly {
+      margin-bottom: 14px;
+    }
+  .agenda .sectionHeading > .mobileOnly {
+      margin-bottom: 0;
+    }
+}

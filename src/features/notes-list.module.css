@@ -1,0 +1,150 @@
+.chip {
+  min-height: 44px;
+}
+.libraryToolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 30px 0 18px;
+  flex-wrap: wrap;
+}
+.search {
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 13px;
+  background: var(--surface);
+  color: var(--muted);
+}
+.search input {
+  border: 0;
+  padding-left: 0;
+  font-size: 0.74rem;
+}
+.libraryToolbar > select {
+  width: auto;
+  font-size: 0.73rem;
+}
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 12px;
+  padding: 20px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-bottom: 16px;
+}
+.filters label {
+  font-size: 0.7rem;
+}
+.filters input,
+.filters select {
+  font-size: 0.7rem;
+}
+.libraryMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-bottom: 18px;
+  min-height: 28px;
+}
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 20px;
+  background: var(--sage);
+  padding: 7px 12px;
+  font-size: 0.65rem;
+  min-height: 32px;
+}
+/* Card 42: one section per category on the notes page. */
+.categoryGroup + .categoryGroup {
+  margin-top: 32px;
+}
+.categoryHeading {
+  margin: 0 0 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+}
+@media (max-width: 1250px) {
+  .filters {
+      grid-template-columns: repeat(3, 1fr);
+    }
+}
+@media (max-width: 767px) {
+  .libraryToolbar {
+      gap: 8px;
+      margin-top: 23px;
+    }
+  .search {
+      flex-basis: 100%;
+    }
+  .libraryToolbar > select {
+      flex: 1;
+    }
+  .libraryToolbar .secondary {
+      font-size: 0.7rem;
+      padding: 10px 12px;
+    }
+  .libraryToolbar .segment > button {
+      min-height: 38px;
+      min-width: 36px;
+    }
+  .libraryMeta {
+      flex-wrap: wrap;
+      font-size: 0.65rem;
+    }
+  .libraryMeta .actions {
+      gap: 6px;
+    }
+  .filters {
+      grid-template-columns: 1fr 1fr;
+      padding: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+      gap: 12px;
+    }
+  .search input,
+  .libraryToolbar > select,
+  .filters input,
+  .filters select {
+      font-size: 1rem;
+    }
+}
+.libraryToolbar .segment > button,
+.chip {
+  min-width: 44px;
+  min-height: 44px;
+}
+/* Card 158: "Shared with me" on the Notes page and the read-only shared note. */
+.sharedList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sharedNote {
+  display: grid;
+  gap: 4px;
+  min-height: 44px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+.sharedNote small {
+  color: var(--muted);
+}

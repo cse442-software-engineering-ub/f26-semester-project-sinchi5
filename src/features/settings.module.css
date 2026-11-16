@@ -67,3 +67,51 @@
     overflow: visible;
   }
 }
+
+.confirmField {
+  margin-bottom: 17px;
+}
+.fieldError {
+  display: block;
+  margin-top: -8px;
+  color: var(--danger);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+.passwordRules + .fieldError {
+  margin-top: 8px;
+}
+.passwordRules {
+  list-style: none;
+  margin: -6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+.passwordRules li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.passwordRules li[data-met="true"] {
+  color: var(--text);
+}
+.passwordRules li[data-met="true"] svg {
+  color: var(--success);
+}
+.recoveryCode {
+  display: block;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-family: monospace;
+  font-size: 1.1rem;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.accountText {
+  overflow-wrap: anywhere;
+}

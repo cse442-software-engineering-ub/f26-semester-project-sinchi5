@@ -1,0 +1,28 @@
+.eventLink {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line);
+}
+.eventLink span,
+.eventLink small {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.eventLink strong {
+  font-size: 0.8rem;
+  flex: 1;
+}
+@media (max-width: 767px) {
+  .eventLink {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+  .eventLink > span {
+      width: 100%;
+    }
+}
+.shareStatus {
+  margin: -6px 0 22px;
+}

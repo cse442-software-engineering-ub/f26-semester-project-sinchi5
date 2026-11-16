@@ -4,7 +4,7 @@ import { GraduationCap, Plus, FileText } from "lucide-react";
 import { useApp } from "../app/context";
 import { dateKey } from "../services/fixtures";
 import { ImportDialog } from "./imports";
-import s from "../app/App.module.css";
+import s from "../shared/ui.module.css";
 import c from "./courses.module.css";
 
 export function Courses({ onAddCourse }: { onAddCourse: () => void }) {

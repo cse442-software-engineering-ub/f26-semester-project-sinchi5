@@ -55,7 +55,7 @@ await test("4. A request nobody scripted goes unnoticed", "tests/frontend/harnes
   expect(api.unexpected).toEqual(["login"]);
   api.unexpected.length = 0;                             // caught: clear it so this case itself passes
 });
-await test("5. The log in screen scrolls sideways on a 320 px phone", "src/app/App.module.css → .onboarding, .onboardingMain", async () => {
+await test("5. The log in screen scrolls sideways on a 320 px phone", "src/features/onboarding.module.css → .onboarding, .onboardingMain", async () => {
   stubApi({ session: signedOut });
   mount(ui, { width: 320 });
   await waitFor(() => byRole("button", "Log in"));

@@ -15,7 +15,8 @@ import { fileTypeProblem } from "../services/syllabus-file";
 import { checkMeeting } from "../services/syllabus";
 import { formatEventTime, Modal } from "../shared/ui";
 import { CLASS_KINDS, type DetectedEvent, type DetectedMeeting, type EventKind, type UploadKind, type UploadJob } from "../domain";
-import s from "../app/App.module.css";
+import css from "./imports.module.css";
+import s from "../shared/ui.module.css";
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const STEPS = ["Choose", "Read", "Check", "Done"];
 const PHASE_STEP: Record<string, number> = { pick: 0, queued: 1, processing: 1, failed: 1, review: 2, completed: 3 };
@@ -66,14 +67,14 @@ function ReadingLine() {
     : LONG_READ_LINES[(tick - READING_LINES.length) % LONG_READ_LINES.length];
   // Hidden from screen readers, which hear the status message once instead of every line. The key restarts
   // the highlighter swipe on each new line.
-  return <p className={s.readingLine} aria-hidden="true"><span key={line}>{line}</span></p>;
+  return <p className={css.readingLine} aria-hidden="true"><span key={line}>{line}</span></p>;
 }
 
 // Card 45: shows where the student is in the syllabus upload, so every screen says what comes next.
 function Steps({ phase }: { phase: string }) {
   const current = PHASE_STEP[phase] ?? 0;
   return (
-    <ol className={s.steps} aria-label={`Step ${current + 1} of ${STEPS.length}`}>
+    <ol className={css.steps} aria-label={`Step ${current + 1} of ${STEPS.length}`}>
       {STEPS.map((step, i) => (
         <li key={step} aria-current={i === current ? "step" : undefined} data-done={i < current || undefined}>
           {i < current ? <Check size={13} aria-hidden="true" /> : <span aria-hidden="true">{i + 1}</span>}
@@ -358,11 +359,11 @@ export function ImportDialog({
             ) : (
               <p className={s.notice}>
                 Add a course in Courses before uploading its syllabus.{" "}
-                <Link className={s.inlineLink} to="/courses" onClick={onClose}>Go to Courses</Link>
+                <Link className={css.inlineLink} to="/courses" onClick={onClose}>Go to Courses</Link>
               </p>
             ))}
           <label
-            className={s.dropzone}
+            className={css.dropzone}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault();
@@ -405,7 +406,7 @@ export function ImportDialog({
           {kind === "syllabus" && (
             <details className={s.demoDetails}>
               <summary>Tips for the best result</summary>
-              <ul className={s.tips}>
+              <ul className={css.tips}>
                 <li>The PDF or Word file from your course website works best.</li>
                 <li>A photo works too: lay the page flat in good light, with every date readable.</li>
                 <li>For a very long syllabus, the pages with your class times and the course schedule are enough.</li>
@@ -436,9 +437,9 @@ export function ImportDialog({
       {(phase === "queued" || phase === "processing") && (
         <div className={s.empty} role="status">
           {kind === "syllabus" ? (
-            <span className={s.readingPage} aria-hidden="true"><i /><i /><i /><i /></span>
+            <span className={css.readingPage} aria-hidden="true"><i /><i /><i /><i /></span>
           ) : (
-            <LoaderCircle className={s.spinner} size={36} />
+            <LoaderCircle className={css.spinner} size={36} />
           )}
           <h3>
             {phase === "queued"
@@ -491,7 +492,7 @@ export function ImportDialog({
               : `We read ${job.name}, but it doesn’t list weekly classes or dated work.`}{" "}
             Nothing was added to your schedule.
           </p>
-          <div className={`${s.actions} ${s.completionActions}`}>
+          <div className={`${s.actions} ${css.completionActions}`}>
             <button className={s.primary} onClick={addEvent}>
               <Plus size={16} /> Add events by hand
             </button>
@@ -554,7 +555,7 @@ export function ImportDialog({
               />
             </label>
           )}
-          <div className={kind === "syllabus" ? undefined : `${s.formRow} ${s.importMetadata}`}>
+          <div className={kind === "syllabus" ? undefined : `${s.formRow} ${css.importMetadata}`}>
             <label>
               Course
               <select
@@ -615,7 +616,7 @@ export function ImportDialog({
           {/* Card 46: weekly classes first, then dated work, each saying if the file had none. */}
           {kind === "syllabus" && meetings.length > 0 && (
             <>
-              <h3 className={s.reviewHeading}>Your classes <span className={s.hint}>repeat weekly</span></h3>
+              <h3 className={css.reviewHeading}>Your classes <span className={s.hint}>repeat weekly</span></h3>
               {!!job.noClassDates?.length && (
                 <p className={s.hint}>
                   No class on {job.noClassDates.map(({ from, to }) => (from === to ? shortDate(from) : `${shortDate(from)}–${shortDate(to)}`)).join(", ")}, from your syllabus.
@@ -626,7 +627,7 @@ export function ImportDialog({
                   {/* A class offered at several times: the student attends one, so none is assumed. */}
                   {meeting.section && meetings.filter((m) => m.kind === meeting.kind && m.section).length > 1
                     && !meetings.slice(0, i).some((m) => m.kind === meeting.kind && m.section) && (
-                    <p className={s.reviewSubheading}>Pick your {meeting.kind} section</p>
+                    <p className={css.reviewSubheading}>Pick your {meeting.kind} section</p>
                   )}
                   <ClassReview
                     meeting={meeting}
@@ -640,7 +641,7 @@ export function ImportDialog({
           {kind === "syllabus" && !meetings.length && foundEvents > 0 && (
             <p className={s.hint}>We didn’t find weekly class times in this file.</p>
           )}
-          {kind === "syllabus" && meetings.length > 0 && <h3 className={s.reviewHeading}>Due dates and exams</h3>}
+          {kind === "syllabus" && meetings.length > 0 && <h3 className={css.reviewHeading}>Due dates and exams</h3>}
           {kind === "syllabus" && meetings.length > 0 && !foundEvents && (
             <p className={s.hint}>We didn’t find any dated work in this file.</p>
           )}
@@ -777,7 +778,7 @@ export function ImportDialog({
       )}
       {phase === "completed" && (
         <div className={s.empty}>
-          <span className={s.successIcon}>
+          <span className={css.successIcon}>
             <Check size={28} />
           </span>
           <h3>A little more organized.</h3>
@@ -802,7 +803,7 @@ export function ImportDialog({
             );
           })()}
           {/* Card 48: open the schedule on the earliest added event, so it is in view. */}
-          <div className={`${s.actions} ${s.completionActions}`}>
+          <div className={`${s.actions} ${css.completionActions}`}>
             {kind === "syllabus" && (
               <Link
                 className={s.primary}

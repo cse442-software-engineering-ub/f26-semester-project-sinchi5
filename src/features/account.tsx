@@ -2,12 +2,12 @@ import { useRef, useState, type FormEvent } from "react";
 import { Check, Circle } from "lucide-react";
 import { useApp } from "../app/context";
 import { Avatar, Modal } from "../shared/ui";
-import s from "../app/App.module.css";
+import s from "../shared/ui.module.css";
 import d from "./settings.module.css";
 import { PASSWORD_MAX, PASSWORD_MIN, emailError, nameError, passwordCharacterError, passwordError } from "../services/validation";
 
 export function FieldError({ id, message }: { id: string; message: string }) {
-  return message ? <small id={id} className={s.fieldError}>{message}</small> : null;
+  return message ? <small id={id} className={d.fieldError}>{message}</small> : null;
 }
 
 export function PasswordRequirements({ id, password, confirmation }: { id: string; password: string; confirmation?: string }) {
@@ -19,13 +19,13 @@ export function PasswordRequirements({ id, password, confirmation }: { id: strin
     ...(confirmation === undefined ? [] : [{ label: "Passwords match", met: password !== "" && password === confirmation }]),
   ];
   return <div id={id} aria-live="polite">
-    <ul className={s.passwordRules}>
+    <ul className={d.passwordRules}>
       {rules.map(r => <li key={r.label} data-met={r.met}>
         {r.met ? <Check size={14} aria-hidden="true" /> : <Circle size={14} aria-hidden="true" />}
         {r.label}<span className={s.srOnly}>{r.met ? " (met)" : " (not met)"}</span>
       </li>)}
     </ul>
-    {characterError && <small className={s.fieldError}>{characterError}</small>}
+    {characterError && <small className={d.fieldError}>{characterError}</small>}
   </div>;
 }
 
@@ -34,7 +34,7 @@ export function RecoveryCode({ code, onDone }: { code: string; onDone: () => voi
   return <section className={s.form} aria-label="Save your recovery code">
     <h2>Save your recovery code</h2>
     <p>Keep this code somewhere safe, such as a password manager. It is shown only once. You will need it if you forget your password.</p>
-    <output className={s.recoveryCode} aria-label="Recovery code">{code}</output>
+    <output className={d.recoveryCode} aria-label="Recovery code">{code}</output>
     <p className={s.muted}>A new code replaces any previous code. Without your password or this code, you cannot recover your account.</p>
     <label className={s.checkLabel}><input type="checkbox" checked={saved} onChange={e => setSaved(e.target.checked)} />I saved my recovery code</label>
     <button className={s.primary} disabled={!saved} onClick={onDone}>Continue</button>
@@ -157,8 +157,8 @@ export function AccountSettings({ danger = false }: { danger?: boolean } = {}) {
     <div className={s.accountSummary} role="group" aria-label="Account summary" aria-busy={busy}>
       {state.user && <Avatar user={state.user} version={state.photoVersion} alt="" />}
       <span>
-        <strong className={s.accountText}>{state.user?.name}</strong>
-        <small className={`${s.muted} ${s.accountText}`}>{state.user?.email}</small>
+        <strong className={d.accountText}>{state.user?.name}</strong>
+        <small className={`${s.muted} ${d.accountText}`}>{state.user?.email}</small>
       </span>
       <>
         <input ref={photoInput} type="file" accept=".png,.jpg,.jpeg,.webp" aria-label="Profile photo" hidden disabled={busy}

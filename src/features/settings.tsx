@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useApp } from "../app/context";
 import { Modal, PageHeading } from "../shared/ui";
-import s from "../app/App.module.css";
+import s from "../shared/ui.module.css";
 import a from "./appearance.module.css";
 import l from "./settings.module.css";
 import type { ColorScheme, ThemeMode } from "../domain";
@@ -128,7 +128,7 @@ export function Settings() {
           onClose={() => setReset(false)}
         >
           {(
-            <label className={s.confirmField}>
+            <label className={l.confirmField}>
               Type CLEAR to confirm
               <input
                 value={confirmText}

@@ -4,7 +4,10 @@ import { useApp } from "../app/context";
 import { dateKey } from "../services/fixtures";
 import { semesterList } from "../services/semester";
 import { EventDialog } from "./schedule";
-import s from "../app/App.module.css";
+import css from "./assignments.module.css";
+import s from "../shared/ui.module.css";
+// Shared classes this screen's own rules also name (see assignments.module.css), applied together.
+const both = { sectionHeading: `${s.sectionHeading} ${css.sectionHeading}`, textLink: `${s.textLink} ${css.textLink}` };
 
 function displayDate(date: string) {
   return new Date(`${date}T12:00:00`).toLocaleDateString("en-US", {
@@ -57,15 +60,15 @@ export function Assignments() {
       <button
         key={event.id}
         type="button"
-        className={s.assignmentRow}
+        className={css.assignmentRow}
         onClick={() => setSelectedEvent(event)}
       >
-        <span className={s.assignmentWhen}>
+        <span className={css.assignmentWhen}>
           <strong>{displayDate(event.date)}</strong>
           <span>{displayTime(event.time)}</span>
         </span>
 
-        <span className={s.assignmentInfo}>
+        <span className={css.assignmentInfo}>
           <strong>{event.title}</strong>
           <span>
             {courseLabel(event)} · {event.kind}
@@ -77,8 +80,8 @@ export function Assignments() {
 
   return (
     <>
-      <div className={s.assignmentsPage}>
-        <div className={s.sectionHeading}>
+      <div className={css.assignmentsPage}>
+        <div className={both.sectionHeading}>
           <div>
             <h1>Assignments</h1>
             <p className={s.muted}>
@@ -86,7 +89,7 @@ export function Assignments() {
             </p>
           </div>
 
-          <label className={s.assignmentFilter}>
+          <label className={css.assignmentFilter}>
             Course
             <select
               value={courseFilter}
@@ -110,12 +113,12 @@ export function Assignments() {
             <p>Add events in your schedule or upload a syllabus.</p>
           </div>
         ) : (
-          <div className={s.assignmentWeeks}>
+          <div className={css.assignmentWeeks}>
             {upcoming.map((week) => (
-              <section key={week.weekStart} className={s.assignmentWeek}>
+              <section key={week.weekStart} className={css.assignmentWeek}>
                 <h2>{week.label}</h2>
 
-                <div className={s.assignmentRows}>
+                <div className={css.assignmentRows}>
                   {week.events.map(eventRow)}
                 </div>
               </section>
@@ -124,20 +127,20 @@ export function Assignments() {
         )}
 
         {past.length > 0 && (
-          <div className={s.assignmentPast}>
+          <div className={css.assignmentPast}>
             <button
               type="button"
-              className={s.textLink}
+              className={both.textLink}
               onClick={() => setShowPast((current) => !current)}
             >
               {showPast ? "Hide past items" : "Show past items"}
             </button>
 
             {showPast && (
-              <section className={s.assignmentWeek}>
+              <section className={css.assignmentWeek}>
                 <h2>Earlier this semester</h2>
 
-                <div className={s.assignmentRows}>
+                <div className={css.assignmentRows}>
                   {past.map(eventRow)}
                 </div>
               </section>
