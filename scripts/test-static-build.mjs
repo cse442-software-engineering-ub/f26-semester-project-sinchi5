@@ -70,12 +70,11 @@ try {
       page.setDefaultTimeout(20_000);
       const first = await page.goto(origin + base);
       assert.equal(first.status(), 200);
-      await expect(page.getByRole("heading", { name: "Welcome to your space." })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Good to see you again." })).toBeVisible();
       assert.equal(new URL(page.url()).hash, "#/welcome");
       assert.equal((await page.reload()).status(), 200);
-      await expect(page.getByRole("heading", { name: "Welcome to your space." })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Good to see you again." })).toBeVisible();
 
-      await page.getByRole("button", { name: "Log in" }).click();
       await page.getByLabel("Email address").fill("routes@example.edu");
       await page.getByLabel("Password", { exact: true }).fill("Routing fixture password 42!");
       await page.getByRole("button", { name: "Log in", exact: true }).click();
