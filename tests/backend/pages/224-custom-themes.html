@@ -1,0 +1,107 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>224 Backend: Save up to four custom themes</title>
+<link rel="stylesheet" href="../../shared/runner.css">
+<script type="module">
+// Backend test: real API, no screen code. Imports nothing from src/.
+import { page, test, expect, api, signIn, signOut } from "../../shared/runner.js";
+
+page({ card: "224", title: "Backend: Save up to four custom themes", kind: "backend" });
+const A = "notely-task224-442@example.edu";
+const B = "notely-task224b-442@example.edu";
+const FILE = "backend/lib/preferences.php → themeAction";
+const colorMsg = "Use a color like #1a2b3c for the accent, background, and text.";
+const nameMsg = "Enter a theme name of 1 to 30 visible characters.";
+const notFound = "That theme was not found.";
+const good = { name: "Dusk", accent: "#AA5533", background: "#101820", text: "#EEEEEE" };
+const prefs = async () => (await api("session")).body.preferences;
+
+// Start and end clean: no custom themes, defaults chosen. Accounts are never deleted.
+async function clean() {
+  for (const who of [A, B]) {
+    await signIn(who);
+    for (const t of (await prefs()).customThemes) await api("theme-delete", { id: t.id });
+    await api("preferences", { mode: "system", scheme: "sage" });
+  }
+}
+await clean();
+await signOut();
+
+await test("1. A signed-out visitor can save or delete a theme", "backend/index.php (the signed-in route check)", async () => {
+  expect(await api("theme-save", good)).toEqual(401, { error: "Sign in to continue." });
+  expect(await api("theme-delete", { id: "0123456789abcdef" })).toEqual(401, { error: "Sign in to continue." });
+});
+await test("2. The wrong method or an oversized body is accepted", "backend/index.php (the method and size checks)", async () => {
+  await signIn(A);
+  expect(await api.raw("GET", "theme-save")).toEqual(405, { error: "This request method is not supported." });
+  expect(await api.raw("POST", "theme-save", JSON.stringify({ ...good, name: "x".repeat(9000) }))).toEqual(413, { error: "This request is too large." });
+});
+await test("3. A student with no themes does not get an empty list", "backend/lib/preferences.php → preferencesFor", async () => {
+  expect(await prefs()).toEqual({ mode: "system", scheme: "sage", customThemes: [] });
+});
+await test("4. A saved theme is not read back with a server id and lowercase colors", FILE, async () => {
+  const r = await api("theme-save", good);
+  expect(r.status).toBe(200);
+  const t = r.body.preferences.customThemes[0];
+  expect(r.body.preferences.customThemes.length).toBe(1);
+  expect(/^[0-9a-f]{16}$/.test(t.id)).toBe(true);
+  expect({ ...t, id: "x" }).toEqual({ id: "x", name: "Dusk", accent: "#aa5533", background: "#101820", text: "#eeeeee" });
+  expect((await prefs()).customThemes).toEqual([t]);
+});
+await test("5. Saving with an id adds a second theme instead of changing the first", FILE, async () => {
+  const id = (await prefs()).customThemes[0].id;
+  const r = await api("theme-save", { ...good, id, name: "Dusk 2", accent: "#112233" });
+  expect(r.body.preferences.customThemes).toEqual([{ id, name: "Dusk 2", accent: "#112233", background: "#101820", text: "#eeeeee" }]);
+});
+await test("6. A color that is not exactly #rrggbb (red, #fff, #12345g, CSS text) is stored", FILE, async () => {
+  const before = await prefs();
+  for (const bad of ["red", "#fff", "#12345g", "#123456;}body{display:none", "#1234567", " #123456", 123456, null, ["#123456"]])
+    for (const key of ["accent", "background", "text"]) expect(await api("theme-save", { ...good, [key]: bad })).toEqual(422, { error: colorMsg });
+  expect(await api("theme-save", { name: "No colors" })).toEqual(422, { error: colorMsg });
+  expect(await prefs()).toEqual(before);
+});
+await test("7. A blank, empty, or 31-character name is stored, or 30 characters is refused", FILE, async () => {
+  for (const name of ["", "   ", "x".repeat(31), 5, null, "Bell\u0007"]) expect(await api("theme-save", { ...good, name })).toEqual(422, { error: nameMsg });
+  const ok = await api("theme-save", { ...good, name: "y".repeat(30) });
+  expect(ok.status).toBe(200);
+  await api("theme-delete", { id: ok.body.preferences.customThemes.at(-1).id });
+});
+await test("8. A script in the name is run or changed instead of returned as plain text", FILE, async () => {
+  const name = "<script>alert(1)<\/script>'; DROP TABLE notely_preferences; --".slice(0, 30);
+  const r = await api("theme-save", { ...good, name });
+  expect(r.body.preferences.customThemes.at(-1).name).toBe(name);
+  expect((await prefs()).customThemes.at(-1).name).toBe(name);
+  await api("theme-delete", { id: r.body.preferences.customThemes.at(-1).id });
+});
+await test("9. A fifth theme is saved", FILE, async () => {
+  for (let i = 0; i < 3; i++) expect((await api("theme-save", { ...good, name: `Extra ${i}` })).status).toBe(200);
+  expect((await prefs()).customThemes.length).toBe(4);
+  expect(await api("theme-save", { ...good, name: "Fifth" })).toEqual(422, { error: "You can save up to 4 themes. Delete one to add another." });
+  const first = (await prefs()).customThemes[0];
+  expect((await api("theme-save", { ...good, id: first.id, name: "Still four" })).body.preferences.customThemes.length).toBe(4);
+  for (const t of (await prefs()).customThemes.slice(1)) await api("theme-delete", { id: t.id });
+});
+await test("10. Another student's theme can be updated, deleted, or selected", "backend/lib/preferences.php → themeAction, preferenceAction (the owned-id check)", async () => {
+  const mine = (await prefs()).customThemes[0];
+  await signIn(B);
+  expect((await prefs()).customThemes).toEqual([]);
+  expect(await api("theme-save", { ...good, id: mine.id })).toEqual(404, { error: notFound });
+  expect(await api("theme-delete", { id: mine.id })).toEqual(404, { error: notFound });
+  expect((await api("preferences", { mode: "dark", scheme: `custom:${mine.id}` })).status).toBe(422);
+  expect(await prefs()).toEqual({ mode: "system", scheme: "sage", customThemes: [] });
+  await signIn(A);
+  expect((await prefs()).customThemes).toEqual([mine]);
+});
+await test("11. Selecting your own theme is refused, or deleting it keeps it selected", FILE, async () => {
+  const mine = (await prefs()).customThemes[0];
+  expect((await api("preferences", { mode: "dark", scheme: `custom:${mine.id}` })).body.preferences).toEqual({ mode: "dark", scheme: `custom:${mine.id}`, customThemes: [mine] });
+  expect(await api("preferences", { mode: "dark", scheme: "custom:ffffffffffffffff" })).toEqual(422, { error: "Choose sage, fjord, rose, or mocha." });
+  expect(await api("theme-delete", { id: mine.id })).toEqual(200, { preferences: { mode: "dark", scheme: "sage", customThemes: [] } });
+  expect(await prefs()).toEqual({ mode: "dark", scheme: "sage", customThemes: [] });
+  expect(await api("theme-delete", { id: mine.id })).toEqual(404, { error: notFound });
+});
+
+await clean();
+await signOut();
+</script>

@@ -105,7 +105,7 @@ try {
         $result = courseAction($db, $config, $session, $route, $input);
     } elseif (in_array($route, PREFERENCE_ROUTES, true)) {
         requireCsrf($session, $config);
-        $result = preferenceAction($db, $config, $session, $input);
+        $result = preferenceAction($db, $config, $session, $route, $input);
     } elseif (in_array($route, IMPORT_ROUTES, true)) {
         if ($method === 'POST') requireCsrf($session, $config);
         $result = importAction($db, $config, $session, $route, $input);

@@ -72,7 +72,7 @@ $tables = [
     ],
     'notely_preferences' => [
         'user_id' => ['bigint unsigned', 'NO'], 'mode' => ["enum('system','light','dark')", 'NO'],
-        'scheme' => ["enum('sage','fjord','rose','mocha')", 'NO'], 'updated_at' => ['datetime', 'NO'],
+        'scheme' => ['varchar(40)', 'NO'], 'custom_themes' => ['json', 'YES'], 'updated_at' => ['datetime', 'NO'],
     ],
 ];
 foreach ($tables as $table => $columns) {

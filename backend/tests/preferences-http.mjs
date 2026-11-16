@@ -37,7 +37,7 @@ const a = client(), b = client();
 let passed = 0;
 const pass = (what) => { passed++; console.log(`PASS ${passed}: ${what}`); };
 const err = (r, status, message) => assert.deepEqual([r.status, r.data], [status, { error: message }]);
-const defaults = { mode: "system", scheme: "sage" };
+const defaults = { mode: "system", scheme: "sage", customThemes: [] };
 
 await a.join(); await b.join();
 try {
@@ -48,10 +48,10 @@ try {
   err(await a.call("preferences"), 405, "This request method is not supported.");
   err(await a.call("preferences", {}, { raw: "x".repeat(9000) }), 413, "This request is too large.");
   pass("GET is 405, an oversized body is 413");
-  assert.deepEqual((await a.call("preferences", { mode: "dark", scheme: "mocha" })).data, { preferences: { mode: "dark", scheme: "mocha" } });
-  assert.deepEqual((await a.call("session")).data.preferences, { mode: "dark", scheme: "mocha" });
-  assert.deepEqual((await a.call("preferences", { mode: "light", scheme: "rose" })).data.preferences, { mode: "light", scheme: "rose" });
-  assert.deepEqual((await a.call("session")).data.preferences, { mode: "light", scheme: "rose" });
+  assert.deepEqual((await a.call("preferences", { mode: "dark", scheme: "mocha" })).data, { preferences: { mode: "dark", scheme: "mocha", customThemes: [] } });
+  assert.deepEqual((await a.call("session")).data.preferences, { mode: "dark", scheme: "mocha", customThemes: [] });
+  assert.deepEqual((await a.call("preferences", { mode: "light", scheme: "rose" })).data.preferences, { mode: "light", scheme: "rose", customThemes: [] });
+  assert.deepEqual((await a.call("session")).data.preferences, { mode: "light", scheme: "rose", customThemes: [] });
   pass("saving then reading back through session, and saving again replaces");
   assert.deepEqual((await b.call("session")).data.preferences, defaults);
   for (const mode of ["system", "light", "dark"]) for (const scheme of ["sage", "fjord", "rose", "mocha"]) {
@@ -62,7 +62,7 @@ try {
   for (const [body, msg] of [[{ scheme: "sage" }, modeMsg], [{ mode: "blue", scheme: "sage" }, modeMsg], [{ mode: 1, scheme: "sage" }, modeMsg],
     [{ mode: "dark" }, schemeMsg], [{ mode: "dark", scheme: "neon" }, schemeMsg], [{ mode: "dark", scheme: ["sage"] }, schemeMsg],
     [{ mode: "dark", scheme: "<script>alert(1)</script>'; DROP TABLE notely_preferences; --" }, schemeMsg]]) err(await a.call("preferences", body), 422, msg);
-  assert.deepEqual((await a.call("session")).data.preferences, { mode: "dark", scheme: "mocha" });
+  assert.deepEqual((await a.call("session")).data.preferences, { mode: "dark", scheme: "mocha", customThemes: [] });
   pass("every invalid choice is 422 and nothing is stored");
 } finally {
   for (const p of [a, b]) await p.call("delete", { password }).catch(() => {});
