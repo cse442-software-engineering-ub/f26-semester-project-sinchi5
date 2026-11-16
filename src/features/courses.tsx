@@ -31,7 +31,7 @@ export function Courses({ onAddCourse }: { onAddCourse: () => void }) {
         <div className={c.empty}>
           <GraduationCap size={32} />
           <h2>No courses yet</h2>
-          <p>Add a course to keep its notes, events and deadlines together.</p>
+          <p>Use Add course to keep its notes, events and deadlines together.</p>
           <div className={c.actions}>{actions}</div>
         </div>
       ) : (

@@ -224,6 +224,15 @@ export function formatEventTime(time: string) {
   return `${hours % 12 || 12}:${parts[2]} ${hours < 12 ? "AM" : "PM"}`;
 }
 
+// "1 note", "2 notes".
+export const countOf = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+// "December 1 · 5:00 PM", or "December 1 · All day" when the event has no time.
+export function formatEventWhen(date: string, time: string) {
+  const day = new Date(`${date}T12:00:00`).toLocaleDateString("en-US", { month: "long", day: "numeric" });
+  return `${day} · ${time ? formatEventTime(time) : "All day"}`;
+}
+
 export function EventRow({
   event,
   onClick,

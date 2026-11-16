@@ -595,14 +595,14 @@
   background: transparent;
 }
 .miniWeek .weekToday {
-  background: #e8efdf;
-  color: #526549;
+  background: var(--sage);
+  color: var(--muted);
 }
 .miniWeek .weekToday strong {
-  color: #425b3e;
+  color: var(--text);
 }
 .weekToday i {
-  background: #7e926d;
+  background: var(--primary);
 }
 .smallHeading {
   font-size: 0.54rem;

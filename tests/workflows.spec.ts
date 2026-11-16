@@ -54,7 +54,7 @@ test("account and complete onboarding", async ({ page }) => {
   await page.getByLabel("I saved my recovery code").check();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.getByText("No courses yet")).toBeVisible();
-  await page.getByRole("button", { name: "Add a course" }).click();
+  await page.getByRole("button", { name: "Add course" }).click();
   await page.getByLabel("Course code").fill("ART 101");
   await page.getByLabel("Course name").fill("Ways of Seeing");
   await page.getByRole("button", { name: "Add course", exact: true }).click();
