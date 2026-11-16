@@ -2,6 +2,7 @@
 // support/account-fixture.ts. The card's by-hand steps run the same checks on aptitude.
 import type { Page } from "@playwright/test";
 import { test, expect } from "./support/account-fixture";
+import { accountButton, logOut as logOutShell, openSettings } from "./support/shell";
 
 const email = "notely-task-recovery-442@example.edu";
 const first = "Sample river password 42!";
@@ -27,10 +28,11 @@ async function signUp(page: Page) {
   await expect(page.getByRole("heading", { name: /Good .*Recovery/ })).toBeVisible();
   return code;
 }
-const logOutButton = (page: Page) => page.getByRole("button", { name: "Log out", exact: true }).filter({ visible: true }).first();
+// Log out lives in the account menu: its button is the visible menu button that is not New or More.
+const logOutButton = accountButton;
 // Logging out from Home shows the welcome screen, and from other pages the sign-in screen, so both are handled.
 async function logOut(page: Page) {
-  await logOutButton(page).click();
+  await logOutShell(page);
   await expect(page.getByRole("heading", { name: /^(Welcome to your space\.|Good to see you again\.)$/ })).toBeVisible();
   const already = page.getByRole("button", { name: "I already have an account" });
   if (await already.isVisible()) await already.click();
@@ -95,7 +97,7 @@ test("Task test 3 - a badly typed code is caught before anything is sent", async
 
 test("Task test 4 - replacing the code in Settings stops the old one", async ({ page }) => {
   const code = await signUp(page);
-  await page.getByRole("link", { name: "Settings" }).filter({ visible: true }).first().click();
+  await openSettings(page);
   await page.getByRole("button", { name: "Replace recovery code" }).click();
   const replace = page.getByRole("dialog", { name: "Replace recovery code" });
   await expect(replace.getByText("Your previous recovery code will stop working. Save the replacement before leaving this screen.")).toBeVisible();

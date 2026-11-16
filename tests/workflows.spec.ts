@@ -1,6 +1,7 @@
 import { type Page } from "@playwright/test";
 import { test, expect } from "./support/account-fixture";
 import AxeBuilder from "@axe-core/playwright";
+import { openNew, openSettings } from "./support/shell";
 async function demo(page: Page) {
   await page.goto("/");
   await page.getByRole("button", { name: "Take a look around first" }).click();
@@ -24,45 +25,20 @@ async function upload(page: Page, kind: string, name = "lecture.pdf") {
   // The review form ends with "Save to my notes", or "Add to schedule" for a syllabus (card 46).
   await expect(page.getByRole("button", { name: /^(Save to my notes|Add to schedule)/ })).toBeVisible();
 }
-test("the workspace header has no dropdown arrow", async ({ page }) => {
-  await page.setViewportSize({ width: 1024, height: 768 });
+test("the left menu is navigation only and Settings lives in the account menu", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
   await demo(page);
   const sidebar = page.locator("aside");
-  const workspace = sidebar.getByText("My workspace", { exact: true }).locator("../..");
-  const initial = await page.getByRole("link", { name: "Your account", exact: true }).innerText();
   const greeting = await page.getByRole("heading", { name: /Good (morning|afternoon|evening)/ }).innerText();
-
-  await expect(workspace.locator(":scope > span").first()).toHaveText(initial);
-  await expect(workspace.locator("svg")).toHaveCount(0);
-  expect(await workspace.evaluate((element) => element.tagName)).toBe("DIV");
-  await expect(workspace).not.toHaveAttribute("role", "button");
-  await expect(workspace).not.toHaveAttribute("aria-haspopup");
-  await expect(workspace).not.toHaveAttribute("aria-expanded");
-  await expect(workspace.locator("button, a, [tabindex], [role='button']")).toHaveCount(0);
-  await sidebar.getByRole("link", { name: /Notely/ }).focus();
-  await page.keyboard.press("Tab");
-  await expect(sidebar.getByRole("link", { name: "Today", exact: true })).toBeFocused();
-
-  for (const [link, heading] of [["Schedule", "Your schedule"], ["Notes", "Your notes"], ["Settings", "Settings"], ["Today", greeting]]) {
-    await sidebar.getByRole("link", { name: link === "Notes" ? /^Notes\b/ : link, exact: true }).click();
+  await expect(sidebar.getByRole("link", { name: "Settings" })).toHaveCount(0);
+  await expect(sidebar.getByRole("button", { name: "Log out" })).toHaveCount(0);
+  for (const [link, heading] of [["Schedule", "Your schedule"], ["Notes", "Your notes"], ["Courses", "Courses"], ["Today", greeting]]) {
+    await sidebar.getByRole("link", { name: link, exact: true }).click();
     await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: link, exact: true })).toHaveAttribute("aria-current", "page");
   }
-
-  for (const viewport of [{ width: 1024, height: 768 }, { width: 800, height: 1000 }]) {
-    await page.setViewportSize(viewport);
-    await expect(workspace.getByText("My workspace", { exact: true })).toBeVisible();
-    await expect(workspace.getByText("A little room to think", { exact: true })).toBeVisible();
-    await expect(workspace.locator("svg")).toHaveCount(0);
-    const text = workspace.locator(":scope > span").nth(1);
-    expect(await text.evaluate((element) => {
-      const parent = element.parentElement!.getBoundingClientRect();
-      return element.scrollWidth <= element.clientWidth &&
-        [...element.children].every((child) => {
-          const bounds = child.getBoundingClientRect();
-          return child.scrollWidth <= child.clientWidth && bounds.left >= parent.left && bounds.right <= parent.right;
-        });
-    })).toBe(true);
-  }
+  await openSettings(page);
+  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
 });
 
 test("account and complete onboarding", async ({ page }) => {
@@ -199,10 +175,7 @@ test("upload documents and scan, syllabus reviewed events", async ({
 });
 test("dialog keyboard behavior and theme persistence", async ({ page }) => {
   await demo(page);
-  await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page
-    .getByRole("menuitem", { name: "Upload document", exact: true })
-    .click();
+  await openNew(page, "Upload document");
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).not.toBeVisible();
@@ -267,10 +240,7 @@ test("new note saves explicitly before leaving", async ({ page }) => {
 });
 test("invalid uploads and failure recovery", async ({ page }) => {
   await demo(page);
-  await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page
-    .getByRole("menuitem", { name: "Upload document", exact: true })
-    .click();
+  await openNew(page, "Upload document");
   await page
     .getByLabel("Choose upload file")
     .setInputFiles({

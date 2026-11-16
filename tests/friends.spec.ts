@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { test, expect } from "./support/account-fixture";
+import { logOut as logOutShell } from "./support/shell";
 
 // Card 154: the Friends page. The account fixture stands in for the card 153 PHP routes,
 // so requests sent by one student show up for another within a test.
@@ -24,7 +25,7 @@ async function signUp(page: Page, name: string, email: string) {
   await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening)/ })).toBeVisible();
 }
 async function logOut(page: Page) {
-  await page.getByRole("button", { name: "Log out", exact: true }).click();
+  await logOutShell(page);
   await expect(page.getByRole("button", { name: /^(Log In|I already have an account)$/ })).toBeVisible();
 }
 async function logIn(page: Page, email: string) {
@@ -40,7 +41,12 @@ function menu(page: Page) {
   return page.getByRole("navigation", { name: /^(Main|Mobile) navigation$/ }).filter({ visible: true });
 }
 async function openFriends(page: Page) {
-  await menu(page).getByRole("link", { name: "Friends", exact: true }).click();
+  // Friends is a left-menu link on a computer and sits under "More" on a phone.
+  const more = page.getByRole("button", { name: "More", exact: true });
+  if (await more.isVisible()) {
+    await more.click();
+    await page.getByRole("menuitem", { name: "Friends", exact: true }).click();
+  } else await menu(page).getByRole("link", { name: "Friends", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Friends", exact: true, level: 1 })).toBeVisible();
 }
 async function sendRequest(page: Page, email: string) {
@@ -52,9 +58,10 @@ const empty = "No friends yet. Add a classmate by email.";
 
 test("Friends page opens from the menu after Notes and starts empty", async ({ page }) => {
   await signUp(page, "Friend Ana", ANA);
-  const labels = await menu(page).getByRole("link").allInnerTexts();
-  const notes = labels.findIndex((label) => /^Notes/.test(label.trim()));
-  expect(labels[notes + 1].trim()).toBe("Friends");
+  if (await page.getByRole("navigation", { name: "Main navigation" }).isVisible()) {
+    const labels = (await menu(page).getByRole("link").allInnerTexts()).map((label) => label.trim());
+    expect(labels.indexOf("Friends")).toBeGreaterThan(labels.findIndex((label) => /^Notes/.test(label)));
+  }
   await openFriends(page);
   await expect(page).toHaveURL(/\/friends$/);
   await expect(page.getByText(empty)).toBeVisible();
@@ -166,7 +173,7 @@ test("fits a phone: bottom menu, 44 px buttons, and a 100-character name wraps",
   await page.goto("/friends");
   await logOut(page);
   await signUp(page, "Friend Ana", ANA);
-  await expect(page.getByRole("navigation", { name: "Mobile navigation" }).getByRole("link", { name: "Friends" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "More", exact: true })).toBeVisible();
   await openFriends(page);
   await sendRequest(page, BEA);
   await expect(section(page, "Sent requests")).toContainText(long);

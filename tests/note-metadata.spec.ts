@@ -1,10 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
+import { openNew } from "./support/shell";
 
 async function startUpload(page: Page) {
   await page.goto("/");
   await page.getByRole("button", { name: "Take a look around first" }).click();
-  await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Upload document", exact: true }).click();
+  await openNew(page, "Upload document");
 }
 
 async function saveAndOpen(page: Page, title: string) {

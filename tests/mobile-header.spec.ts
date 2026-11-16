@@ -2,6 +2,7 @@
 // Desktop keeps the name once, in the left menu.
 import { test, expect } from "./support/account-fixture";
 import type { Locator, Page } from "@playwright/test";
+import { accountButton } from "./support/shell";
 
 const GREETING = /Good (morning|afternoon|evening)/;
 
@@ -21,22 +22,19 @@ test("mobile header shows Notely", async ({ page }, testInfo) => {
   const brand = header.getByRole("link", { name: "Notely", exact: true });
   await expect(brand).toBeVisible();
   await expect(brand).toHaveAttribute("href", "/");
-  // The name replaces the "My Workspace / Today" path, which only fit as "My …".
-  await expect(header.getByText("My Workspace")).toBeHidden();
 
   await page.goto("/notes");
   await expect(page.getByRole("heading", { name: "Your notes" })).toBeVisible();
   await brand.click();
   await expect(page.getByRole("heading", { name: GREETING })).toBeVisible();
 
-  // The smallest phones: the name, search, Create (+), and account buttons all fit without overlapping.
+  // The smallest phones: the name, the account button and the floating New button all fit without overlapping.
   for (const size of [{ width: 390, height: 664 }, { width: 320, height: 640 }]) {
     await page.setViewportSize(size);
     const controls = [
       brand,
-      header.getByRole("link", { name: "Search your space" }),
-      header.getByRole("button", { name: "Create" }),
-      header.getByRole("link", { name: "Your account" }),
+      accountButton(page),
+      page.getByRole("button", { name: "New", exact: true }),
     ];
     const boxes = [];
     for (const control of controls) {
@@ -61,5 +59,4 @@ test("desktop shows Notely once", async ({ page }, testInfo) => {
   await expect(visibleNames).toHaveCount(1);
   await expect(page.locator("aside").getByRole("link", { name: /^Notely/ })).toBeVisible();
   await expect(page.locator("header").getByRole("link", { name: "Notely", exact: true })).toBeHidden();
-  await expect(page.locator("header").getByText("My Workspace")).toBeVisible();
 });

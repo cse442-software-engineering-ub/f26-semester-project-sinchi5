@@ -2,6 +2,7 @@ import { test, expect } from "./support/account-fixture";
 import type { Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
+import { accountButton, logOut, openSettings } from "./support/shell";
 
 const password = "Sample river password 42!";
 const email = "notely-task162-442@example.edu";
@@ -9,10 +10,8 @@ const square = readFileSync(new URL("../backend/tests/data/photo-64.png", import
 // Real RGB PNG generated with standard-library zlib; its non-square size exposes stretching.
 const portrait = readFileSync(new URL("fixtures/profile-photo-64x128.png", import.meta.url));
 const summary = (page: Page) => page.getByRole("group", { name: "Account summary" });
-const accountLink = (page: Page) => page.getByRole("link", { name: "Your account", exact: true });
 const avatars = (page: Page) => [
-  page.locator('aside [class*="workspace"] > [class*="avatar"]'),
-  accountLink(page).locator(":scope > span"),
+  accountButton(page).locator(":scope > span").first(),
   summary(page).locator(':scope > [class*="avatar"]'),
 ];
 async function register(page: Page, name = "Picture Tester", address = email) {
@@ -29,19 +28,19 @@ async function register(page: Page, name = "Picture Tester", address = email) {
   await page.getByRole("button", { name: "I’ll do this later" }).click();
   await page.getByRole("button", { name: "Let’s begin" }).click();
   await expect(page.getByRole("heading", { name: new RegExp(`Good .*${name.split(" ")[0]}`) })).toBeVisible();
-  await accountLink(page).click();
+  await openSettings(page);
   await expect(summary(page)).toBeVisible();
 }
 async function signOut(page: Page) {
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await logOut(page);
   await expect(page.getByRole("heading", { name: "Good to see you again." })).toBeVisible();
 }
 async function signIn(page: Page, address = email) {
   await page.getByLabel("Email address").fill(address);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Log In", exact: true }).click();
-  await expect(accountLink(page)).toBeVisible();
-  await accountLink(page).click();
+  await expect(accountButton(page)).toBeVisible();
+  await openSettings(page);
   await expect(summary(page)).toBeVisible();
 }
 async function expectInitials(page: Page, letter = "P") {
@@ -57,7 +56,7 @@ async function expectPhotos(page: Page, height = 64) {
     await expect(avatar).toHaveCount(1);
     await expect(avatar.locator("img")).toHaveJSProperty("naturalWidth", 64);
     await expect(avatar.locator("img")).toHaveJSProperty("naturalHeight", height);
-    await expect(avatar.locator("img")).toHaveAttribute("alt", index === 1 ? "Your profile photo" : "");
+    await expect(avatar.locator("img")).toHaveAttribute("alt", "");
     await expect(avatar).toHaveText("");
     sources.push((await avatar.locator("img").getAttribute("src"))!);
   }
@@ -87,9 +86,7 @@ async function remove(page: Page) {
 test("photo replaces the initial everywhere and persists across sign-in and account switches", async ({ page }) => {
   await register(page);
   await expectInitials(page);
-  const footer = page.locator('aside [class*="sideFooter"]');
-  await expect(footer).toHaveText("Picture Tester");
-  await expect(footer.locator('img, [class*="avatar"]')).toHaveCount(0);
+  await expect(accountButton(page)).toHaveAttribute("aria-label", "Picture Tester");
   await upload(page);
   const first = await expectPhotos(page);
   await upload(page, portrait);
@@ -100,7 +97,7 @@ test("photo replaces the initial everywhere and persists across sign-in and acco
   await expectPhotos(page, 128);
   await page.locator('a[href="/notes"]:visible').filter({ hasText: "Notes" }).click();
   await expect(page.getByRole("heading", { name: "Your notes" })).toBeVisible();
-  await accountLink(page).click();
+  await openSettings(page);
   expect(await expectPhotos(page, 128)).toBe(replacement);
   await signOut(page);
   await signIn(page);
@@ -153,11 +150,11 @@ test("mobile avatars crop a portrait without stretching and keep account navigat
   await expectPhotos(page, 128);
   await page.reload();
   await expectPhotos(page, 128);
-  const control = accountLink(page);
+  const control = accountButton(page);
   const bounds = (await control.boundingBox())!;
   expect(bounds.height).toBeGreaterThanOrEqual(44);
   expect(bounds.width).toBeGreaterThanOrEqual(44);
-  for (const avatar of avatars(page).slice(1)) {
+  for (const avatar of avatars(page)) {
     const layout = await avatar.evaluate(element => {
       const img = element.querySelector("img")!;
       const box = element.getBoundingClientRect();
