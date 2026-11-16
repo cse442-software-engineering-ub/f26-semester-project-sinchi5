@@ -1,0 +1,175 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>141 Backend: Store courses and hand-made events on the server</title>
+<link rel="stylesheet" href="../../shared/runner.css">
+<script type="module">
+// Backend test: real API, no screen code. Imports nothing from src/.
+import { page, test, expect, api, signIn, signOut } from "../../shared/runner.js";
+
+page({ card: "141", title: "Backend: Store courses and hand-made events on the server", kind: "backend" });
+const A = "notely-task141-442@example.edu";
+const B = "notely-task141b-442@example.edu";
+const XSS = "<script>alert(1)<\/script>'; DROP TABLE notely_events; --";
+const COURSES = "backend/lib/courses.php → courseAction";
+const EVENTS = "backend/lib/imports.php → importAction (the event-save branch)";
+const course = { code: "CSE 442", name: "Software Engineering", color: "#869D7A", term: "Fall 2026" };
+const event = { courseId: "t141-c1", title: "Study group", kind: "other", date: "2026-11-20", time: "14:30", location: "Capen 1", description: "Bring notes" };
+const repeat = { every: 2, days: [1, 3], until: "2026-12-20" };
+const rmsg = "Choose 1 or 2 weeks, at least one day, and an end date within a year of the start.";
+
+// Start and end clean: remove the courses (and so their events) and any other events these two accounts made.
+async function clean() {
+  for (const who of [A, B]) {
+    await signIn(who);
+    for (const c of (await api("courses")).body.courses ?? []) await api("course-delete", { id: c.id });
+    for (const e of (await api("events")).body.events ?? []) await api("event-delete", { id: e.id });
+  }
+}
+await clean();
+await signOut();
+
+await test("1. A signed-out visitor can read or change courses and events", "backend/index.php (the signed-in route check)", async () => {
+  for (const [route, body] of [["courses"], ["course-save", {}], ["course-delete", {}], ["event-save", {}]])
+    expect(await api(route, body)).toEqual(401, { error: "Sign in to continue." });
+});
+await signIn(A);
+await test("2. The wrong method is accepted on the new routes", "backend/index.php (the method check)", async () => {
+  expect(await api.raw("POST", "courses", "{}")).toEqual(405, { error: "This request method is not supported." });
+  expect(await api.raw("GET", "course-save")).toEqual(405, { error: "This request method is not supported." });
+  expect(await api.raw("GET", "event-save")).toEqual(405, { error: "This request method is not supported." });
+});
+await test("3. A body over 8 KB is read instead of refused", "backend/index.php (the 8 KB body limit)", async () => {
+  expect(await api.raw("POST", "course-save", JSON.stringify({ ...course, name: "x".repeat(9000) }))).toEqual(413, { error: "This request is too large." });
+});
+await test("4. A new student's course list is not empty", `${COURSES} (the courses branch)`, async () => {
+  expect(await api("courses")).toEqual(200, { courses: [] });
+});
+let first;
+await test("5. A course saved without an id is not given one, or is not listed", `${COURSES} (the course-save branch)`, async () => {
+  const r = await api("course-save", course);
+  expect(r.status).toBe(200);
+  first = r.body.course;
+  expect(/^[A-Za-z0-9_-]{1,64}$/.test(first.id)).toBe(true);
+  expect({ ...first, id: "" }).toEqual({ id: "", ...course });
+  expect((await api("courses")).body.courses.length).toBe(1);
+});
+await test("6. A course saved with an unknown id is refused instead of created with that id", `${COURSES} (the unknown-id branch)`, async () => {
+  const r = await api("course-save", { ...course, id: "t141-c1", code: "CSE 250", classesStart: "2026-08-31", classesEnd: "2026-12-11" });
+  expect(r).toEqual(200, { course: { id: "t141-c1", ...course, code: "CSE 250", classesStart: "2026-08-31", classesEnd: "2026-12-11" } });
+  expect((await api("courses")).body.courses.length).toBe(2);
+});
+await test("7. Saving a course with its own id adds a second copy instead of updating it", `${COURSES} (the update branch)`, async () => {
+  const r = await api("course-save", { ...course, id: "t141-c1", name: "Algorithms", color: "#ABCDEF" });
+  expect(r.body.course.name).toBe("Algorithms");
+  expect(r.body.course.color).toBe("#ABCDEF");
+  expect(r.body.course.classesStart).toBe(undefined); // saved without dates: they are cleared
+  expect((await api("courses")).body.courses.length).toBe(2);
+});
+await test("8. Each course rule is not enforced", `${COURSES} (the course-save checks)`, async () => {
+  const cases = [
+    [{ code: "" }, "Enter a course code of 1 to 64 visible characters."],
+    [{ code: "x".repeat(65) }, "Enter a course code of 1 to 64 visible characters."],
+    [{ name: "   " }, "Enter a course name of 1 to 255 visible characters."],
+    [{ name: "x".repeat(256) }, "Enter a course name of 1 to 255 visible characters."],
+    [{ name: "a\tb" }, "Enter a course name of 1 to 255 visible characters."],
+    [{ term: 5 }, "Enter a term of 1 to 64 visible characters."],
+    [{ color: "red" }, "Choose a course color."],
+    [{ color: "#12345g" }, "Choose a course color."],
+    [{ id: "bad id!" }, "Choose a valid course."],
+    [{ classesStart: "2026-02-30" }, "Choose real class start and end dates."],
+    [{ classesStart: "2026-09-01", classesEnd: "2026-09-01" }, "Choose a class end date after the start date."],
+  ];
+  for (const [patch, message] of cases) expect(await api("course-save", { ...course, ...patch })).toEqual(422, { error: message });
+  expect((await api("courses")).body.courses.length).toBe(2);
+});
+await test("9. Script and SQL text in a course is changed or run instead of stored as text", `${COURSES} (the prepared INSERT)`, async () => {
+  const r = await api("course-save", { ...course, name: XSS, code: "<b>x</b>" });
+  expect([r.body.course.name, r.body.course.code]).toEqual([XSS, "<b>x</b>"]);
+  expect((await api("courses")).body.courses.find((c) => c.id === r.body.course.id).name).toBe(XSS);
+  expect(await api("course-delete", { id: r.body.course.id })).toEqual(200, { deleted: true });
+});
+await test("10. Events: the list is wrong when empty, with 1, or with 2", `${EVENTS}, and the events branch of importAction`, async () => {
+  expect(await api("events")).toEqual(200, { events: [] });
+  const one = await api("event-save", event);
+  expect(one.status).toBe(201);
+  expect(/^[1-9][0-9]*$/.test(one.body.event.id)).toBe(true);
+  expect({ ...one.body.event, id: "" }).toEqual({ id: "", courseId: "t141-c1", title: "Study group", kind: "other", date: "2026-11-20", time: "14:30",
+    location: "Capen 1", description: "Bring notes", source: "manual", importJobId: null, seriesId: null });
+  expect((await api("events")).body.events.length).toBe(1);
+  const two = await api("event-save", { ...event, title: "Office hours", repeat });
+  expect(two.body.event.repeat).toEqual(repeat);
+  const list = (await api("events")).body.events;
+  expect(list.map((e) => e.title)).toEqual(["Study group", "Office hours"]);
+  expect(list[1].repeat).toEqual(repeat);
+});
+await test("11. Editing an event adds a copy, or loses the change, or keeps a removed repeat", EVENTS, async () => {
+  const id = (await api("events")).body.events[0].id;
+  const r = await api("event-save", { ...event, id, title: "Renamed", time: "", repeat });
+  expect([r.status, r.body.event.id, r.body.event.title, r.body.event.time, r.body.event.source]).toEqual([200, id, "Renamed", "", "manual"]);
+  expect((await api("events")).body.events.length).toBe(2);
+  expect((await api("event-save", { ...event, id })).body.event.repeat).toBe(undefined);
+});
+await test("12. An imported event is copied or turned into a hand-made one when edited", `${EVENTS} (the UPDATE)`, async () => {
+  const up = await api("syllabus-upload", { courseId: "t141-c1", fileName: "s.txt", content: btoa("CSE 442 syllabus") });
+  expect(up.status).toBe(201);
+  expect((await api("import-confirm", { id: up.body.job.id, events: [{ title: "Exam 1", kind: "exam", date: "2026-10-10", time: "09:00" }] })).status).toBe(200);
+  const imported = (await api("events")).body.events.find((e) => e.title === "Exam 1");
+  expect(imported.source).toBe("imported");
+  const r = await api("event-save", { ...event, id: imported.id, title: "Exam 1 (moved)", kind: "exam", date: "2026-10-12", description: "Room change" });
+  expect([r.body.event.source, r.body.event.title, r.body.event.date, r.body.event.importJobId]).toEqual(["imported", "Exam 1 (moved)", "2026-10-12", up.body.job.id]);
+});
+await test("13. Each event rule is not enforced", EVENTS + " and reviewedEvents / repeatRule", async () => {
+  const cases = [
+    [{ courseId: "bad id" }, "Choose a course for this event."],
+    [{ title: "" }, "Give every event a title and a date."],
+    [{ title: "x".repeat(256) }, "Keep each event title to 255 visible characters."],
+    [{ kind: "party" }, "Choose a valid event type."],
+    [{ date: "2026-02-30" }, "Choose a real date for every event."],
+    [{ time: "25:00" }, "Use a 24-hour time like 10:00."],
+    [{ location: "x".repeat(121) }, "Keep each location to 120 visible characters."],
+    [{ description: "x".repeat(2001) }, "Keep each description to 2000 visible characters."],
+    [{ id: "abc" }, "Choose a valid event."],
+    ...[{ ...repeat, every: 3 }, { ...repeat, days: [] }, { ...repeat, days: [7] }, { ...repeat, days: [1, 1] }, { ...repeat, until: "2026-11-19" },
+      { ...repeat, until: "2027-11-21" }, { ...repeat, until: "nope" }, "weekly"].map((r) => [{ repeat: r }, rmsg]),
+  ];
+  for (const [patch, message] of cases) expect(await api("event-save", { ...event, ...patch })).toEqual(422, { error: message });
+  expect((await api("event-save", { ...event, description: "line 1\nline 2", repeat: { ...repeat, until: "2027-11-20" } })).status).toBe(201);
+});
+await test("14. Script and SQL text in an event is changed or run instead of stored as text", EVENTS, async () => {
+  const r = await api("event-save", { ...event, title: XSS, description: XSS });
+  expect([r.body.event.title, r.body.event.description]).toEqual([XSS, XSS]);
+});
+await test("15. Another student can read, change, or delete this student's course or event", "backend/lib/courses.php and imports.php (the owner checks)", async () => {
+  const mine = (await api("events")).body.events[0];
+  await signIn(B);
+  expect(await api("courses")).toEqual(200, { courses: [] });
+  expect(await api("events")).toEqual(200, { events: [] });
+  expect(await api("course-save", { ...course, id: "t141-c1", name: "Mine now" })).toEqual(404, { error: "This course could not be found." });
+  expect(await api("course-delete", { id: "t141-c1" })).toEqual(404, { error: "This course could not be found." });
+  expect(await api("event-save", { ...event, id: mine.id, title: "Hijack" })).toEqual(404, { error: "This event could not be found." });
+  await signIn(A);
+  expect((await api("courses")).body.courses.find((c) => c.id === "t141-c1").name).toBe("Algorithms");
+  expect((await api("events")).body.events.find((e) => e.id === mine.id).title !== "Hijack").toBe(true);
+});
+await test("16. Deleting a course keeps its events, or removes its notes, or other courses", "backend/lib/courses.php → courseAction (the course-delete branch)", async () => {
+  const note = await api("note-create", { title: "t141 lecture", body: "text", courseId: "t141-c1" });
+  expect(note.status).toBe(201);
+  expect(await api("course-delete", { id: "t141-c1" })).toEqual(200, { deleted: true });
+  expect((await api("events")).body.events).toEqual([]);
+  const kept = (await api("note", undefined, { id: note.body.note.id })).body.note;
+  expect([kept.body, kept.courseId]).toEqual(["text", ""]);
+  expect((await api("courses")).body.courses.length).toBe(1);
+  expect(await api("course-delete", { id: "t141-c1" })).toEqual(404, { error: "This course could not be found." });
+  await api("note-delete", { id: note.body.note.id });
+});
+await test("17. A student can have more than 50 courses", "backend/lib/courses.php → courseAction (MAX_COURSES)", async () => {
+  const have = (await api("courses")).body.courses.length;
+  for (let i = have; i < 50; i++) expect((await api("course-save", { ...course, code: `C${i}` })).status).toBe(200);
+  expect(await api("course-save", course)).toEqual(422, { error: "You can have at most 50 courses." });
+  expect((await api("courses")).body.courses.length).toBe(50);
+});
+
+await clean();
+await signOut();
+</script>

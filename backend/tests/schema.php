@@ -61,8 +61,14 @@ $tables = [
         'title' => ['varchar(255)', 'NO'],
         'kind' => ["enum('lecture','assignment','quiz','exam','deadline','other','recitation','lab')", 'NO'],
         'event_date' => ['date', 'NO'], 'event_time' => ['time', 'YES'], 'location' => ['varchar(120)', 'NO'],
+        'description' => ['varchar(2000)', 'NO'], 'repeat_rule' => ['json', 'YES'],
         'series_id' => ['varchar(40)', 'YES'], 'source' => ["enum('manual','imported')", 'NO'],
-        'import_job_id' => ['bigint unsigned', 'YES'], 'created_at' => ['datetime', 'NO'],
+        'import_job_id' => ['bigint unsigned', 'YES'], 'created_at' => ['datetime', 'NO'], 'updated_at' => ['datetime', 'NO'],
+    ],
+    'notely_courses' => [
+        'id' => ['varchar(64)', 'NO'], 'owner_user_id' => ['bigint unsigned', 'NO'], 'code' => ['varchar(64)', 'NO'],
+        'name' => ['varchar(255)', 'NO'], 'color' => ['char(7)', 'NO'], 'term' => ['varchar(64)', 'NO'],
+        'classes_start' => ['date', 'YES'], 'classes_end' => ['date', 'YES'], 'created_at' => ['datetime', 'NO'], 'updated_at' => ['datetime', 'NO'],
     ],
 ];
 foreach ($tables as $table => $columns) {
