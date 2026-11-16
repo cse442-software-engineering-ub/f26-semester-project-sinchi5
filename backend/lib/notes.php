@@ -8,10 +8,10 @@ if (PHP_SAPI !== 'cli' && !defined('NOTELY_INTERNAL')) {
 // GET routes only read; every other note route writes inside one transaction.
 const NOTE_READ_ROUTES = ['note', 'notes', 'note-versions', 'note-comments', 'note-collaborators'];
 const NOTE_ROUTES = [...NOTE_READ_ROUTES, 'note-create', 'note-title', 'note-content', 'note-save', 'note-pin',
-    'note-restore', 'note-delete', 'note-comment', 'note-invite', 'note-permission'];
+    'note-reminder', 'note-restore', 'note-delete', 'note-comment', 'note-invite', 'note-permission'];
 const NOTE_CATEGORIES = ['School', 'Work', 'Meetings', 'Personal'];
 const NOTE_COLUMNS = 'n.id, n.owner_user_id, n.title, n.body, n.highlights, n.course_id, n.lecture_date, n.category,
-    n.visibility, n.tags, n.pinned, n.created_at, n.updated_at, n.checklist';
+    n.visibility, n.tags, n.pinned, n.remind_at, n.created_at, n.updated_at, n.checklist';
 
 // Task #79 / Story #19: retain ordered tasks and exact boolean completion states.
 // HTTP JSON objects arrive as stdClass; PHP callers may supply associative items.
@@ -273,6 +273,26 @@ function isoTime(string $value): string
     return str_replace(' ', 'T', $value) . 'Z';
 }
 
+function reminderTime(mixed $value): ?string
+{
+    if ($value === null) return null;
+    if (!is_string($value) || !preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/D', $value)) {
+        throw new HttpError(422, 'Choose a valid reminder time.');
+    }
+    try {
+        $time = new DateTimeImmutable($value);
+    } catch (Exception $e) {
+        throw new HttpError(422, 'Choose a valid reminder time.');
+    }
+    if ($time->format('Y-m-d\TH:i:s') !== substr($value, 0, 19)) {
+        throw new HttpError(422, 'Choose a valid reminder time.');
+    }
+    if ($time <= new DateTimeImmutable('now', new DateTimeZone('UTC'))) {
+        throw new HttpError(422, 'Choose a time in the future.');
+    }
+    return $time->format('Y-m-d H:i:s.v');
+}
+
 function noteJson(array $row): array
 {
     return [
@@ -290,6 +310,7 @@ function noteJson(array $row): array
         'visibility' => $row['visibility'],
         'tags' => json_decode($row['tags'], true) ?: [],
         'pinned' => (bool) $row['pinned'],
+        'remindAt' => $row['remind_at'] === null ? null : isoTime($row['remind_at']),
         'createdAt' => isoTime($row['created_at']),
         'updatedAt' => isoTime($row['updated_at']),
     ];
@@ -482,6 +503,13 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
         requireEditor($db, $id, $user);
         // Pinning changes list placement, not the note's edit date.
         query($db, 'UPDATE notely_notes SET pinned = ?, updated_at = updated_at WHERE id = ?', [(int) $input['pinned'], $id]);
+        return ['note' => loadNote($db, $id)];
+    }
+    if ($route === 'note-reminder') {
+        if (!array_key_exists('remindAt', $input)) throw new HttpError(422, 'Choose a valid reminder time.');
+        $remindAt = reminderTime($input['remindAt']);
+        requireEditor($db, $id, $user);
+        query($db, 'UPDATE notely_notes SET remind_at = ? WHERE id = ?', [$remindAt, $id]);
         return ['note' => loadNote($db, $id)];
     }
     if ($route === 'note-restore') {

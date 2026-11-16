@@ -33,6 +33,7 @@ $tables = [
         'title' => ['varchar(255)', 'NO'], 'body' => ['text', 'NO'], 'highlights' => ['text', 'YES'],
         'course_id' => ['varchar(64)', 'NO'], 'lecture_date' => ['date', 'YES'], 'category' => ['varchar(20)', 'NO'],
         'visibility' => ["enum('private','shared')", 'NO'], 'tags' => ['varchar(4000)', 'NO'], 'pinned' => ['tinyint', 'NO'],
+        'remind_at' => ['datetime(3)', 'YES'],
         'created_at' => ['datetime', 'NO'], 'updated_at' => ['datetime', 'NO'],
         'checklist' => ['text', 'YES'],
     ],

@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { createAppRepositories } from "../services/app-repositories";
+import { createReminderScheduler, showNoteNotification } from "../services/note-reminders";
 import type { User, Course, Note, CourseEvent, Repositories, Preferences } from "../domain";
 type State = {
   user: User | null;
@@ -40,6 +41,7 @@ const Context = createContext<{
 }>(null!);
 export function Provider({ children }: { children: ReactNode }) {
   const repo = useMemo(() => createAppRepositories(), []);
+  const reminders = useMemo(() => createReminderScheduler(showNoteNotification), []);
   const [state, dispatch] = useReducer(
     (s: State, a: Partial<State>) => ({ ...s, ...a }),
     initial,
@@ -91,6 +93,10 @@ export function Provider({ children }: { children: ReactNode }) {
     const timer = setInterval(recheck, 30000);
     return () => { window.removeEventListener("focus", recheck); clearInterval(timer); };
   }, []);
+  useEffect(() => {
+    reminders.update(state.user ? state.notes : []);
+  }, [reminders, state.user, state.notes]);
+  useEffect(() => () => reminders.dispose(), [reminders]);
   useEffect(() => {
     const media = matchMedia("(prefers-color-scheme: dark)");
     const { mode, scheme } = state.preferences;
