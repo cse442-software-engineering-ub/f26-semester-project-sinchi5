@@ -10,6 +10,8 @@ if (PHP_SAPI !== 'cli' && !defined('NOTELY_INTERNAL')) {
 // Card 127: import-extract reads a job with the Gemini API (syllabus-ai.php).
 // Card 172: event-delete removes one of the student's own saved events.
 // Card 141: event-save creates a hand-made event, or edits one of the student's own (imported ones in place).
+// Card 233: a job's events may carry rangeStart and rangeEnd, week, and meeting (syllabus-ai.php → aiSpan).
+// They are stored and returned with the job as read; import-confirm saves only events that have a date.
 // Needs notes.php for recordId() and isoTime().
 const IMPORT_READ_ROUTES = ['import-job', 'events'];
 const IMPORT_ROUTES = [...IMPORT_READ_ROUTES, 'syllabus-upload', 'import-confirm', 'import-extract', 'event-delete', 'event-save'];

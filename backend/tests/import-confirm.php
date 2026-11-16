@@ -54,3 +54,14 @@ foreach ([-1, 1000, '1', 1.5, true] as $series) rejects([$event(['series' => $se
 foreach ([null, [], 'events', ['a' => $event([])], array_fill(0, 601, $event([]))] as $events) rejects($events, 'Choose 1 to 600 events to add.');
 check(count(reviewedEvents(array_fill(0, 600, $event([])))) === 600, '600 events should be accepted.');
 echo "PASS 3: events without a title or date, and invalid fields or counts, are rejected\n";
+
+// Card 233: the server never picks a day. An item that still has only its span or week is refused, and one
+// the student's review gave a day is saved on that day, whatever span, week, or class kind is sent along.
+$span = ['rangeStart' => '2026-10-05', 'rangeEnd' => '2026-10-09', 'week' => 5, 'meeting' => 'lab'];
+rejects([$event(['date' => ''] + $span)], 'Give every event a title and a date.');
+rejects([$event(['date' => '', 'week' => 5])], 'Give every event a title and a date.');
+check(reviewedEvents([$event(['title' => 'Lab 3', 'date' => '2026-10-06', 'time' => '14:00'] + $span),
+    $event(['rangeStart' => "'; DROP TABLE notely_events; --", 'rangeEnd' => ['x'], 'week' => 'five', 'meeting' => '<script>'])])
+    === [['Lab 3', 'assignment', '2026-10-06', '14:00:00', '', null], ['Homework 1', 'assignment', '2026-09-28', null, '', null]],
+    'A placed item should be saved on its day, and the span, week, and class kind sent with it should be ignored.');
+echo "PASS 4: an item with only a span or week is refused, and a placed item is saved on its day with the rest ignored\n";

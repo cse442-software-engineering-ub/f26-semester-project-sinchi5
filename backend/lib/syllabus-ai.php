@@ -51,7 +51,7 @@ noClassDates: days with no class
 
 events: graded work with its own date
 - List each assignment, midterm, final exam, test, quiz, project, paper, presentation, or essay that the
-  file ties to a date, wherever that date appears.
+  file ties to a date, a span of days, or a numbered week, wherever that appears.
 - kind is assignment for homework, problem sets, programming assignments, lab work to turn in, discussion
   posts, and essays; exam for midterms, finals, tests, and lab exams; quiz for quizzes; deadline for
   projects, papers, and presentations.
@@ -74,6 +74,22 @@ events: graded work with its own date
 - location is the room given for the item as written, or the class's room as above, or "".
 - If the file names one specific item but not its day ("Final exam: TBA", "Quiz next Friday", "Week of
   2026-09-15: Lab Exam 1"), still list it, with date "". Never work out a day from a week number.
+- When the file gives an item a span of days or a week instead of one day, date stays "" and the fields
+  below carry only what is written. Never pick or work out a day inside a span or a week, and never turn a
+  week number into dates: the planner does that from the student's own class times.
+  rangeStart and rangeEnd are the first and last day of a written span: "Oct 5-9: Homework 3" and a table
+  row "Sept. 21-25 | Test #1" give both days. "Week of October 5: Lab 2 due" gives rangeStart October 5
+  and rangeEnd "", because only the first day is written.
+  week is the number when the file gives the item only a numbered week with no dates, as in "Week 5: Lab 3
+  due". If the week's dates are written too ("Week 5, Sept. 21-25"), use rangeStart and rangeEnd, and week
+  is 0.
+  An item with a day of its own uses date, with rangeStart "", rangeEnd "", and week 0. So do "Final exam:
+  TBA" and "Quiz next Friday", which give no span.
+- meeting is the kind of class the item belongs to, judged from the item's own words. lab for lab work,
+  lab reports, and lab quizzes ("Lab 3", "Lab report 2"). recitation for work named for a recitation or
+  discussion section ("Recitation quiz 4"). lecture for homework, problem sets, programming assignments,
+  reading responses, and quizzes with no such word. none for exams, projects, papers, presentations, and
+  anything unclear.
 - Don't turn general statements into events. "Three programming assignments", "two midterm exams and a
   final", "six pop quizzes", due-date policies such as "labs are due the following Monday", and grade-weight
   tables are not events. An exam mentioned only that way is left out.
@@ -97,7 +113,7 @@ const SYLLABUS_AI_SECONDS = 280;
 // After this long on one request, the next model is likely to answer sooner.
 const SYLLABUS_AI_REQUEST_SECONDS = 90;
 // Bump this when the prompt or the reply's shape changes, so reads saved by an older reader aren't reused.
-const SYLLABUS_READER_VERSION = 2;
+const SYLLABUS_READER_VERSION = 3;
 const SYLLABUS_KINDS = ['assignment', 'exam', 'quiz', 'deadline', 'other'];
 const SYLLABUS_CLASS_KINDS = ['lecture', 'recitation', 'lab'];
 // In weekday order, so a position in this list is the day's number (0 = Sunday).
@@ -149,10 +165,14 @@ const SYLLABUS_AI_SCHEMA = [
                     'date' => ['type' => 'STRING', 'description' => 'YYYY-MM-DD, or "" when no specific day is given'],
                     'time' => ['type' => 'STRING', 'description' => '24-hour HH:MM, or ""'],
                     'location' => ['type' => 'STRING'],
+                    'rangeStart' => ['type' => 'STRING', 'description' => 'YYYY-MM-DD first day of a written span, or ""'],
+                    'rangeEnd' => ['type' => 'STRING', 'description' => 'YYYY-MM-DD last day of a written span, or ""'],
+                    'week' => ['type' => 'INTEGER', 'description' => 'The week number when only a numbered week is given, or 0'],
+                    'meeting' => ['type' => 'STRING', 'format' => 'enum', 'enum' => [...SYLLABUS_CLASS_KINDS, 'none']],
                     'source' => ['type' => 'STRING'],
                 ],
-                'required' => ['title', 'kind', 'date', 'time', 'location', 'source'],
-                'propertyOrdering' => ['title', 'kind', 'date', 'time', 'location', 'source'],
+                'required' => ['title', 'kind', 'date', 'time', 'location', 'rangeStart', 'rangeEnd', 'week', 'meeting', 'source'],
+                'propertyOrdering' => ['title', 'kind', 'date', 'time', 'location', 'rangeStart', 'rangeEnd', 'week', 'meeting', 'source'],
             ],
         ],
     ],
@@ -474,16 +494,33 @@ function cleanAiEvents(array $events, int $year): array
         if ($title === '') {
             continue;
         }
+        $date = aiDate($event['date'] ?? null, $year);
         $clean[] = [
             'title' => $title,
             'kind' => in_array($event['kind'] ?? null, SYLLABUS_KINDS, true) ? $event['kind'] : 'other',
-            'date' => aiDate($event['date'] ?? null, $year),
+            'date' => $date,
             'time' => aiTime($event['time'] ?? null),
             'location' => aiText($event['location'] ?? null, 120),
             'source' => aiText($event['source'] ?? null, 500),
-        ];
+        ] + ($date === '' ? aiSpan($event, $year) : [])
+            + (in_array($event['meeting'] ?? null, SYLLABUS_CLASS_KINDS, true) ? ['meeting' => $event['meeting']] : []);
     }
     return $clean;
+}
+
+// Card 233: where an item with no day of its own falls, as rangeStart and rangeEnd or as week, or nothing.
+// These are added only when the file gave them, so an item with an exact date reads exactly as before.
+// A span with only its first day ("week of October 5") runs through that week's Sunday. A span that ends
+// before it starts, or runs longer than a month, is a misreading, and the item is left for the student.
+function aiSpan(array $event, int $year): array
+{
+    $start = aiDate($event['rangeStart'] ?? null, $year);
+    if ($start !== '') {
+        $end = ($event['rangeEnd'] ?? '') === '' ? gmdate('Y-m-d', strtotime("$start UTC sunday")) : aiDate($event['rangeEnd'], $year);
+        return $end >= $start && $end <= gmdate('Y-m-d', strtotime("$start UTC +31 days")) ? ['rangeStart' => $start, 'rangeEnd' => $end] : [];
+    }
+    $week = $event['week'] ?? null;
+    return is_int($week) && $week >= 1 && $week <= 30 ? ['week' => $week] : [];
 }
 
 function aiDate(mixed $date, int $year): string

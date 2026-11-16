@@ -276,3 +276,63 @@ $clock += 10;
 check($budget('models/x', []) === [0, []] && count($timeouts) === 2, 'Once the time is up, nothing more should be sent.');
 check(SYLLABUS_AI_SECONDS < 330, 'The browser must wait longer than a read can take (imports-http.ts).');
 echo "PASS 11: every request of a read shares one time budget, and nothing is sent once it is used up\n";
+
+// 12. Card 233: an item with no day of its own keeps the span or week the file gave and the kind of class
+// it belongs to. The model never picks the day, so nothing here turns a span or week into a date, and
+// every value is checked like the rest of the reply.
+$with = fn (string $title, array $fields) => $fields + ['title' => $title, 'kind' => 'assignment', 'date' => '', 'time' => '', 'location' => '',
+    'rangeStart' => '', 'rangeEnd' => '', 'week' => 0, 'meeting' => 'none', 'source' => ''];
+$kept = fn (string $title, array $fields = []) => ['title' => $title, 'kind' => 'assignment', 'date' => '', 'time' => '', 'location' => '', 'source' => ''] + $fields;
+$spans = [
+    $with('Homework 3', ['rangeStart' => '2026-10-05', 'rangeEnd' => '2026-10-09', 'meeting' => 'lecture']),
+    $with('Lab 2', ['rangeStart' => '2026-10-05', 'meeting' => 'lab']),                       // "week of October 5"
+    $with('Lab 3', ['week' => 5, 'meeting' => 'lab']),
+    $with('Recitation quiz 4', ['rangeStart' => '2026-12-28', 'rangeEnd' => '2027-01-01', 'meeting' => 'recitation']),
+    $with('One day', ['rangeStart' => '2026-10-07', 'rangeEnd' => '2026-10-07']),
+    // An exact date wins: the span and week are dropped, and the output has its old shape plus the class kind.
+    $with('Homework 1', ['date' => '2026-09-28', 'rangeStart' => '2026-09-28', 'rangeEnd' => '2026-10-02', 'week' => 6, 'meeting' => 'lecture']),
+    $with('Midterm exam', ['kind' => 'exam', 'date' => '2026-10-14']),
+    // A span wins over a week. A backwards, impossible, far-off, or month-long span and a bad week are dropped.
+    $with('Both', ['rangeStart' => '2026-10-05', 'rangeEnd' => '2026-10-09', 'week' => 7]),
+    $with('Backwards', ['rangeStart' => '2026-10-09', 'rangeEnd' => '2026-10-05']),
+    $with('Impossible', ['rangeStart' => '2026-02-30', 'rangeEnd' => '2026-03-02']),
+    $with('Bad end', ['rangeStart' => '2026-10-05', 'rangeEnd' => 'Friday']),
+    $with('Nested end', ['rangeStart' => '2026-10-05', 'rangeEnd' => ['2026-10-09']]),
+    $with('Far off', ['rangeStart' => '1999-10-05', 'rangeEnd' => '1999-10-09']),
+    $with('Too long', ['rangeStart' => '2026-09-01', 'rangeEnd' => '2026-12-01']),
+    $with('End only', ['rangeEnd' => '2026-10-09']),
+    ...array_map(fn (mixed $week) => $with('Week ' . json_encode($week), ['week' => $week]), [0, -1, 31, '5', 5.5, null, [5]]),
+    $with('Week 1', ['week' => 1]),
+    $with('Week 30', ['week' => 30]),
+    ...array_map(fn (mixed $kind) => $with('Kind', ['meeting' => $kind]), ['none', '', 'LAB', 'seminar', 'lab; DROP TABLE notely_events', 3, ['lab']]),
+];
+$clean = readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($spans)), 'pdf', $pdf, 2026)['events'];
+$want = [
+    $kept('Homework 3', ['rangeStart' => '2026-10-05', 'rangeEnd' => '2026-10-09', 'meeting' => 'lecture']),
+    $kept('Lab 2', ['rangeStart' => '2026-10-05', 'rangeEnd' => '2026-10-11', 'meeting' => 'lab']),
+    $kept('Lab 3', ['week' => 5, 'meeting' => 'lab']),
+    $kept('Recitation quiz 4', ['rangeStart' => '2026-12-28', 'rangeEnd' => '2027-01-01', 'meeting' => 'recitation']),
+    $kept('One day', ['rangeStart' => '2026-10-07', 'rangeEnd' => '2026-10-07']),
+    ['date' => '2026-09-28'] + $kept('Homework 1', ['meeting' => 'lecture']),
+    ['kind' => 'exam', 'date' => '2026-10-14'] + $kept('Midterm exam'),
+    $kept('Both', ['rangeStart' => '2026-10-05', 'rangeEnd' => '2026-10-09']),
+    ...array_map($kept, ['Backwards', 'Impossible', 'Bad end', 'Nested end', 'Far off', 'Too long', 'End only',
+        'Week 0', 'Week -1', 'Week 31', 'Week "5"', 'Week 5.5', 'Week null', 'Week [5]']),
+    $kept('Week 1', ['week' => 1]),
+    $kept('Week 30', ['week' => 30]),
+    ...array_fill(0, 7, $kept('Kind')),
+];
+// Key order matters to nobody, so the lists are compared with their keys sorted.
+$sorted = fn (array $list) => json_encode(array_map(function (array $event) { ksort($event); return $event; }, $list));
+check($sorted($clean) === $sorted($want), 'Spans, weeks, and class kinds were not cleaned: ' . json_encode($clean));
+// A reply from before card 233 (no new fields at all) reads exactly as it did.
+check(readSyllabusWithAi($config, fakeApi($calls, $counted, $reply($events)), 'pdf', $pdf, 2026)['events'] === $events, 'A reply without the new fields must read as before.');
+$fields = SYLLABUS_AI_SCHEMA['properties']['events']['items'];
+check($fields['properties']['meeting']['enum'] === ['lecture', 'recitation', 'lab', 'none'] && $fields['properties']['week']['type'] === 'INTEGER'
+    && !array_diff(['rangeStart', 'rangeEnd', 'week', 'meeting'], $fields['required']), 'The schema must ask for the span, week, and class kind of every event.');
+foreach (['Never pick or work out a day inside a span or a week', 'never turn a week number into dates', 'date stays ""', '"Week of October 5: Lab 2 due" gives rangeStart October 5 and rangeEnd ""',
+    'An item with a day of its own uses date', '"Recitation quiz 4"', 'none for exams'] as $rule) {
+    check(str_contains(preg_replace('/\s+/', ' ', SYLLABUS_AI_PROMPT), $rule), "The prompt is missing the rule about: $rule");
+}
+check(SYLLABUS_READER_VERSION === 3, 'Reads saved by the reader before card 233 must not be reused.');
+echo "PASS 12: spans, weeks, and class kinds are kept as the file gave them, checked, never turned into a day, and absent from exactly dated items\n";

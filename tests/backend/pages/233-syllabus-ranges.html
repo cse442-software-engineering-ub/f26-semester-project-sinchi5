@@ -1,0 +1,132 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>233 Backend: Read ranges, weeks and meeting types from a syllabus</title>
+<link rel="stylesheet" href="../../shared/runner.css">
+<script type="module">
+// Backend test: real API, no screen code. Imports nothing from src/.
+// What this page covers: how import-confirm and events treat items that came from a span or a week (saved only
+// once they have a day, never placed by the server), and that assignment deadlines are saved and listed.
+// What it cannot cover: the reader itself. A page can't call Gemini, and it never calls import-extract on its
+// own upload (that would spend a real read on aptitude). The reader's new fields and their checks are tested
+// with canned replies in backend/tests/syllabus-ai.php (check 12) and backend/tests/import-extract.php (check 5).
+import { page, test, expect, api, signIn, signOut } from "../../shared/runner.js";
+
+page({ card: "233", title: "Backend: Read ranges, weeks and meeting types from a syllabus", kind: "backend" });
+const A = "notely-task233-442@example.edu";
+const B = "notely-task233b-442@example.edu";
+const XSS = "<script>alert(1)<\/script>'; DROP TABLE notely_events; --";
+const CONFIRM = "backend/lib/imports.php → importAction (the import-confirm branch)";
+const REVIEWED = "backend/lib/imports.php → reviewedEvents";
+const COURSE = "t233-c1";
+const span = { rangeStart: "2026-10-05", rangeEnd: "2026-10-09", meeting: "lab" };
+const undated = { error: "Give every event a title and a date." };
+const mine = async () => (await api("events", undefined, { courseId: COURSE })).body.events;
+// A tiny text file becomes a queued job. It is never read, so no request reaches Gemini.
+async function upload() {
+  const r = await api("syllabus-upload", { courseId: COURSE, fileName: "t233.txt", content: btoa("CSE 442 syllabus for card 233") });
+  if (r.status !== 201) throw new Error(`upload answered ${r.status} ${JSON.stringify(r.body)}`);
+  return r.body.job.id;
+}
+const saved = (e) => ({ title: e.title, kind: e.kind, date: e.date, time: e.time, source: e.source });
+
+// Start and end clean: remove every event these two accounts made.
+async function clean() {
+  for (const who of [A, B]) {
+    await signIn(who);
+    for (const e of (await api("events")).body.events ?? []) await api("event-delete", { id: e.id });
+  }
+}
+await clean();
+await signOut();
+
+await test("1. A signed-out visitor can read a job, read it with the reader, or save its events", "backend/index.php (the signed-in route check)", async () => {
+  for (const [route, body, query] of [["import-confirm", { id: "1", events: [] }], ["import-extract", { id: "1", year: 2026 }], ["import-job", undefined, { id: 1 }], ["events"]])
+    expect(await api(route, body, query)).toEqual(401, { error: "Sign in to continue." });
+});
+await signIn(A);
+await test("2. The wrong method is accepted on the import routes", "backend/index.php (the method check)", async () => {
+  for (const [method, route] of [["GET", "import-confirm"], ["GET", "import-extract"], ["POST", "events"], ["POST", "import-job"]])
+    expect(await api.raw(method, route, method === "POST" ? "{}" : undefined)).toEqual(405, { error: "This request method is not supported." });
+});
+await test("3. A reviewed list over 1 MB is read instead of refused", "backend/index.php (the 1 MB limit for import-confirm)", async () => {
+  expect(await api.raw("POST", "import-confirm", JSON.stringify({ id: "1", events: [{ title: "x".repeat(1024 * 1024 + 1), date: "2026-10-05" }] })))
+    .toEqual(413, { error: "This request is too large." });
+});
+await test("4. Assignment deadlines with exact dates are not saved, lose their kind, or are missing from events", CONFIRM, async () => {
+  expect(await mine()).toEqual([]);
+  const id = await upload();
+  const r = await api("import-confirm", { id, courseId: COURSE, events: [
+    { title: "Homework 1", kind: "assignment", date: "2026-09-28", time: "23:59" },
+    { title: "Project proposal", kind: "deadline", date: "2026-10-02", time: "" },
+  ] });
+  expect(r).toEqual(200, { created: 2, skipped: 0 });
+  const list = await mine();
+  expect(list.map(saved)).toEqual([
+    { title: "Homework 1", kind: "assignment", date: "2026-09-28", time: "23:59", source: "imported" },
+    { title: "Project proposal", kind: "deadline", date: "2026-10-02", time: "", source: "imported" },
+  ]);
+  expect(list.map((e) => [e.courseId, e.importJobId])).toEqual([[COURSE, id], [COURSE, id]]);
+});
+let job;
+await test("5. An item that has only a span (rangeStart, rangeEnd) is given a day by the server instead of refused", REVIEWED, async () => {
+  job = await upload();
+  const before = (await mine()).length;
+  expect(await api("import-confirm", { id: job, courseId: COURSE, events: [{ title: "Lab 2", kind: "assignment", date: "", ...span }] })).toEqual(422, undated);
+  expect(await api("import-confirm", { id: job, courseId: COURSE, events: [{ title: "Lab 2", kind: "assignment", ...span }] })).toEqual(422, undated);
+  expect((await mine()).length).toBe(before);
+});
+await test("6. An item that has only a week number, or only a meeting type, is given a day by the server instead of refused", REVIEWED, async () => {
+  const before = (await mine()).length;
+  expect(await api("import-confirm", { id: job, courseId: COURSE, events: [{ title: "Lab 3", kind: "assignment", date: "", week: 5, meeting: "lab" }] })).toEqual(422, undated);
+  expect(await api("import-confirm", { id: job, courseId: COURSE, events: [{ title: "Lab 3", kind: "assignment", date: "", meeting: "lab" }] })).toEqual(422, undated);
+  // One undated item refuses the whole list, so nothing is half-saved.
+  expect(await api("import-confirm", { id: job, courseId: COURSE, events: [{ title: "Quiz 9", kind: "quiz", date: "2026-10-20" }, { title: "Lab 3", date: "", week: 5 }] })).toEqual(422, undated);
+  expect((await mine()).length).toBe(before);
+  expect((await api("import-job", undefined, { id: job })).body.job.state).toBe("queued");
+});
+await test("7. A placed item (a day worked out from its span) is refused, moved, or saved with its span instead of on its day", CONFIRM, async () => {
+  const r = await api("import-confirm", { id: job, courseId: COURSE, events: [
+    { title: "Lab 2", kind: "assignment", date: "2026-10-06", time: "14:00", ...span },
+    { title: "Lab 3", kind: "assignment", date: "2026-10-13", time: "14:00", week: 5, meeting: "lab" },
+    { title: "Reading response", kind: "assignment", date: "2026-10-09", time: "23:59", rangeStart: "2026-10-05", rangeEnd: "2026-10-09", meeting: "" },
+  ] });
+  expect(r).toEqual(200, { created: 3, skipped: 0 });
+  const placed = (await mine()).filter((e) => e.importJobId === job);
+  expect(placed.map(saved)).toEqual([
+    { title: "Lab 2", kind: "assignment", date: "2026-10-06", time: "14:00", source: "imported" },
+    { title: "Reading response", kind: "assignment", date: "2026-10-09", time: "23:59", source: "imported" },
+    { title: "Lab 3", kind: "assignment", date: "2026-10-13", time: "14:00", source: "imported" },
+  ]);
+  // A saved event has exactly the fields it always had: the span, week and meeting type are not stored.
+  expect(Object.keys(placed[0]).sort()).toEqual(["courseId", "date", "description", "id", "importJobId", "kind", "location", "seriesId", "source", "time", "title"]);
+});
+let last;
+await test("8. Script and SQL text in a title or in the new fields is run, changed, or stored instead of kept as text or ignored", `${REVIEWED} and ${CONFIRM} (the prepared INSERT)`, async () => {
+  last = await upload();
+  const before = (await mine()).length;
+  const r = await api("import-confirm", { id: last, courseId: COURSE, events: [
+    { title: XSS, kind: "deadline", date: "2026-11-02", time: "09:00", rangeStart: XSS, rangeEnd: [XSS], week: XSS, meeting: XSS },
+  ] });
+  expect(r).toEqual(200, { created: 1, skipped: 0 });
+  const list = await mine();
+  expect(list.length).toBe(before + 1);
+  const stored = list.find((e) => e.importJobId === last);
+  expect(saved(stored)).toEqual({ title: XSS, kind: "deadline", date: "2026-11-02", time: "09:00", source: "imported" });
+  expect(JSON.stringify({ ...stored, title: "" }).includes("DROP TABLE")).toBe(false);
+});
+await test("9. Another student can read this student's job, read it with the reader, or save events into it", "backend/lib/imports.php → ownedImport", async () => {
+  const before = await mine();
+  await signIn(B);
+  const missing = { error: "This upload could not be found." };
+  expect(await api("import-job", undefined, { id: last })).toEqual(404, missing);
+  expect(await api("import-extract", { id: last, year: 2026 })).toEqual(404, missing);
+  expect(await api("import-confirm", { id: last, courseId: COURSE, events: [{ title: "Hijack", kind: "assignment", date: "2026-10-06", ...span }] })).toEqual(404, missing);
+  expect(await api("events")).toEqual(200, { events: [] });
+  await signIn(A);
+  expect(await mine()).toEqual(before);
+});
+
+await clean();
+await signOut();
+</script>

@@ -161,6 +161,25 @@ try {
     $resume = $read($roomy, $a, job($db, $a, pdfOf('Resume ' . bin2hex(random_bytes(8)))), $answer('{"isSyllabus":false,"meetings":[],"noClassDates":[],"events":[]}'))['job'];
     check([$resume['state'], $resume['isSyllabus']] === ['review', false], 'A file that is not a syllabus should say so.');
     echo "PASS 4: weekly classes, no events, and not a syllabus are saved with the job and reused for the same file\n";
+
+    // Card 233: a span, a week, and the kind of class come back with the job, are stored with it for the
+    // review screen (import-job reads the same row), and reach another student with the same file.
+    $ranged = pdfOf('Ranged ' . bin2hex(random_bytes(8)));
+    $before = $requests;
+    $found = $read($roomy, $a, job($db, $a, $ranged), $answer('{"isSyllabus":true,"meetings":[],"noClassDates":[],"events":['
+        . '{"title":"Homework 3","kind":"assignment","date":"","time":"","location":"","rangeStart":"2026-10-05","rangeEnd":"2026-10-09","week":0,"meeting":"lecture","source":"Oct 5-9: Homework 3"},'
+        . '{"title":"Lab 3","kind":"assignment","date":"","time":"","location":"","rangeStart":"","rangeEnd":"","week":5,"meeting":"lab","source":"Week 5: Lab 3 due"},'
+        . '{"title":"Midterm exam","kind":"exam","date":"2026-10-14","time":"10:00","location":"","rangeStart":"","rangeEnd":"","week":0,"meeting":"none","source":"Midterm exam October 14"}]}'))['job'];
+    $wanted = [
+        ['title' => 'Homework 3', 'kind' => 'assignment', 'date' => '', 'time' => '', 'location' => '', 'source' => 'Oct 5-9: Homework 3',
+            'rangeStart' => '2026-10-05', 'rangeEnd' => '2026-10-09', 'meeting' => 'lecture'],
+        ['title' => 'Lab 3', 'kind' => 'assignment', 'date' => '', 'time' => '', 'location' => '', 'source' => 'Week 5: Lab 3 due', 'week' => 5, 'meeting' => 'lab'],
+        $midterm[0],
+    ];
+    check($found['events'] === $wanted, 'The span, week, and class kind should come back with the job: ' . json_encode($found['events']));
+    check(ownedImport($db, $a, $found['id'])['events'] === $wanted, 'The span, week, and class kind should be stored with the job.');
+    check($read($roomy, $b, job($db, $b, $ranged))['job']['events'] === $wanted && $requests === $before + 2, 'A saved read should keep the span, week, and class kind.');
+    echo "PASS 5: spans, weeks, and class kinds are stored with the job, returned to its owner, and reused for the same file\n";
 } finally {
     // Deleting each test student also deletes their jobs (ON DELETE CASCADE); the throwaway counters
     // are found by their keys.
