@@ -7,7 +7,7 @@ if (PHP_SAPI !== 'cli' && !defined('NOTELY_INTERNAL')) {
 
 // Card 141: a student's courses are stored on the server. Needs imports.php (courseId) for the id check.
 const COURSE_READ_ROUTES = ['courses'];
-const COURSE_ROUTES = [...COURSE_READ_ROUTES, 'course-save', 'course-delete'];
+const COURSE_ROUTES = [...COURSE_READ_ROUTES, 'course-save', 'course-delete', 'workspace-clear'];
 const MAX_COURSES = 50;
 const COURSE_COLUMNS = 'id, code, name, color, term, classes_start, classes_end';
 
@@ -43,6 +43,20 @@ function courseAction(PDO $db, array $config, array $session, string $route, arr
     }
     // Bounds how fast one account can write to the shared database.
     rateLimit($db, $config, 'data-write', (string) $session['user_id'], 1000);
+    if ($route === 'workspace-clear') {
+        if (($input['confirm'] ?? null) !== 'CLEAR') {
+            throw new HttpError(422, 'Type CLEAR to confirm.');
+        }
+        // One transaction: all of it or none. Versions, comments and collaborators go with the notes through
+        // ON DELETE CASCADE. Only the caller's own rows are touched; friends and the account itself stay.
+        $db->beginTransaction();
+        $user = requireUser($db, $session, true);
+        foreach (['notely_notes', 'notely_courses', 'notely_events', 'notely_course_note_shares', 'notely_import_jobs'] as $table) {
+            query($db, "DELETE FROM $table WHERE owner_user_id = ?", [$user['id']]);
+        }
+        $db->commit();
+        return ['cleared' => true];
+    }
     if ($route === 'course-save') {
         $id = $input['id'] ?? null;
         if ($id !== null && (!is_string($id) || !preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $id))) {

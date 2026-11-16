@@ -1,0 +1,75 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>217 Backend: Clear a workspace in one request</title>
+<link rel="stylesheet" href="../../shared/runner.css">
+<script type="module">
+// Backend test: real API, no screen code. Imports nothing from src/.
+import { page, test, expect, api, signIn, signOut } from "../../shared/runner.js";
+
+page({ card: "217", title: "Backend: Clear a workspace in one request", kind: "backend" });
+const A = "notely-task217-442@example.edu";
+const B = "notely-task217b-442@example.edu";
+const FILE = "backend/lib/courses.php → courseAction (the workspace-clear branch)";
+const course = { code: "CSE 442", name: "Software Engineering", color: "#869D7A", term: "Fall 2026" };
+const refused = { error: "Type CLEAR to confirm." };
+
+// Gives a student a course, an event, a note with an older version, and a syllabus upload.
+async function fill(courseId) {
+  expect((await api("course-save", { ...course, id: courseId })).status).toBe(200);
+  expect((await api("event-save", { courseId, title: "Study group", kind: "other", date: "2026-11-20", time: "", location: "", description: "" })).status).toBe(201);
+  const note = (await api("note-create", { title: "t12 lecture", body: "one", courseId })).body.note.id;
+  expect((await api("note-save", { id: note, title: "t12 lecture", body: "two" })).status).toBe(200);
+  expect((await api("syllabus-upload", { courseId, fileName: "s.txt", content: btoa("syllabus") })).status).toBe(201);
+  return note;
+}
+const counts = async () => [(await api("notes")).body.notes.length, (await api("courses")).body.courses.length, (await api("events")).body.events.length];
+
+// Start and end clean: clear both students' workspaces. Accounts are never deleted.
+async function clean() {
+  for (const who of [A, B]) { await signIn(who); await api("workspace-clear", { confirm: "CLEAR" }); }
+}
+await clean();
+await signOut();
+
+await test("1. A signed-out visitor can clear a workspace", "backend/index.php (the signed-in route check)", async () => {
+  expect(await api("workspace-clear", { confirm: "CLEAR" })).toEqual(401, { error: "Sign in to continue." });
+});
+await test("2. The wrong method or an oversized body is accepted", "backend/index.php (the method and size checks)", async () => {
+  await signIn(A);
+  expect(await api.raw("GET", "workspace-clear")).toEqual(405, { error: "This request method is not supported." });
+  expect(await api.raw("POST", "workspace-clear", JSON.stringify({ confirm: "x".repeat(9000) }))).toEqual(413, { error: "This request is too large." });
+});
+await test("3. Clearing an empty workspace fails", FILE, async () => {
+  expect(await api("workspace-clear", { confirm: "CLEAR" })).toEqual(200, { cleared: true });
+});
+let noteA;
+await test("4. Anything other than the exact word CLEAR clears the workspace", FILE, async () => {
+  noteA = await fill("t12-a");
+  for (const confirm of [undefined, "", "clear", "CLEAR ", " CLEAR", true, ["CLEAR"], "CLEAR'; DROP TABLE notely_notes; --"])
+    expect(await api("workspace-clear", confirm === undefined ? {} : { confirm })).toEqual(422, refused);
+  expect(await counts()).toEqual([1, 1, 1]);
+});
+await test("5. Clearing leaves notes, courses or events behind, or leaves their versions", FILE, async () => {
+  await signIn(B);
+  const noteB = await fill("t12-b");
+  await signIn(A);
+  expect(await api("workspace-clear", { confirm: "CLEAR" })).toEqual(200, { cleared: true });
+  expect(await counts()).toEqual([0, 0, 0]);
+  expect((await api("note-versions", undefined, { id: noteA })).status).toBe(404);
+  expect((await api("session")).body.user.email).toBe(A.toLowerCase()); // the account itself stays
+  await signIn(B);
+  expect(await counts()).toEqual([1, 1, 1]); // another student's data is untouched
+  expect((await api("note-versions", undefined, { id: noteB })).body.versions.length).toBe(1);
+});
+await test("6. A workspace with 25 notes is not cleared in one request", FILE, async () => {
+  await signIn(A);
+  for (let i = 0; i < 25; i++) expect((await api("note-create", { title: `t12 n${i}`, body: "x" })).status).toBe(201);
+  expect((await api("notes")).body.notes.length).toBe(25);
+  expect(await api("workspace-clear", { confirm: "CLEAR" })).toEqual(200, { cleared: true });
+  expect((await api("notes")).body.notes.length).toBe(0);
+});
+
+await clean();
+await signOut();
+</script>
