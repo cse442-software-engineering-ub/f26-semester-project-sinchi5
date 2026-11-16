@@ -50,6 +50,10 @@ export function fakeApi(seed: { courses?: Course[]; events?: CourseEvent[]; syll
       store.courses = store.courses.filter((c) => c.id !== id);
       store.events = store.events.filter((e) => e.courseId !== id);
     },
+    async clearWorkspace() {
+      call("workspace-clear", { confirm: "CLEAR" });
+      store.courses = []; store.events = []; store.notes = [];
+    },
     async saveEvent(event) {
       call("event-save", Object.fromEntries(Object.entries(event).filter(([key, value]) => key !== "id" || value)));
       if (event.id && !/^\d+$/.test(event.id)) throw new NoteServiceError("Choose a valid event.", 422);

@@ -83,7 +83,7 @@ it("ignores an older server refresh after signing out", async () => {
   expect(await earlier).toBeNull();
   await expect(repo.notes.list()).rejects.toThrow("Sign in");
 });
-it("Clear workspace deletes the student's notes, then each course (with its events), then any event left (card 142)", async () => {
+it("Clear workspace sends one workspace-clear request and the server empties notes, courses and events (card 218)", async () => {
   const { repo, server } = app({ session: async () => alice });
   await repo.auth.session();
   const api = server.stores.get("1")!;
@@ -93,7 +93,7 @@ it("Clear workspace deletes the student's notes, then each course (with its even
   await repo.schedule.save({ id: "", courseId: "gone", title: "Orphan", kind: "other", date: "2026-11-21", time: "", location: "", description: "", source: "manual" });
   await repo.reset();
   expect([await repo.notes.list(), await repo.courses.list(), await repo.schedule.list()]).toEqual([[], [], []]);
-  expect(api.calls.filter((c) => /delete/.test(c.route)).map((c) => c.route)).toEqual(["note-delete", "course-delete", "event-delete"]);
+  expect(api.calls.filter((c) => /clear|delete/.test(c.route))).toEqual([{ route: "workspace-clear", body: { confirm: "CLEAR" } }]);
 });
 it("keeps notes with the server and lists a course's lecture folders from them (task #120)", async () => {
   const { repo, storage } = app({ session: async () => alice });

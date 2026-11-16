@@ -5,10 +5,10 @@ import { test, expect } from "./support/account-fixture";
 // Card 167: clearing a signed-in workspace needs CLEAR typed into the "Start fresh?" window first.
 const password = "Sample river password 42!";
 
-// Clearing deletes each note the student owns on the server, so note-delete requests are the clear requests.
+// Clearing is one workspace-clear request (card 218).
 function countClears(page: Page) {
   const seen = { count: 0 };
-  page.on("request", (r) => { if (new URL(r.url()).searchParams.get("route") === "note-delete") seen.count += 1; });
+  page.on("request", (r) => { if (new URL(r.url()).searchParams.get("route") === "workspace-clear") seen.count += 1; });
   return seen;
 }
 
