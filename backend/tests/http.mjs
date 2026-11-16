@@ -92,7 +92,7 @@ try {
   const loggedIn = await b.call("login", { email: ` ${email.toUpperCase()} `, password });
   assert.equal(loggedIn.status, 200);
   assert.deepEqual(loggedIn.data.user, created.data.user);
-  assert.deepEqual(Object.keys(loggedIn.data).sort(), ["csrfToken", "onboarding", "user"]);
+  assert.deepEqual(Object.keys(loggedIn.data).sort(), ["csrfToken", "onboarding", "preferences", "user"]);
   assert.deepEqual(Object.keys(loggedIn.data.user).sort(), ["email", "hasPhoto", "id", "name"]);
   assert.equal(loggedIn.data.user.hasPhoto, false);
   assert.notEqual(b.cookie, beforeLoginCookie); assert.notEqual(b.csrf, beforeLoginCsrf);

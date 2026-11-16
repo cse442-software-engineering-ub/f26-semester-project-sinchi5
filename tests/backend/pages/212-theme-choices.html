@@ -1,0 +1,68 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>212 Backend: Save a student's theme choices</title>
+<link rel="stylesheet" href="../../shared/runner.css">
+<script type="module">
+// Backend test: real API, no screen code. Imports nothing from src/.
+import { page, test, expect, api, signIn, signOut } from "../../shared/runner.js";
+
+page({ card: "212", title: "Backend: Save a student's theme choices", kind: "backend" });
+const A = "notely-task212-442@example.edu";
+const B = "notely-task212b-442@example.edu";
+const FILE = "backend/lib/preferences.php → preferenceAction";
+const modeMsg = "Choose system, light, or dark.";
+const schemeMsg = "Choose sage, fjord, rose, or mocha.";
+
+// Start and end clean: put both students back on the defaults. Accounts are never deleted.
+async function clean() {
+  for (const who of [A, B]) { await signIn(who); await api("preferences", { mode: "system", scheme: "sage" }); }
+}
+await clean();
+await signOut();
+
+await test("1. A signed-out visitor can save theme choices", "backend/index.php (the signed-in route check)", async () => {
+  expect(await api("preferences", { mode: "dark", scheme: "mocha" })).toEqual(401, { error: "Sign in to continue." });
+});
+await test("2. A student with no saved choice does not get system and sage", "backend/lib/bootstrap.php → sessionResponse", async () => {
+  await signIn(A);
+  expect((await api("session")).body.preferences).toEqual({ mode: "system", scheme: "sage" });
+});
+await test("3. The wrong method or an oversized body is accepted", "backend/index.php (the method and size checks)", async () => {
+  expect(await api.raw("GET", "preferences")).toEqual(405, { error: "This request method is not supported." });
+  expect(await api.raw("POST", "preferences", JSON.stringify({ mode: "dark", scheme: "x".repeat(9000) }))).toEqual(413, { error: "This request is too large." });
+});
+await test("4. Saved choices are not returned, or are not found again in the session", FILE, async () => {
+  expect(await api("preferences", { mode: "dark", scheme: "mocha" })).toEqual(200, { preferences: { mode: "dark", scheme: "mocha" } });
+  expect((await api("session")).body.preferences).toEqual({ mode: "dark", scheme: "mocha" });
+});
+await test("5. Saving again adds a second choice instead of replacing the first", FILE, async () => {
+  expect((await api("preferences", { mode: "light", scheme: "rose" })).body.preferences).toEqual({ mode: "light", scheme: "rose" });
+  expect((await api("session")).body.preferences).toEqual({ mode: "light", scheme: "rose" });
+});
+await test("6. One of the 12 mode and scheme combinations is refused", FILE, async () => {
+  for (const mode of ["system", "light", "dark"]) for (const scheme of ["sage", "fjord", "rose", "mocha"])
+    expect((await api("preferences", { mode, scheme })).status).toBe(200);
+});
+await test("7. An unknown or missing mode or scheme is stored", FILE, async () => {
+  await api("preferences", { mode: "dark", scheme: "mocha" });
+  for (const [body, msg] of [[{ scheme: "sage" }, modeMsg], [{ mode: "blue", scheme: "sage" }, modeMsg], [{ mode: 1, scheme: "sage" }, modeMsg],
+    [{ mode: "dark" }, schemeMsg], [{ mode: "dark", scheme: "neon" }, schemeMsg], [{ mode: "dark", scheme: ["sage"] }, schemeMsg]])
+    expect(await api("preferences", body)).toEqual(422, { error: msg });
+  expect((await api("session")).body.preferences).toEqual({ mode: "dark", scheme: "mocha" });
+});
+await test("8. Script and SQL text is stored or run instead of refused", FILE, async () => {
+  expect(await api("preferences", { mode: "dark", scheme: "<script>alert(1)<\/script>'; DROP TABLE notely_preferences; --" })).toEqual(422, { error: schemeMsg });
+  expect((await api("session")).body.preferences).toEqual({ mode: "dark", scheme: "mocha" });
+});
+await test("9. One student's choices show up for another student", "backend/lib/bootstrap.php → sessionResponse (the user_id filter)", async () => {
+  await signIn(B);
+  expect((await api("session")).body.preferences).toEqual({ mode: "system", scheme: "sage" });
+  await api("preferences", { mode: "light", scheme: "fjord" });
+  await signIn(A);
+  expect((await api("session")).body.preferences).toEqual({ mode: "dark", scheme: "mocha" });
+});
+
+await clean();
+await signOut();
+</script>
