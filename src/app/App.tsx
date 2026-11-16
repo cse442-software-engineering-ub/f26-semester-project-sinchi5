@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Link,
   NavLink,
@@ -61,6 +61,14 @@ export default function App() {
   const [addingCourse, setAddingCourse] = useState(false);
   // Bug 3: after Log out the signed-out redirect always lands on the log-in form, from any page.
   const [loggedOut, setLoggedOut] = useState(false);
+  // An account left mid-setup goes straight in; one background request, retried at the next load.
+  const setupTried = useRef(false);
+  const newAccount = Boolean(location.state?.newAccount);
+  useEffect(() => {
+    if (!state.user || state.completed || newAccount || setupTried.current) return;
+    setupTried.current = true;
+    repo.auth.completeOnboarding().then(() => refresh(), () => {});
+  }, [state.user, state.completed, newAccount]);
   useEffect(() => {
     document.title = `${BRAND} · ${location.pathname.startsWith("/notes") ? "Your notes" : location.pathname.startsWith("/schedule") ? "Your schedule" : "Your study space"}`;
     window.scrollTo(0, 0);
@@ -148,7 +156,7 @@ export default function App() {
         <BookOpen size={32} /> Opening your space…
       </div>
     );
-  if (!state.user || !state.completed)
+  if (!state.user || (!state.completed && newAccount))
     return (
       <Routes>
         <Route path="/welcome" element={<Onboarding />} />

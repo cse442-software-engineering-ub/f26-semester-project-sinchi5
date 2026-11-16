@@ -24,9 +24,6 @@ async function register(page: Page, name = "Picture Tester", address = email) {
   await page.getByRole("button", { name: "Create account", exact: true }).click();
   await page.getByLabel("I saved my recovery code").check();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "Skip for now" }).click();
-  await page.getByRole("button", { name: "I’ll do this later" }).click();
-  await page.getByRole("button", { name: "Let’s begin" }).click();
   await expect(page.getByRole("heading", { name: new RegExp(`Good .*${name.split(" ")[0]}`) })).toBeVisible();
   await openSettings(page);
   await expect(summary(page)).toBeVisible();

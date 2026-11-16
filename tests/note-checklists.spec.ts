@@ -33,9 +33,6 @@ async function accountNote(page: Page) {
   await page.getByRole("button", { name: "Create account", exact: true }).click();
   await page.getByLabel("I saved my recovery code").check();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "Skip for now" }).click();
-  await page.getByRole("button", { name: /do this later/ }).click();
-  await page.getByRole("button", { name: /begin/ }).click();
   await expect(page.getByRole("heading", { name: /Good .*Jamie/ })).toBeVisible();
   await page.goto("/notes");
   await page.getByRole("button", { name: "Create Note", exact: true }).click();

@@ -18,16 +18,11 @@ async function signUp(page: Page, name: string, email: string, course?: string) 
   await page.getByLabel("I saved my recovery code").check();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   if (course) {
-    await page.getByRole("button", { name: "Add course" }).click();
-    await page.getByLabel("Course code").fill(course);
-    await page.getByLabel("Course name").fill("Software Engineering");
-    await page.getByRole("button", { name: "Add course", exact: true }).click();
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
-  } else {
-    await page.getByRole("button", { name: "Skip for now" }).click();
+    await openNew(page, "Course");
+    await page.getByRole("dialog").getByLabel("Course code").fill(course);
+    await page.getByRole("dialog").getByLabel("Course name").fill("Software Engineering");
+    await page.getByRole("dialog").getByRole("button", { name: "Add course", exact: true }).click();
   }
-  await page.getByRole("button", { name: "I’ll do this later" }).click();
-  await page.getByRole("button", { name: "Let’s begin" }).click();
   await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening)/ })).toBeVisible();
 }
 

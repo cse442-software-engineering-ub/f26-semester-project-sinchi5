@@ -144,13 +144,13 @@ test("pending login disables the form and prevents duplicate submissions", async
   expect(credentials).toHaveLength(1);
 });
 
-test("login preserves unfinished onboarding", async ({ page }) => {
+test("login sends an account left mid-setup straight to the app", async ({ page }) => {
   const credentials = await mockLogin(page, { completed: false });
   await openLogin(page);
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Log in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "What are you learning?" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Your notes", exact: true })).not.toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your notes", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What are you learning?" })).not.toBeVisible();
   expect(credentials).toEqual([{ email, password }]);
 });

@@ -2075,39 +2075,6 @@ and a highlighter swipes across
   font-size: 0.6rem;
   color: var(--muted);
 }
-.courseSetup:empty {
-  display: none;
-}
-.courseSetup {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-.courseSetup > div {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  padding: 14px;
-  background: var(--surface);
-}
-.courseSetup > div > span:nth-child(2) {
-  flex: 1;
-}
-.courseSetup strong {
-  font-size: 0.8rem;
-}
-.courseSetup small {
-  display: block;
-  color: var(--muted);
-  font-size: 0.66rem;
-  margin-top: 3px;
-}
-.onboardingContent > .successIcon {
-  margin-bottom: 28px;
-}
 @media (hover: hover) and (pointer: fine) {.noteCard:hover {
     border-color: #a9b59e;
     box-shadow: 0 5px 18px #34432a08;

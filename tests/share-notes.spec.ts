@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { test, expect } from "./support/account-fixture";
+import { openNew } from "./support/shell";
 
 // Card 157: the "Share notes with friends" window on the course page. The account fixture stands in
 // for the card 153 friend routes and the card 156 sharing routes.
@@ -26,14 +27,11 @@ async function signUpOwner(page: Page) {
   await page.getByRole("button", { name: "Create account", exact: true }).click();
   await page.getByLabel("I saved my recovery code").check();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "Add course" }).click();
-  await page.getByLabel("Course code").fill("CSE 442");
-  await page.getByLabel("Term").fill("Fall 2026");
-  await page.getByLabel("Course name").fill("Software Engineering");
-  await page.getByRole("button", { name: "Add course" }).click();
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "I’ll do this later" }).click();
-  await page.getByRole("button", { name: "Let’s begin" }).click();
+  await openNew(page, "Course");
+  await page.getByRole("dialog").getByLabel("Course code").fill("CSE 442");
+  await page.getByRole("dialog").getByLabel("Term").fill("Fall 2026");
+  await page.getByRole("dialog").getByLabel("Course name").fill("Software Engineering");
+  await page.getByRole("dialog").getByRole("button", { name: "Add course", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening)/ })).toBeVisible();
 }
 // Deck Friend and Deck Other accept Deck Owner's requests unless `friends` is false.

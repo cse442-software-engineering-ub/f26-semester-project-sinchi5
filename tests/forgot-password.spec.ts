@@ -22,9 +22,6 @@ async function signUp(page: Page) {
   const code = (await page.getByLabel("Recovery code", { exact: true }).textContent())!;
   await page.getByLabel("I saved my recovery code").check();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "Skip for now" }).click();
-  await page.getByRole("button", { name: "I’ll do this later" }).click();
-  await page.getByRole("button", { name: "Let’s begin" }).click();
   await expect(page.getByRole("heading", { name: /Good .*Recovery/ })).toBeVisible();
   return code;
 }
