@@ -1,6 +1,6 @@
-import type { AuthRepository, OnboardingState, User } from "../domain";
+import type { AuthRepository, OnboardingState, Preferences, User } from "../domain";
 
-type Session = { user: User | null; onboarding: OnboardingState; csrfToken: string; recoveryCode?: string };
+type Session = { user: User | null; onboarding: OnboardingState; csrfToken: string; recoveryCode?: string; preferences?: Preferences };
 export class AccountError extends Error {
   constructor(message: string, public status: number) { super(message); }
 }
@@ -36,6 +36,7 @@ export function createAuthRepository(
       if (response.status === 401 || response.status === 403) snapshot = undefined;
       throw new AccountError(body?.error || "The account service is unavailable. Please try again later.", response.status);
     }
+    if (route === "preferences" && body?.preferences) return body as Session; // answers only the saved choice
     if (!body || typeof body.csrfToken !== "string" || !body.onboarding || !("user" in body)) {
       throw new AccountError("The account service is unavailable. Please try again later.", 503);
     }
@@ -53,6 +54,12 @@ export function createAuthRepository(
     return request(route, data);
   }
   return {
+    preferences: () => snapshot?.preferences ?? { mode: "system", scheme: "sage" },
+    async savePreferences(next) {
+      const saved = (await post("preferences", { ...next }) as unknown as { preferences: Preferences }).preferences;
+      if (snapshot) snapshot.preferences = saved;
+      return saved;
+    },
     async session() { return (await read()).user; },
     async onboarding() { return (snapshot || await read()).onboarding; },
     async signIn(email, password) { return (await post("login", { email, password })).user!; },
