@@ -63,7 +63,7 @@ export function Onboarding() {
       } else {
         await repo.auth.signIn(email, password);
         // An account left mid-setup is finished in the background by App.
-        navigate("/welcome", { replace: true, state: { returningLogin: true } });
+        navigate("/welcome", { replace: true });
       }
       setPassword(""); setConfirmation(""); setRecoveryInput("");
       await refresh();

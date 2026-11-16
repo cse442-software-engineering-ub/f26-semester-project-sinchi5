@@ -78,8 +78,8 @@ try {
       await page.getByLabel("Email address").fill("routes@example.edu");
       await page.getByLabel("Password", { exact: true }).fill("Routing fixture password 42!");
       await page.getByRole("button", { name: "Log in", exact: true }).click();
-      // Returning users who finished onboarding land on their notes library.
-      await expect(page.getByRole("heading", { name: "Your notes", exact: true })).toBeVisible();
+      // Returning students land on Today.
+      await expect(page.getByRole("heading", { name: "Your week at a glance", exact: true })).toBeVisible();
       assert.equal(new URL(page.url()).pathname, base);
 
       // A new tab exercises an actual document request; hash-only navigation does not.
