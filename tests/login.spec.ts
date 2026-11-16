@@ -42,12 +42,12 @@ async function mockLogin(page: Page, options: { fail?: boolean; completed?: bool
 
 async function openLogin(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "I already have an account" }).click();
-  await expect(page.getByRole("button", { name: "Log In", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Log in" }).click();
+  await expect(page.getByRole("button", { name: "Log in", exact: true })).toBeVisible();
 }
 
 async function expectLogin(page: Page) {
-  await expect(page.getByRole("button", { name: "Log In", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log in", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Your notes", exact: true })).not.toBeVisible();
   await expect(page).toHaveURL(/welcome/);
 }
@@ -69,7 +69,7 @@ test("valid login submits credentials and opens the authenticated notes page", a
   await expect(passwordInput).toBeFocused();
   await page.keyboard.type(password);
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Log In", exact: true })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Log in", exact: true })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: "Your notes", exact: true })).toBeVisible();
   await expect(page).toHaveURL(/notes/);
@@ -84,7 +84,7 @@ test("incorrect password displays a generic alert and keeps entered fields on Lo
   await openLogin(page);
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Password", { exact: true }).fill("WrongPassword");
-  await page.getByRole("button", { name: "Log In", exact: true }).click();
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page.getByRole("alert")).toHaveText("Email or password is incorrect.");
   await expectLogin(page);
   await expect(page.getByLabel("Email address")).toHaveValue(email);
@@ -95,7 +95,7 @@ test("incorrect password displays a generic alert and keeps entered fields on Lo
 test("empty fields show both required messages, focus email, and send no login request", async ({ page }) => {
   const credentials = await mockLogin(page);
   await openLogin(page);
-  await page.getByRole("button", { name: "Log In", exact: true }).click();
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page.getByText("Enter your email address.", { exact: true })).toBeVisible();
   await expect(page.getByText("Enter your password.", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Email address")).toBeFocused();
@@ -110,12 +110,12 @@ test("invalid email and empty password are rejected before authentication", asyn
   await openLogin(page);
   await page.getByLabel("Email address").fill("student");
   await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Log In", exact: true }).click();
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page.getByLabel("Email address")).toBeFocused();
   await expect(page.getByText("Email addresses need exactly one @, like name@university.edu.")).toBeVisible();
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Password", { exact: true }).fill("");
-  await page.getByRole("button", { name: "Log In", exact: true }).click();
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page.getByText("Enter your password.", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Password", { exact: true })).toBeFocused();
   expect(credentials).toEqual([]);
@@ -128,7 +128,7 @@ test("pending login disables the form and prevents duplicate submissions", async
   await openLogin(page);
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Log In", exact: true }).click();
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
   try {
     await expect.poll(() => credentials.length).toBe(1);
     await expect(page.getByRole("button", { name: "Opening your space…" })).toBeDisabled();
@@ -149,7 +149,7 @@ test("login preserves unfinished onboarding", async ({ page }) => {
   await openLogin(page);
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Log In", exact: true }).click();
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page.getByRole("heading", { name: "What are you learning?" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Your notes", exact: true })).not.toBeVisible();
   expect(credentials).toEqual([{ email, password }]);

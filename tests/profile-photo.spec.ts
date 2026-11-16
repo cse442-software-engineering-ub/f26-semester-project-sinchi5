@@ -16,7 +16,7 @@ const avatars = (page: Page) => [
 ];
 async function register(page: Page, name = "Picture Tester", address = email) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Create your workspace" }).click();
+  await page.getByRole("button", { name: "Create account" }).click();
   await page.getByLabel("Your name").fill(name);
   await page.getByLabel("Email address").fill(address);
   await page.getByLabel("Password", { exact: true }).fill(password);
@@ -38,7 +38,7 @@ async function signOut(page: Page) {
 async function signIn(page: Page, address = email) {
   await page.getByLabel("Email address").fill(address);
   await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Log In", exact: true }).click();
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(accountButton(page)).toBeVisible();
   await openSettings(page);
   await expect(summary(page)).toBeVisible();

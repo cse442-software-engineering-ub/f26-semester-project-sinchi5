@@ -27,7 +27,7 @@ export const photoFile = (name: string) => ({ name, mimeType: "image/png", buffe
 
 export async function signUpWithCourse(page: Page, email = "notely-syllabus-442@example.edu", classes?: { start: string; end: string }) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Create your workspace" }).click();
+  await page.getByRole("button", { name: "Create account" }).click();
   await page.getByLabel("Your name").fill("Task Tester");
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Password", { exact: true }).fill("Sample river password 42!");
