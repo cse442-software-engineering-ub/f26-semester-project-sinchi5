@@ -1,0 +1,77 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>206 Backend: Accounts, sessions and request rules</title>
+<link rel="stylesheet" href="../../shared/runner.css">
+<script type="module">
+// Backend test: real API, no screen code. Imports nothing from src/.
+import { page, test, expect, api, signIn, signOut } from "../../shared/runner.js";
+
+page({ card: "206", title: "Backend: Accounts, sessions and request rules", kind: "backend" });
+const A = "notely-task206-442@example.edu";
+const PASSWORD = "TestPassword2026!";
+const XSS = "<script>alert(1)<\/script>'; DROP TABLE notely_notes; --";
+const INDEX = "backend/index.php";
+
+// Start and end clean: delete the notes this page made. Accounts are never deleted.
+async function clean() {
+  await signIn(A);
+  for (const n of (await api("notes")).body.notes ?? []) if (n.title === XSS) await api("note-delete", { id: n.id });
+}
+await clean();
+await signOut();
+
+await test("1. A signed-out visitor can read a protected route", `${INDEX} (the signed-in route check)`, async () => {
+  expect(await api("notes")).toEqual(401, { error: "Sign in to continue." });
+});
+await test("2. An unknown route is answered instead of refused", `${INDEX} (the route list)`, async () => {
+  expect(await api("no-such-route")).toEqual(404, { error: "This action was not found." });
+});
+await test("3. A GET is accepted on a POST-only route", `${INDEX} (the method check)`, async () => {
+  expect(await api.raw("GET", "login")).toEqual(405, { error: "This request method is not supported." });
+});
+await test("4. A wrong password logs in", "backend/lib/accounts.php → accountAction (the login branch)", async () => {
+  await signIn(A);          // makes sure the account exists, then leaves it signed out for the wrong-password try
+  await signOut();
+  expect(await api("login", { email: A, password: "NotThePassword2026!" })).toEqual(401, { error: "Email or password is incorrect." });
+});
+await test("5. The correct password does not log in or return the user", "backend/lib/accounts.php → accountAction (the login branch)", async () => {
+  const r = await api("login", { email: A, password: PASSWORD });
+  expect(r.status).toBe(200);
+  expect(r.body.user.email).toBe(A.toLowerCase()); // the server lowercases emails
+  expect(JSON.stringify(r.body).includes("hash")).toBe(false); // no password hash leaks
+  expect((await api("session")).body.user.email).toBe(A.toLowerCase());
+});
+await test("6. A POST without the CSRF token is accepted", "backend/lib/bootstrap.php → requireCsrf", async () => {
+  expect(await api.raw("POST", "note-create", JSON.stringify({ title: "no token" }), { csrf: false }))
+    .toEqual(403, { error: "Your session changed. Reload the page and try again." });
+});
+await test("7. A body over 8 KB is read instead of refused", `${INDEX} (the 8 KB body limit)`, async () => {
+  expect(await api.raw("POST", "note-create", JSON.stringify({ title: "a".repeat(9000) })))
+    .toEqual(413, { error: "This request is too large." });
+});
+await test("8. A name made of markup is accepted", "backend/lib/security.php → validName", async () => {
+  expect(await api("profile", { name: "<script>alert(x)<\/script>", email: A }))
+    .toEqual(422, { error: "Your name can’t include \"<\". Use letters, spaces, hyphens (-), apostrophes ('), and periods (.)." });
+  expect((await api("session")).body.user.name).toBe("Notely Tester"); // the name was not changed
+});
+await test("9. Script and SQL text in a note title is stored changed, or reaches the query as code", "backend/lib/notes.php → noteAction (the prepared INSERT)", async () => {
+  const made = await api("note-create", { title: XSS });
+  expect(made.status).toBe(201);
+  expect(made.body.note.title).toBe(XSS);
+  const read = await api("note", undefined, { id: made.body.note.id });
+  expect(read.status).toBe(200);
+  expect(read.body.note.title).toBe(XSS);
+  expect((await api("notes")).status).toBe(200); // the notes table is still there
+  expect(await api("note-delete", { id: made.body.note.id })).toEqual(200, { note: { id: made.body.note.id } });
+});
+await test("10. After log out a protected route is still readable", "backend/lib/accounts.php → accountAction (the logout branch)", async () => {
+  const out = await api("logout", {});
+  expect(out.status).toBe(200);
+  expect(out.body.user).toBe(null);
+  expect(await api("notes")).toEqual(401, { error: "Sign in to continue." });
+});
+
+await clean();
+await signOut();
+</script>

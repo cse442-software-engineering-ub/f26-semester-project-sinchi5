@@ -1,0 +1,27 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notely test pages</title>
+<link rel="stylesheet" href="shared/runner.css">
+<h1>Notely test pages</h1>
+<p class="meta">Open a page and wait for its last line: <code>Result: N of N passed</code>.</p>
+<h2>Backend tests</h2>
+<ul id="backend"><li>Loading…</li></ul>
+<h2>Frontend tests</h2>
+<ul id="frontend"><li>Loading…</li></ul>
+<noscript>This list needs JavaScript.</noscript>
+<script>
+// pages.json is written by scripts/copy-tests.mjs from the files in dist/tests, so adding a page edits no shared file.
+fetch("pages.json").then((r) => r.json()).then((pages) => {
+  for (const kind of ["backend", "frontend"]) {
+    const ul = document.getElementById(kind);
+    ul.textContent = "";
+    for (const p of pages[kind] || []) {
+      const li = document.createElement("li");
+      li.append(Object.assign(document.createElement("a"), { href: p.href, textContent: p.title }));
+      ul.append(li);
+    }
+    if (!ul.children.length) ul.innerHTML = "<li>None yet.</li>";
+  }
+}).catch((e) => { document.body.append("Could not load pages.json: " + e.message); });
+</script>

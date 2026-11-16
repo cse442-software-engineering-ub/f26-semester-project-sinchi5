@@ -1,0 +1,11 @@
+:root { color-scheme: light dark; --pass: #0a7a2f; --fail: #b00020; --muted: #666; }
+@media (prefers-color-scheme: dark) { :root { --pass: #5fd27f; --fail: #ff6b81; --muted: #aaa; } }
+body { font: 15px/1.5 system-ui, sans-serif; margin: 0 auto; padding: 16px; max-width: 60rem; overflow-wrap: anywhere; }
+h1 { font-size: 1.3rem; margin: 0 0 .5rem; }
+.meta { color: var(--muted); margin: 0; }
+#rows { margin: 1rem 0; }
+.row, .hint, #result { font: 14px/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; margin: 0; }
+.row.pass { color: var(--pass); }
+.row.fail { color: var(--fail); font-weight: 600; }
+.hint { color: var(--muted); margin: 0 0 .5rem 2rem; }
+#result { font-weight: 700; margin-top: 1rem; }
