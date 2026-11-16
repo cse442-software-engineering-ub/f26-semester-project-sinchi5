@@ -3,6 +3,7 @@ import { Check, Circle } from "lucide-react";
 import { useApp } from "../app/context";
 import { Avatar, Modal } from "../shared/ui";
 import s from "../app/App.module.css";
+import d from "./settings.module.css";
 import { PASSWORD_MAX, PASSWORD_MIN, emailError, nameError, passwordCharacterError, passwordError } from "../services/validation";
 
 export function FieldError({ id, message }: { id: string; message: string }) {
@@ -40,7 +41,8 @@ export function RecoveryCode({ code, onDone }: { code: string; onDone: () => voi
   </section>;
 }
 
-export function AccountSettings() {
+// danger: only the "Delete account" block, shown at the bottom of Settings; otherwise everything else.
+export function AccountSettings({ danger = false }: { danger?: boolean } = {}) {
   const { state, repo, refresh } = useApp();
   const [action, setAction] = useState<"profile" | "password" | "recovery" | "delete">();
   const [busy, setBusy] = useState(false);
@@ -114,59 +116,7 @@ export function AccountSettings() {
     finally { pending.current = false; setBusy(false); }
   }
   const open = (next: NonNullable<typeof action>) => { if (pending.current) return; setError(""); setMessage(""); setAction(next); };
-  return <section className={s.panel} aria-labelledby="account-heading">
-    <div className={s.settingsHeading}>
-      <h2 id="account-heading">Account</h2>
-      <p className={s.muted}>Manage how you sign in and keep your account secure.</p>
-    </div>
-    <div className={s.accountSummary} role="group" aria-label="Account summary" aria-busy={busy}>
-      {state.user && <Avatar user={state.user} version={state.photoVersion} alt="" />}
-      <span>
-        <strong className={s.accountText}>{state.user?.name}</strong>
-        <small className={`${s.muted} ${s.accountText}`}>{state.user?.email}</small>
-      </span>
-      {!isDemo && <>
-        <input ref={photoInput} type="file" accept=".png,.jpg,.jpeg,.webp" aria-label="Profile photo" hidden disabled={busy}
-          onChange={e => {
-            const file = e.currentTarget.files?.[0];
-            // Reset immediately so the same file can be selected again after a failure.
-            e.currentTarget.value = "";
-            void changePhoto(file);
-          }} />
-        <button type="button" className={s.secondary} disabled={busy} onClick={() => photoInput.current?.click()}>Change photo</button>
-        {state.user?.hasPhoto && <button type="button" className={s.secondary} disabled={busy} onClick={() => void removePhoto()}>Remove photo</button>}
-        <button className={s.secondary} disabled={busy} onClick={() => open("profile")}>Edit account</button>
-      </>}
-    </div>
-    {isDemo && <p className={s.muted}>You’re exploring a sample workspace. Sign out to create an account.</p>}
-    <ul className={s.settingRows}>
-      {!isDemo && <>
-        <li>
-          <span><strong>Password</strong><small>Use at least {PASSWORD_MIN} characters. A passphrase is easiest to remember.</small></span>
-          <button className={s.secondary} onClick={() => open("password")}>Change password</button>
-        </li>
-        <li>
-          <span><strong>Recovery code</strong><small>Your only way back in if you forget your password.</small></span>
-          <button className={s.secondary} onClick={() => open("recovery")}>Replace recovery code</button>
-        </li>
-      </>}
-      <li>
-        <span><strong>Sign out</strong><small>End your session in this browser.</small></span>
-        <button className={s.secondary} disabled={busy} onClick={async () => {
-          if (pending.current) return;
-          pending.current = true; setBusy(true); setError("");
-          try { await repo.auth.signOut(); await refresh(); }
-          catch (e) { setError((e as Error).message); }
-          finally { pending.current = false; setBusy(false); }
-        }}>Sign out</button>
-      </li>
-      {!isDemo && <li className={s.dangerRow}>
-        <span><strong>Delete account</strong><small>Permanently remove your account and sign out everywhere.</small></span>
-        <button className={s.dangerOutline} onClick={() => open("delete")}>Delete account</button>
-      </li>}
-    </ul>
-    {message && <p role="status">{message}</p>}
-    {!action && error && <p className={s.error} role="alert">{error}</p>}
+  const dialogs = <>
     {action && <Modal title={{ profile: "Edit account", password: "Change password", recovery: "Replace recovery code", delete: "Delete your account?" }[action]}
       dismissible={!busy} onClose={() => { if (!pending.current) { setAction(undefined); setError(""); setNewPassword(""); setConfirmPassword(""); } }}>
       <form className={s.form} onSubmit={submit}>
@@ -191,5 +141,54 @@ export function AccountSettings() {
       </form>
     </Modal>}
     {code && <Modal title="Your new recovery code" dismissible={false} onClose={() => {}}><RecoveryCode code={code} onDone={() => setCode("")} /></Modal>}
+  </>;
+  const dangerBlock = <section className={`${s.panel} ${d.danger}`} aria-labelledby="delete-heading">
+    <h2 id="delete-heading">Delete account</h2>
+    <p className={s.muted}>Permanently remove your account and sign out everywhere.</p>
+    <button className={s.dangerOutline} onClick={() => open("delete")}>Delete account</button>
+    {!action && error && <p className={s.error} role="alert">{error}</p>}
+    {dialogs}
+  </section>;
+  if (danger) return isDemo ? null : dangerBlock;
+  return <section className={s.panel} aria-labelledby="account-heading">
+    <div className={s.settingsHeading}>
+      <h2 id="account-heading">Account</h2>
+      <p className={s.muted}>Manage how you sign in and keep your account secure.</p>
+    </div>
+    <div className={s.accountSummary} role="group" aria-label="Account summary" aria-busy={busy}>
+      {state.user && <Avatar user={state.user} version={state.photoVersion} alt="" />}
+      <span>
+        <strong className={s.accountText}>{state.user?.name}</strong>
+        <small className={`${s.muted} ${s.accountText}`}>{state.user?.email}</small>
+      </span>
+      {!isDemo && <>
+        <input ref={photoInput} type="file" accept=".png,.jpg,.jpeg,.webp" aria-label="Profile photo" hidden disabled={busy}
+          onChange={e => {
+            const file = e.currentTarget.files?.[0];
+            // Reset immediately so the same file can be selected again after a failure.
+            e.currentTarget.value = "";
+            void changePhoto(file);
+          }} />
+        <button type="button" className={s.secondary} disabled={busy} onClick={() => photoInput.current?.click()}>Change photo</button>
+        {state.user?.hasPhoto && <button type="button" className={s.secondary} disabled={busy} onClick={() => void removePhoto()}>Remove photo</button>}
+        <button className={s.secondary} disabled={busy} onClick={() => open("profile")}>Edit account</button>
+      </>}
+    </div>
+    {isDemo && <p className={s.muted}>You’re exploring a sample workspace. Log out from the account menu to create an account.</p>}
+    <ul className={s.settingRows}>
+      {!isDemo && <>
+        <li>
+          <span><strong>Password</strong><small>Use at least {PASSWORD_MIN} characters. A passphrase is easiest to remember.</small></span>
+          <button className={s.secondary} onClick={() => open("password")}>Change password</button>
+        </li>
+        <li>
+          <span><strong>Recovery code</strong><small>Your only way back in if you forget your password.</small></span>
+          <button className={s.secondary} onClick={() => open("recovery")}>Replace recovery code</button>
+        </li>
+      </>}
+    </ul>
+    {message && <p role="status">{message}</p>}
+    {!action && error && <p className={s.error} role="alert">{error}</p>}
+    {dialogs}
   </section>;
 }

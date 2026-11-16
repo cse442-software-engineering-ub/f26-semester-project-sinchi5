@@ -70,7 +70,7 @@ test("account changes, invalid current password, recovery rotation and deletion"
   await page.getByLabel("Current password").fill(password);
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Password changed");
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await logOut(page);
   await expect(page.getByRole("heading", { name: "Good to see you again." })).toBeVisible();
   await page.getByRole("button", { name: "Forgot password?" }).click();
   await page.getByLabel("Email address").fill("jamie@example.edu");
@@ -308,7 +308,7 @@ test("photo load failure falls back to initials and demo controls stay hidden", 
   await page.reload();
   await expect(summary(page).getByText("J", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Remove photo", exact: true })).toBeEnabled();
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await logOut(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Take a look around first" }).click();
   await page.goto("/settings");

@@ -1,9 +1,11 @@
 import { AccountSettings } from "./account";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useApp } from "../app/context";
 import { Modal, PageHeading } from "../shared/ui";
 import s from "../app/App.module.css";
 import a from "./appearance.module.css";
+import l from "./settings.module.css";
 import type { ColorScheme, ThemeMode } from "../domain";
 
 const MODES: [ThemeMode, string][] = [["system", "System"], ["light", "Light"], ["dark", "Dark"]];
@@ -16,6 +18,8 @@ const SCHEMES: [ColorScheme, string, string[]][] = [
 ];
 
 // Native radios give the arrow-key and Tab behavior of a radio group.
+const SECTIONS = [["account", "Account"], ["appearance", "Appearance"], ["data", "Data"]] as const;
+
 function Appearance() {
   const { state, setPreferences } = useApp();
   const [failed, setFailed] = useState(false);
@@ -61,25 +65,36 @@ export function Settings() {
   const [busy, setBusy] = useState(false);
   const clearing = useRef(false); // set at once, so a double click cannot send a second request
   const isDemo = state.user?.id === "student";
+  const [params] = useSearchParams();
+  const asked = params.get("section");
+  const current = SECTIONS.find(([key]) => key === asked)?.[0] ?? "account";
+  // Scroll to the section named in the address (not on first load of the default).
+  useEffect(() => { if (asked) document.getElementById(`${current}-section`)?.scrollIntoView?.({ block: "start" }); }, [asked, current]);
   return (
     <>
       <PageHeading
         eyebrow="Just the way you like it"
         title="Settings"
-        description="Manage your account, appearance, and courses."
+        description="Manage your account, appearance, and data."
       />
-      <div className={s.settingsGrid}>
-        <AccountSettings />
-        <section className={s.panel} aria-labelledby="appearance-heading">
+      <div className={l.layout}>
+      <nav className={l.nav} aria-label="Settings sections">
+        {SECTIONS.map(([key, label]) => (
+          <Link key={key} to={`/settings?section=${key}`} aria-current={current === key ? "true" : undefined}>{label}</Link>
+        ))}
+      </nav>
+      <div className={l.sections}>
+        <div id="account-section" className={l.section}><AccountSettings /></div>
+        <section id="appearance-section" className={`${s.panel} ${l.section}`} aria-labelledby="appearance-heading">
           <div className={s.settingsHeading}>
             <h2 id="appearance-heading">Appearance</h2>
             <p className={s.muted}>Choose a theme, or follow your device.</p>
           </div>
           <Appearance />
         </section>
-        <section className={s.panel} aria-labelledby="data-heading">
+        <section id="data-section" className={`${s.panel} ${l.section}`} aria-labelledby="data-heading">
           <div className={s.settingsHeading}>
-            <h2 id="data-heading">Workspace data</h2>
+            <h2 id="data-heading">Data</h2>
             <p className={s.muted}>
               Notes, courses, and events are saved to your account.
             </p>
@@ -105,6 +120,8 @@ export function Settings() {
             </p>
           )}
         </section>
+        <AccountSettings danger />
+      </div>
       </div>
       {reset && (
         <Modal
