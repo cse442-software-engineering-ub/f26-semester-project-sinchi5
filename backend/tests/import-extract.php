@@ -161,6 +161,15 @@ try {
     $resume = $read($roomy, $a, job($db, $a, pdfOf('Resume ' . bin2hex(random_bytes(8)))), $answer('{"isSyllabus":false,"meetings":[],"noClassDates":[],"events":[]}'))['job'];
     check([$resume['state'], $resume['isSyllabus']] === ['review', false], 'A file that is not a syllabus should say so.');
     echo "PASS 4: weekly classes, no events, and not a syllabus are saved with the job and reused for the same file\n";
+
+    // Card 227: spans, weeks, and meeting types are saved with the job and returned as they were read.
+    $ranged = $read($roomy, $a, job($db, $a, pdfOf('Ranges ' . bin2hex(random_bytes(8)))), $answer(json_encode(['isSyllabus' => true, 'meetings' => [], 'noClassDates' => [], 'events' => [
+        ['title' => 'Lab 3', 'kind' => 'assignment', 'date' => '', 'time' => '', 'location' => '', 'source' => 'Oct 5-9', 'rangeStart' => '2026-10-05', 'rangeEnd' => '2026-10-09', 'meeting' => 'lab'],
+        ['title' => 'Quiz 2', 'kind' => 'quiz', 'date' => '', 'time' => '', 'location' => '', 'source' => 'Week 5', 'week' => 5, 'meeting' => 'lecture'],
+    ]])))['job']['events'];
+    check(count($ranged) === 2 && $ranged[0]['rangeEnd'] === '2026-10-09' && $ranged[0]['meeting'] === 'lab' && $ranged[1]['week'] === 5
+        && $ranged[0]['date'] === '' && $ranged[1]['date'] === '', 'A span, a week, and a meeting type should be saved with the job.');
+    echo "PASS 5: ranges, weeks, and meeting types come back in the job\n";
 } finally {
     // Deleting each test student also deletes their jobs (ON DELETE CASCADE); the throwaway counters
     // are found by their keys.

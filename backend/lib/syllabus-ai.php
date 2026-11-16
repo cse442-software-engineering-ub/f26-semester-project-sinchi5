@@ -74,6 +74,14 @@ events: graded work with its own date
 - location is the room given for the item as written, or the class's room as above, or "".
 - If the file names one specific item but not its day ("Final exam: TBA", "Quiz next Friday", "Week of
   2026-09-15: Lab Exam 1"), still list it, with date "". Never work out a day from a week number.
+- When the file gives a span of days and no single day, leave date "" and give rangeStart and rangeEnd:
+  "Oct 5-9" gives 10-05 and 10-09, "Dec 28 - Jan 3" runs across the year, and "week of Oct 5" gives Oct 5
+  and the day six days later. Never pick one day inside the span. When the file says only "Week 5" with no
+  dates, leave date "" and give week as the number 5. Leave a field out when the file doesn't say it.
+  Never work out a date from a week number or from the other items; the rest of the planner does that.
+- meeting says which weekly class the item belongs to: lab for "Lab 3" or a lab report, recitation for a
+  "Recitation quiz" or a discussion-section item, lecture for homework, reading, or a quiz with no such
+  word. Exams, and items where it isn't clear, get "" or no meeting.
 - Don't turn general statements into events. "Three programming assignments", "two midterm exams and a
   final", "six pop quizzes", due-date policies such as "labs are due the following Monday", and grade-weight
   tables are not events. An exam mentioned only that way is left out.
@@ -97,7 +105,7 @@ const SYLLABUS_AI_SECONDS = 280;
 // After this long on one request, the next model is likely to answer sooner.
 const SYLLABUS_AI_REQUEST_SECONDS = 90;
 // Bump this when the prompt or the reply's shape changes, so reads saved by an older reader aren't reused.
-const SYLLABUS_READER_VERSION = 2;
+const SYLLABUS_READER_VERSION = 3;
 const SYLLABUS_KINDS = ['assignment', 'exam', 'quiz', 'deadline', 'other'];
 const SYLLABUS_CLASS_KINDS = ['lecture', 'recitation', 'lab'];
 // In weekday order, so a position in this list is the day's number (0 = Sunday).
@@ -150,9 +158,14 @@ const SYLLABUS_AI_SCHEMA = [
                     'time' => ['type' => 'STRING', 'description' => '24-hour HH:MM, or ""'],
                     'location' => ['type' => 'STRING'],
                     'source' => ['type' => 'STRING'],
+                    // Optional, so a read of a file with none of these costs nothing more.
+                    'rangeStart' => ['type' => 'STRING', 'description' => 'YYYY-MM-DD first day of a span the file gives with no single day'],
+                    'rangeEnd' => ['type' => 'STRING', 'description' => 'YYYY-MM-DD last day of that span'],
+                    'week' => ['type' => 'INTEGER', 'description' => 'The number in "Week 5" when the file gives no dates, 1 to 30'],
+                    'meeting' => ['type' => 'STRING', 'description' => 'lecture, lab, recitation, or "" when unclear'],
                 ],
                 'required' => ['title', 'kind', 'date', 'time', 'location', 'source'],
-                'propertyOrdering' => ['title', 'kind', 'date', 'time', 'location', 'source'],
+                'propertyOrdering' => ['title', 'kind', 'date', 'time', 'location', 'source', 'rangeStart', 'rangeEnd', 'week', 'meeting'],
             ],
         ],
     ],
@@ -474,16 +487,39 @@ function cleanAiEvents(array $events, int $year): array
         if ($title === '') {
             continue;
         }
+        $date = aiDate($event['date'] ?? null, $year);
         $clean[] = [
             'title' => $title,
             'kind' => in_array($event['kind'] ?? null, SYLLABUS_KINDS, true) ? $event['kind'] : 'other',
-            'date' => aiDate($event['date'] ?? null, $year),
+            'date' => $date,
             'time' => aiTime($event['time'] ?? null),
             'location' => aiText($event['location'] ?? null, 120),
             'source' => aiText($event['source'] ?? null, 500),
-        ];
+        ] + ($date === '' ? aiSpan($event, $year) : []) + aiMeeting($event);
     }
     return $clean;
+}
+
+// rangeStart and rangeEnd (never out of order) and week (1 to 30) of an event with no day. A field that
+// is empty or invalid is left out, so a read without them looks the same as before.
+function aiSpan(array $event, int $year): array
+{
+    $start = aiDate($event['rangeStart'] ?? null, $year);
+    $end = aiDate($event['rangeEnd'] ?? null, $year);
+    $span = [];
+    if ($start !== '' && $end !== '' && $start <= $end) {
+        $span = ['rangeStart' => $start, 'rangeEnd' => $end];
+    }
+    $week = $event['week'] ?? null;
+    if (is_int($week) && $week >= 1 && $week <= 30) {
+        $span['week'] = $week;
+    }
+    return $span;
+}
+
+function aiMeeting(array $event): array
+{
+    return in_array($event['meeting'] ?? null, SYLLABUS_CLASS_KINDS, true) ? ['meeting' => $event['meeting']] : [];
 }
 
 function aiDate(mixed $date, int $year): string

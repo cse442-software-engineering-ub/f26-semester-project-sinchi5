@@ -276,3 +276,29 @@ $clock += 10;
 check($budget('models/x', []) === [0, []] && count($timeouts) === 2, 'Once the time is up, nothing more should be sent.');
 check(SYLLABUS_AI_SECONDS < 330, 'The browser must wait longer than a read can take (imports-http.ts).');
 echo "PASS 11: every request of a read shares one time budget, and nothing is sent once it is used up\n";
+
+// 12. Card 227: a span, a week, and a meeting type pass through; bad values are dropped; the model's own
+// day is never invented. Events without them stay exactly as before (checks 1 to 11 above).
+$span = fn (array $f) => $f + ['title' => 'Lab 3', 'kind' => 'assignment', 'date' => '', 'time' => '', 'location' => '', 'source' => 's'];
+$ranged = readSyllabusWithAi($config, fakeApi($calls, $counted, $reply([
+    $span(['rangeStart' => '2026-10-05', 'rangeEnd' => '2026-10-09', 'meeting' => 'lab']),
+    $span(['title' => 'Quiz 2', 'week' => 5, 'meeting' => 'lecture', 'rangeStart' => '', 'rangeEnd' => '']),
+    $span(['title' => 'Across years', 'rangeStart' => '2026-12-28', 'rangeEnd' => '2027-01-03', 'meeting' => 'recitation']),
+    $span(['title' => 'Backwards', 'rangeStart' => '2026-10-09', 'rangeEnd' => '2026-10-05', 'week' => 31, 'meeting' => 'seminar']),
+    $span(['title' => 'Half a span', 'rangeStart' => '2026-10-05', 'week' => '5', 'meeting' => '']),
+    $span(['title' => 'Bad dates', 'rangeStart' => '2026-02-30', 'rangeEnd' => '2026-10-09', 'week' => 0]),
+    $span(['title' => 'Exact day wins', 'date' => '2026-10-07', 'rangeStart' => '2026-10-05', 'rangeEnd' => '2026-10-09', 'week' => 5, 'meeting' => 'lab']),
+])), 'pdf', $pdf, 2026)['events'];
+$keys = fn (array $e) => array_diff_key($e, array_flip(['title', 'kind', 'date', 'time', 'location', 'source']));
+check(array_map($keys, $ranged) === [
+    ['rangeStart' => '2026-10-05', 'rangeEnd' => '2026-10-09', 'meeting' => 'lab'],
+    ['week' => 5, 'meeting' => 'lecture'],
+    ['rangeStart' => '2026-12-28', 'rangeEnd' => '2027-01-03', 'meeting' => 'recitation'],
+    [], [], [],
+    ['meeting' => 'lab'],
+], 'Spans, weeks, and meeting types were not cleaned: ' . json_encode($ranged));
+check(array_column($ranged, 'date') === ['', '', '', '', '', '', '2026-10-07'], 'A span or week must never become a date.');
+check(str_contains(SYLLABUS_AI_PROMPT, 'rangeStart') && str_contains(SYLLABUS_AI_PROMPT, 'Never work out a date from a week')
+    && isset(SYLLABUS_AI_SCHEMA['properties']['events']['items']['properties']['week'])
+    && !in_array('week', SYLLABUS_AI_SCHEMA['properties']['events']['items']['required'], true), 'The prompt and schema must describe the new fields as optional.');
+echo "PASS 12: spans, weeks, and meeting types are kept when valid and dropped when not, and never become a date\n";
