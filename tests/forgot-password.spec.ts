@@ -13,7 +13,7 @@ const badCode = "Recovery codes have 32 characters using only numbers 0–9 and 
 // Signs up and returns the recovery code shown once at signup.
 async function signUp(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Create your workspace" }).click();
+  await page.getByRole("button", { name: "Create account" }).click();
   await page.getByLabel("Your name").fill("Recovery Tester");
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(first);
@@ -34,7 +34,7 @@ const logOutButton = accountButton;
 async function logOut(page: Page) {
   await logOutShell(page);
   await expect(page.getByRole("heading", { name: /^(Welcome to your space\.|Good to see you again\.)$/ })).toBeVisible();
-  const already = page.getByRole("button", { name: "I already have an account" });
+  const already = page.getByRole("button", { name: "Log in" });
   if (await already.isVisible()) await already.click();
   await expect(page.getByRole("heading", { name: "Good to see you again." })).toBeVisible();
 }
@@ -42,10 +42,10 @@ async function logOut(page: Page) {
 async function logIn(page: Page, password: string) {
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Log In", exact: true }).click();
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
 }
 async function reset(page: Page, code: string, password: string) {
-  await page.getByRole("button", { name: "Forgot your password?" }).click();
+  await page.getByRole("button", { name: "Forgot password?" }).click();
   await expect(page.getByRole("heading", { name: "Recover your account." })).toBeVisible();
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Recovery code", { exact: true }).fill(code);
@@ -68,7 +68,7 @@ test("Task test 1 - a correct recovery code resets the password and gives a new 
   await reset(page, code, second);
   await expect(page.getByRole("heading", { name: "Save your recovery code" })).toBeVisible();
   expect(await saveNewCode(page)).not.toBe(code);
-  await expect(page.getByText("Password reset. Sign in with your new password.")).toBeVisible();
+  await expect(page.getByText("Password reset. Log in with your new password.")).toBeVisible();
   await logIn(page, second);
   await expect(logOutButton(page)).toBeVisible();
 });

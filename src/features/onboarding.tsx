@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   BookOpen,
@@ -14,11 +14,11 @@ import { FieldError, PasswordRequirements, RecoveryCode } from "./account";
 import { PASSWORD_MIN, emailError, nameError, passwordCharacterError, passwordError, recoveryCodeError } from "../services/validation";
 import { BRAND } from "../domain";
 import s from "../app/App.module.css";
+import o from "./onboarding.module.css";
 export function Onboarding() {
   const { state, repo, refresh } = useApp();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [mode, setMode] = useState(searchParams.get("mode") === "signin" ? "signin" : "welcome");
+  const [mode, setMode] = useState("signin");
   const [step, setStep] = useState(state.user ? 1 : 0);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -132,42 +132,22 @@ export function Onboarding() {
         <small>Made for curious minds.</small>
       </aside>
       <main className={s.onboardingMain}>
-        <div className={s.onboardingContent}>
+        <div className={`${s.onboardingContent} ${o.enter}`}>
           {recoveryCode ? <RecoveryCode code={recoveryCode} onDone={() => {
             setRecoveryCode("");
             if (mode === "signup") setStep(1);
-            else { setStep(0); changeMode("signin"); setMessage("Password reset. Sign in with your new password."); }
+            else { setStep(0); changeMode("signin"); setMessage("Password reset. Log in with your new password."); }
           }} /> : step === 0 ? (
             <>
               <span className={s.eyebrow}>Your next chapter</span>
               <h2>
-                {mode === "welcome"
-                  ? "Welcome to your space."
-                  : mode === "signup"
-                    ? "A fresh start."
-                    : mode === "recover" ? "Recover your account." : "Good to see you again."}
+                {mode === "signup"
+                  ? "A fresh start."
+                  : mode === "recover" ? "Recover your account." : "Good to see you again."}
               </h2>
               <p className={s.muted}>
-                {mode === "welcome"
-                  ? "Keep the ideas. Lose the clutter."
-                  : "A small step toward a more organized semester."}
+                A small step toward a more organized semester.
               </p>
-              {mode === "welcome" ? (
-                <div className={s.form}>
-                  <button
-                    className={s.primary}
-                    onClick={() => changeMode("signup")}
-                  >
-                    Create your workspace <ArrowRight size={17} />
-                  </button>
-                  <button
-                    className={s.secondary}
-                    onClick={() => changeMode("signin")}
-                  >
-                    I already have an account
-                  </button>
-                </div>
-              ) : (
                 <form
                   className={s.form}
                   noValidate
@@ -238,24 +218,22 @@ export function Onboarding() {
                       ? "Opening your space…"
                       : mode === "signup"
                         ? "Create account"
-                        : mode === "recover" ? "Reset password" : "Log In"}{" "}
+                        : mode === "recover" ? "Reset password" : "Log in"}{" "}
                     <ArrowRight size={16} />
                   </button>
-                  <button
-                    type="button"
-                    className={s.textLink}
-                    onClick={() =>
-                      changeMode(mode === "signup" || mode === "recover" ? "signin" : "signup")
-                    }
-                  >
-                    {mode === "signup" || mode === "recover"
-                      ? "Already have an account? Sign in"
-                      : "New here? Create an account"}
-                  </button>
-                  {mode === "signin" && <button type="button" className={s.textLink} onClick={() => changeMode("recover")}>Forgot your password?</button>}
+                  {mode === "signin" && <button type="button" className={s.textLink} onClick={() => changeMode("recover")}>Forgot password?</button>}
+                  {mode === "signin" ? (
+                    <p className={o.switch}>
+                      New to Notely?{" "}
+                      <button type="button" className={s.textLink} onClick={() => changeMode("signup")}>Create account</button>
+                    </p>
+                  ) : (
+                    <button type="button" className={s.textLink} onClick={() => changeMode("signin")}>
+                      Already have an account? Log in
+                    </button>
+                  )}
                   </fieldset>
                 </form>
-              )}
             </>
           ) : step === 1 ? (
             <>
@@ -443,7 +421,7 @@ export function Onboarding() {
           {state.user && !recoveryCode && <button className={s.textLink} disabled={busy} onClick={async () => {
             try { await repo.auth.signOut(); setStep(0); changeMode("signin"); await refresh(); }
             catch (e) { setError((e as Error).message); }
-          }}>Sign out</button>}
+          }}>Log out</button>}
           {step > 1 && step < 3 && (
             <button className={s.textLink} onClick={() => setStep(step - 1)}>
               Back
