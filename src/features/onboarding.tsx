@@ -212,7 +212,7 @@ export function Onboarding() {
                     <label>Confirm password<input type="password" required autoComplete="new-password" aria-describedby="signup-password-help" value={confirmation} onChange={e => setConfirmation(e.target.value)} /></label>
                     <PasswordRequirements id="signup-password-help" password={password} confirmation={confirmation} />
                   </>}
-                  {mode === "recover" && <p className={s.muted}>Enter the code you saved at signup. A successful reset signs out all sessions and gives you a replacement code.</p>}
+                  {mode === "recover" && <p className={s.muted}>Enter the code you saved at signup. A successful reset logs out all sessions and gives you a replacement code.</p>}
                   <button disabled={busy} className={s.primary}>
                     {busy
                       ? "Opening your space…"
@@ -241,7 +241,7 @@ export function Onboarding() {
               <h2>What are you learning?</h2>
               <p className={s.muted}>
                 Add the courses you’re taking this term. You can always add
-                more later in Settings.
+                more later in Courses.
               </p>
               {state.courses.length === 0 && !adding && (
                 <div className={s.courseEmpty}>
@@ -354,7 +354,7 @@ export function Onboarding() {
                 </form>
               ) : (
                 <button className={s.textLink} onClick={() => setAdding(true)}>
-                  <Plus size={16} /> Add a course
+                  <Plus size={16} /> Add course
                 </button>
               )}
               <button className={s.primary} onClick={() => { setAdding(false); setError(""); setStep(2); }}>
@@ -371,7 +371,7 @@ export function Onboarding() {
               </p>
               <button className={s.dropzone} onClick={() => setImporting(true)}>
                 <UploadCloud size={38} />
-                <strong>Upload a syllabus</strong>
+                <strong>Upload syllabus</strong>
                 <span>Review the dates. We’ll take it from there.</span>
               </button>
               <button className={s.primary} onClick={() => setStep(3)}>
@@ -393,7 +393,7 @@ export function Onboarding() {
                 Space to grow.
               </h2>
               <p className={s.muted}>
-                Your workspace is ready, {state.user?.name}. Let’s make this
+                Your account is ready, {state.user?.name}. Let’s make this
                 semester a little lighter.
               </p>
               <button

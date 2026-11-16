@@ -92,7 +92,7 @@ await test("8. Courses has no heading, Add course button or empty state", "src/f
   await waitFor(() => byRole("heading", "Courses"));
   await waitFor(() => byText("No courses yet"));
   await click(button(root, "Add course"));
-  await waitFor(() => byRole("dialog", "Add a course"));
+  await waitFor(() => byRole("dialog", "Add course"));
 });
 await test("9. A course does not appear as a card linking to its page", "src/features/courses.tsx → Courses", async () => {
   stubApi({ ...routes, courses: { courses: [{ id: "c1", code: "CSE 442", name: "Software Engineering", color: "#869D7A", term: "Fall 2026" }] } });

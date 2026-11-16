@@ -24,7 +24,7 @@ import {
   Users,
 } from "lucide-react";
 import { useApp } from "../app/context";
-import { PageHeading, NoteCard, Empty, Modal, EventRow, DeleteNoteDialog } from "../shared/ui";
+import { PageHeading, NoteCard, Empty, Modal, EventRow, DeleteNoteDialog, countOf, formatEventWhen } from "../shared/ui";
 import { MAX_COMMENT_LENGTH } from "../domain";
 import { groupNotesByCategory, isNoteCategory, NOTE_CATEGORIES, type NoteCategory } from "../services/categories";
 import type {
@@ -381,7 +381,7 @@ export function Notes() {
         </div>
       )}
       <div className={s.libraryMeta}>
-        <span>{notes.length} notes in your space</span>
+        <span>{countOf(notes.length, "note")} in your space</span>
         <div className={s.actions}>
           {active.map((k) => (
             <button className={s.chip} key={k} onClick={() => set(k, "")}
@@ -1501,7 +1501,7 @@ export function CoursePage() {
                   day: "numeric",
                 }) : "Lecture date: Not detected"}
               </h2>
-              <span className={s.muted}>{notes.length} notes</span>
+              <span className={s.muted}>{countOf(notes.length, "note")}</span>
             </div>
             <div className={s.noteGrid}>
               {notes.map((n) => (
@@ -1528,7 +1528,7 @@ export function CoursePage() {
               className={s.eventLink}
             >
               <span>
-                {e.date} · {e.time}
+                {formatEventWhen(e.date, e.time)}
               </span>
               <strong>{e.title}</strong>
               <small>{e.kind}</small>

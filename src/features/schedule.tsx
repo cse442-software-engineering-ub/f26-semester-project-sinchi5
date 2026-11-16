@@ -18,6 +18,7 @@ import {
   EventRow,
   Empty,
   formatEventTime,
+  countOf,
 } from "../shared/ui";
 import { dateKey } from "../services/fixtures";
 import {
@@ -959,7 +960,7 @@ export function Schedule() {
               return (
                 <button
                   key={key}
-                  aria-label={`${d.toDateString()}, ${events.length} events`}
+                  aria-label={`${d.toDateString()}, ${countOf(events.length, "event")}`}
                   aria-pressed={
                     key === selected
                   }

@@ -32,7 +32,7 @@ export function AddCourseDialog({
 
   return (
     <Modal
-      title="Add a course"
+      title="Add course"
       description="Give it a code and a name. You can pick a color to spot it at a glance."
       onClose={onClose}
     >

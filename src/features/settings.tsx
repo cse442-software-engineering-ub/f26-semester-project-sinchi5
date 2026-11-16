@@ -64,7 +64,6 @@ export function Settings() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const clearing = useRef(false); // set at once, so a double click cannot send a second request
-  const isDemo = state.user?.id === "student";
   const [params] = useSearchParams();
   const asked = params.get("section");
   const current = SECTIONS.find(([key]) => key === asked)?.[0] ?? "account";
@@ -102,15 +101,13 @@ export function Settings() {
           <ul className={s.settingRows}>
             <li>
               <span>
-                <strong>{isDemo ? "Reset sample data" : "Clear workspace"}</strong>
+                <strong>Clear workspace</strong>
                 <small>
-                  {isDemo
-                    ? "Start again with the original sample workspace."
-                    : "Remove every note, course, and event from your account."}
+                  Remove every note, course, and event from your account.
                 </small>
               </span>
               <button className={s.secondary} onClick={() => { setError(""); setConfirmText(""); setReset(true); }}>
-                {isDemo ? "Reset sample data" : "Clear workspace"}
+                Clear workspace
               </button>
             </li>
           </ul>
@@ -126,14 +123,11 @@ export function Settings() {
       {reset && (
         <Modal
           title="Start fresh?"
-          description={isDemo
-            ? "This removes notes, comments, and events you created in this browser. It cannot be undone."
-            : "This permanently deletes your notes, courses and events from your account. It cannot be undone."}
+          description="This permanently deletes your notes, courses and events from your account. It cannot be undone."
           dismissible={!busy}
           onClose={() => setReset(false)}
         >
-          {/* The sample workspace only resets sample data, so it skips the typed confirmation. */}
-          {!isDemo && (
+          {(
             <label className={s.confirmField}>
               Type CLEAR to confirm
               <input
@@ -153,7 +147,7 @@ export function Settings() {
           )}
           <button
             className={s.danger}
-            disabled={busy || (!isDemo && confirmText !== "CLEAR")}
+            disabled={busy || (confirmText !== "CLEAR")}
             onClick={async () => {
               if (clearing.current) return;
               clearing.current = true;
@@ -171,7 +165,7 @@ export function Settings() {
               }
             }}
           >
-            {busy ? "Clearing…" : isDemo ? "Reset workspace" : "Clear workspace"}
+            {busy ? "Clearing…" : "Clear workspace"}
           </button>
         </Modal>
       )}

@@ -16,6 +16,7 @@ import {
   EventRow,
   Empty,
   formatEventTime,
+  countOf,
 } from "../shared/ui";
 import { dateKey } from "../services/fixtures";
 import { comingUp, weekAhead } from "../services/upcoming";
@@ -550,7 +551,7 @@ export function Dashboard({
             >
               <span>TODAY</span>
               <span>
-                {day.length} classes
+                {countOf(day.length, "event")}
               </span>
             </div>
 

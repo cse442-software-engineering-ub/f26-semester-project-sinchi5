@@ -56,10 +56,10 @@ test("fields are at least 16px on a phone", async ({ page }, testInfo) => {
 
   await lookAround(page);
   await page.getByRole("button", { name: "Add course", exact: true }).first().click();
-  const addCourse = page.getByRole("dialog", { name: "Add a course" });
+  const addCourse = page.getByRole("dialog", { name: "Add course" });
   await expect(addCourse).toBeVisible();
-  expect(await smallFields(page), "Add a course").toEqual([]);
-  expect(await addCourse.evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth), "Add a course fits").toBe(true);
+  expect(await smallFields(page), "Add course").toEqual([]);
+  expect(await addCourse.evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth), "Add course fits").toBe(true);
   await page.keyboard.press("Escape");
 
   await page.goto("/notes");

@@ -73,7 +73,7 @@ function homeCourses(page: Page) {
   });
 }
 
-test("Home opens the Add a course window", async ({ page }) => {
+test("Home opens the Add course window", async ({ page }) => {
   await register(page);
 
   const courses = homeCourses(page);
@@ -94,14 +94,14 @@ test("Home opens the Add a course window", async ({ page }) => {
 
   await expect(
     page.getByRole("dialog", {
-      name: "Add a course",
+      name: "Add course",
     }),
   ).toBeVisible();
 
   await expect(page).toHaveURL(/\/$/);
 });
 
-test("left menu + opens the Add a course window", async ({ page }) => {
+test("left menu + opens the Add course window", async ({ page }) => {
   await register(page);
 
   await page.setViewportSize({
@@ -122,7 +122,7 @@ test("left menu + opens the Add a course window", async ({ page }) => {
 
   await expect(
     page.getByRole("dialog", {
-      name: "Add a course",
+      name: "Add course",
     }),
   ).toBeVisible();
 
@@ -147,7 +147,7 @@ test("a course added from Home appears everywhere", async ({ page }) => {
     .click();
 
   const dialog = page.getByRole("dialog", {
-    name: "Add a course",
+    name: "Add course",
   });
 
   await dialog
@@ -223,7 +223,7 @@ test("a blank course code is refused", async ({ page }) => {
     .click();
 
   const dialog = page.getByRole("dialog", {
-    name: "Add a course",
+    name: "Add course",
   });
 
   const code = dialog.getByLabel("Course code");
@@ -274,7 +274,7 @@ test("Settings still adds courses", async ({ page }) => {
     .click();
 
   const dialog = page.getByRole("dialog", {
-    name: "Add a course",
+    name: "Add course",
   });
 
   await dialog
@@ -337,7 +337,7 @@ test("Add course window fits on a phone", async ({ page }) => {
   await addCourse.click();
 
   const dialog = page.getByRole("dialog", {
-    name: "Add a course",
+    name: "Add course",
   });
 
   await expect(dialog).toBeVisible();
@@ -394,7 +394,7 @@ test("a course with a syllabus goes straight to review", async ({ page }) => {
     .click();
 
   const dialog = page.getByRole("dialog", {
-    name: "Add a course",
+    name: "Add course",
   });
 
   await dialog
@@ -463,7 +463,7 @@ test("a course with a syllabus adds events to the new course", async ({ page }) 
     .click();
 
   const dialog = page.getByRole("dialog", {
-    name: "Add a course",
+    name: "Add course",
   });
 
   await dialog.getByLabel("Course code").fill("CSE 442");
@@ -577,7 +577,7 @@ test("a bad syllabus file blocks Add course", async ({ page }) => {
     .click();
 
   const dialog = page.getByRole("dialog", {
-    name: "Add a course",
+    name: "Add course",
   });
 
   await dialog
@@ -627,7 +627,7 @@ test("Remove file clears the syllabus", async ({ page }) => {
     .click();
 
   const dialog = page.getByRole("dialog", {
-    name: "Add a course",
+    name: "Add course",
   });
 
   await dialog
@@ -720,7 +720,7 @@ test("a failed read keeps the course", async ({ page }) => {
     .click();
 
   const dialog = page.getByRole("dialog", {
-    name: "Add a course",
+    name: "Add course",
   });
 
   await dialog

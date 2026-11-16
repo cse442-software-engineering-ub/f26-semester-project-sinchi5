@@ -317,7 +317,7 @@ export function ImportDialog({
       description={
         kind === "syllabus"
           ? "Review detected dates before adding them to your schedule."
-          : "Choose a file, then give it a place in your workspace."
+          : "Choose a file, then give it a place in your account."
       }
       onClose={onClose}
     >
@@ -357,8 +357,8 @@ export function ImportDialog({
               </div>
             ) : (
               <p className={s.notice}>
-                Add a course in Settings before uploading its syllabus.{" "}
-                <Link className={s.inlineLink} to="/settings" onClick={onClose}>Go to Settings</Link>
+                Add a course in Courses before uploading its syllabus.{" "}
+                <Link className={s.inlineLink} to="/courses" onClick={onClose}>Go to Courses</Link>
               </p>
             ))}
           <label
@@ -425,7 +425,7 @@ export function ImportDialog({
             {/* Says why Continue is greyed out, or what happens next. */}
             <span id="upload-next" className={s.hint} aria-live="polite">
               {kind === "syllabus" && !courseId
-                ? "Add a course first."
+                ? "Add course first."
                 : !file
                   ? "Choose a file to continue."
                   : `Next: Notely reads ${file.name}.`}

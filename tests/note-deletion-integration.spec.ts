@@ -18,7 +18,7 @@ async function signUp(page: Page, name: string, email: string, course?: string) 
   await page.getByLabel("I saved my recovery code").check();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   if (course) {
-    await page.getByRole("button", { name: "Add a course" }).click();
+    await page.getByRole("button", { name: "Add course" }).click();
     await page.getByLabel("Course code").fill(course);
     await page.getByLabel("Course name").fill("Software Engineering");
     await page.getByRole("button", { name: "Add course", exact: true }).click();
@@ -78,7 +78,7 @@ test("Test 1 - a note deleted from the notes page stays gone after reload and se
   await page.reload();
   await expect(card(page, "Keep this note")).toBeVisible();
   await expect(card(page, "Remove from list")).toHaveCount(0);
-  await expect(page.getByText("1 notes in your space")).toBeVisible();
+  await expect(page.getByText("1 note in your space")).toBeVisible();
   await page.getByLabel("Search notes").fill("Remove");
   await expect(page.getByRole("heading", { name: "No notes found" })).toBeVisible();
 });

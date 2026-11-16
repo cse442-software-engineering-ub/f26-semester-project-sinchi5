@@ -55,7 +55,7 @@ await test("5. Add course does not open the window, or saving sends no course-sa
   const root = mount(ui("/courses"));
   await waitFor(() => byText("No courses yet"));
   await click(inMain(root, "Add course"));
-  const dialog = await waitFor(() => byRole("dialog", "Add a course"));
+  const dialog = await waitFor(() => byRole("dialog", "Add course"));
   await type(byLabel("Course code"), "CSE 250");
   await type(byLabel("Course name"), "Data Structures");
   await click([...dialog.querySelectorAll("button")].find((b) => b.textContent === "Add course") as HTMLElement);

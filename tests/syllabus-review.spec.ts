@@ -289,7 +289,7 @@ test("a syllabus's class dates come first, then the course's, and with neither t
   // A course from before these fields, or one left blank, falls to the student.
   await page.goto("/");
   await page.getByRole("button", { name: "Add course", exact: true }).click();
-  const add = page.getByRole("dialog", { name: "Add a course" });
+  const add = page.getByRole("dialog", { name: "Add course" });
   await add.getByLabel("Course code").fill("CSE 250");
   await add.getByLabel("Course name").fill("Data Structures");
   await add.getByRole("button", { name: "Add course" }).click();
@@ -308,7 +308,7 @@ test("class dates on a course are optional, and an end before the start is refus
   await signUpWithCourse(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Add course", exact: true }).click();
-  const add = page.getByRole("dialog", { name: "Add a course" });
+  const add = page.getByRole("dialog", { name: "Add course" });
   await add.getByLabel("Course code").fill("CSE 250");
   await add.getByLabel("Course name").fill("Data Structures");
   await add.getByLabel("Classes start").fill("2026-12-11");

@@ -53,7 +53,6 @@ export function AccountSettings({ danger = false }: { danger?: boolean } = {}) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const photoInput = useRef<HTMLInputElement>(null);
-  const isDemo = state.user?.id === "student";
   async function changePhoto(file?: File) {
     // An empty selection is a canceled picker, not a removal or validation error.
     if (!file || pending.current) return;
@@ -124,9 +123,9 @@ export function AccountSettings({ danger = false }: { danger?: boolean } = {}) {
           {action === "profile" && <>
             <label>Your name<input name="name" autoComplete="name" defaultValue={state.user?.name} maxLength={100} required /></label>
             <label>Email address<input name="email" type="email" autoComplete="email" defaultValue={state.user?.email} maxLength={254} required /></label>
-            <p className={s.muted}>Enter your current password to change your email address. This signs out your other sessions.</p>
+            <p className={s.muted}>Enter your current password to change your email address. This logs out your other sessions.</p>
           </>}
-          {action === "delete" && <p>This permanently deletes your account and signs out every session. The sample workspace saved for this account in this browser will also be removed.</p>}
+          {action === "delete" && <p>This permanently deletes your account and logs out every session.</p>}
           {action === "recovery" && <p>Your previous recovery code will stop working. Save the replacement before leaving this screen.</p>}
           <label>Current password<input name="currentPassword" type="password" autoComplete="current-password" required={action !== "profile"} /></label>
           {action === "password" && <>
@@ -144,16 +143,16 @@ export function AccountSettings({ danger = false }: { danger?: boolean } = {}) {
   </>;
   const dangerBlock = <section className={`${s.panel} ${d.danger}`} aria-labelledby="delete-heading">
     <h2 id="delete-heading">Delete account</h2>
-    <p className={s.muted}>Permanently remove your account and sign out everywhere.</p>
+    <p className={s.muted}>Permanently remove your account and log out everywhere.</p>
     <button className={s.dangerOutline} onClick={() => open("delete")}>Delete account</button>
     {!action && error && <p className={s.error} role="alert">{error}</p>}
     {dialogs}
   </section>;
-  if (danger) return isDemo ? null : dangerBlock;
+  if (danger) return dangerBlock;
   return <section className={s.panel} aria-labelledby="account-heading">
     <div className={s.settingsHeading}>
       <h2 id="account-heading">Account</h2>
-      <p className={s.muted}>Manage how you sign in and keep your account secure.</p>
+      <p className={s.muted}>Manage how you log in and keep your account secure.</p>
     </div>
     <div className={s.accountSummary} role="group" aria-label="Account summary" aria-busy={busy}>
       {state.user && <Avatar user={state.user} version={state.photoVersion} alt="" />}
@@ -161,7 +160,7 @@ export function AccountSettings({ danger = false }: { danger?: boolean } = {}) {
         <strong className={s.accountText}>{state.user?.name}</strong>
         <small className={`${s.muted} ${s.accountText}`}>{state.user?.email}</small>
       </span>
-      {!isDemo && <>
+      <>
         <input ref={photoInput} type="file" accept=".png,.jpg,.jpeg,.webp" aria-label="Profile photo" hidden disabled={busy}
           onChange={e => {
             const file = e.currentTarget.files?.[0];
@@ -172,11 +171,10 @@ export function AccountSettings({ danger = false }: { danger?: boolean } = {}) {
         <button type="button" className={s.secondary} disabled={busy} onClick={() => photoInput.current?.click()}>Change photo</button>
         {state.user?.hasPhoto && <button type="button" className={s.secondary} disabled={busy} onClick={() => void removePhoto()}>Remove photo</button>}
         <button className={s.secondary} disabled={busy} onClick={() => open("profile")}>Edit account</button>
-      </>}
+      </>
     </div>
-    {isDemo && <p className={s.muted}>You’re exploring a sample workspace. Log out from the account menu to create an account.</p>}
     <ul className={s.settingRows}>
-      {!isDemo && <>
+      <>
         <li>
           <span><strong>Password</strong><small>Use at least {PASSWORD_MIN} characters. A passphrase is easiest to remember.</small></span>
           <button className={s.secondary} onClick={() => open("password")}>Change password</button>
@@ -185,7 +183,7 @@ export function AccountSettings({ danger = false }: { danger?: boolean } = {}) {
           <span><strong>Recovery code</strong><small>Your only way back in if you forget your password.</small></span>
           <button className={s.secondary} onClick={() => open("recovery")}>Replace recovery code</button>
         </li>
-      </>}
+      </>
     </ul>
     {message && <p role="status">{message}</p>}
     {!action && error && <p className={s.error} role="alert">{error}</p>}

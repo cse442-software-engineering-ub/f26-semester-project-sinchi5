@@ -299,7 +299,7 @@ test("photo failures preserve the image and allow retries without duplicate subm
   await expect(page.getByRole("status")).toHaveText("Photo removed.");
 });
 
-test("photo load failure falls back to initials and demo controls stay hidden", async ({ page }) => {
+test("photo load failure falls back to initials", async ({ page }) => {
   await register(page);
   await page.goto("/settings");
   await uploadPhoto(page);
@@ -308,11 +308,4 @@ test("photo load failure falls back to initials and demo controls stay hidden", 
   await page.reload();
   await expect(summary(page).getByText("J", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Remove photo", exact: true })).toBeEnabled();
-  await logOut(page);
-  await page.goto("/");
-  await page.getByRole("button", { name: "Take a look around first" }).click();
-  await page.goto("/settings");
-  await expect(page.getByText("You’re exploring a sample workspace.", { exact: false })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Change photo", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Remove photo", exact: true })).toHaveCount(0);
 });

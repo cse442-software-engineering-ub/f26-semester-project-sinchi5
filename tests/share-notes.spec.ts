@@ -26,7 +26,7 @@ async function signUpOwner(page: Page) {
   await page.getByRole("button", { name: "Create account", exact: true }).click();
   await page.getByLabel("I saved my recovery code").check();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "Add a course" }).click();
+  await page.getByRole("button", { name: "Add course" }).click();
   await page.getByLabel("Course code").fill("CSE 442");
   await page.getByLabel("Term").fill("Fall 2026");
   await page.getByLabel("Course name").fill("Software Engineering");

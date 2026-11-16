@@ -109,17 +109,6 @@ test("resets when closed", async ({ page }) => {
   await expect(again.clear).toBeDisabled();
 });
 
-test("demo reset unchanged", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "Take a look around first" }).click();
-  await page.goto("/settings");
-  await page.getByRole("button", { name: "Reset sample data", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Start fresh?" });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByLabel("Type CLEAR to confirm")).toHaveCount(0);
-  await expect(dialog.getByRole("button", { name: "Reset workspace", exact: true })).toBeEnabled();
-});
-
 test("signed out cannot clear", async ({ page }) => {
   const clears = countClears(page);
   await page.goto("/settings");
