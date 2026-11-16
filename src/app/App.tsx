@@ -15,16 +15,16 @@ import {
   CalendarDays,
   ClipboardList,
   Files,
+  GraduationCap,
   Settings as SettingsIcon,
   Plus,
-  Search,
   UploadCloud,
   Camera,
   FileText,
-  ArrowUpRight,
   X,
   LogOut,
   Users,
+  Ellipsis,
 } from "lucide-react";
 import { useApp } from "./context";
 import { Dashboard } from "../features/dashboard";
@@ -38,14 +38,19 @@ import { ImportDialog } from "../features/imports";
 import { BRAND, type UploadKind } from "../domain";
 import { AddCourseDialog } from "../features/course-dialog";
 import { Avatar } from "../shared/ui";
+import { Courses } from "../features/courses";
 import s from "./App.module.css";
+import sh from "./shell.module.css";
 const nav = [
   { to: "/", label: "Today", icon: Sun },
   { to: "/schedule", label: "Schedule", icon: CalendarDays },
   { to: "/assignments", label: "Assignments", icon: ClipboardList },
   { to: "/notes", label: "Notes", icon: Files },
+  { to: "/courses", label: "Courses", icon: GraduationCap },
   { to: "/friends", label: "Friends", icon: Users },
 ];
+const tabs = nav.filter((n) => ["Today", "Schedule", "Notes", "Courses"].includes(n.label));
+const more = nav.filter((n) => ["Assignments", "Friends"].includes(n.label));
 export default function App() {
   const { state, repo, refresh, setError } = useApp();
   const navigate = useNavigate();
@@ -54,6 +59,8 @@ export default function App() {
   const [event, setEvent] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [addingCourse, setAddingCourse] = useState(false);
+  // Bug 3: after Log out the signed-out redirect always lands on the log-in form, from any page.
+  const [loggedOut, setLoggedOut] = useState(false);
   useEffect(() => {
     document.title = `${BRAND} · ${location.pathname.startsWith("/notes") ? "Your notes" : location.pathname.startsWith("/schedule") ? "Your schedule" : "Your study space"}`;
     window.scrollTo(0, 0);
@@ -73,6 +80,7 @@ export default function App() {
     setError("");
     try {
       await repo.auth.signOut();
+      setLoggedOut(true);
       await refresh();
       navigate("/welcome?mode=signin", { replace: true });
     } catch (e) {
@@ -81,6 +89,59 @@ export default function App() {
       setSigningOut(false);
     }
   }
+  const user = state.user;
+  const newItems = [
+    ["Note", FileText, () => void create()],
+    ["Event", CalendarDays, () => setEvent(true)],
+    ["Course", GraduationCap, () => setAddingCourse(true)],
+    ["Upload syllabus", BookOpen, () => setImportKind("syllabus")],
+    ["Upload document", UploadCloud, () => setImportKind("document")],
+    ["Scan photos", Camera, () => setImportKind("scan")],
+  ] as const;
+  const newMenu = (className: string, side: "bottom" | "top", align: "start" | "end") => (
+    <Menu.Root>
+      <Menu.Trigger className={className} aria-label="New" title="New">
+        <Plus size={18} />
+        <span className={sh.label}>New</span>
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Positioner side={side} align={align} sideOffset={8}>
+          <Menu.Popup className={sh.menu}>
+            {newItems.map(([label, Icon, fn]) => (
+              <Menu.Item key={label} className={sh.menuItem} onClick={fn}>
+                <Icon size={18} />
+                {label}
+              </Menu.Item>
+            ))}
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
+  );
+  const accountMenu = (className: string, side: "bottom" | "top", showName: boolean) =>
+    user && (
+      <Menu.Root>
+        <Menu.Trigger className={className} aria-label={user.name} title={user.name}>
+          <Avatar user={user} version={state.photoVersion} alt="" />
+          {showName && <span>{user.name}</span>}
+        </Menu.Trigger>
+        <Menu.Portal>
+          <Menu.Positioner side={side} align={side === "bottom" ? "end" : "start"} sideOffset={8}>
+            <Menu.Popup className={sh.menu}>
+              <Menu.Item className={sh.menuItem} render={<Link to="/settings" />}>
+                <SettingsIcon size={18} />
+                Settings
+              </Menu.Item>
+              <Menu.Item className={sh.menuItem} disabled={signingOut} onClick={() => void signOut()}>
+                <LogOut size={18} />
+                {signingOut ? "Logging out…" : "Log out"}
+              </Menu.Item>
+            </Menu.Popup>
+          </Menu.Positioner>
+        </Menu.Portal>
+      </Menu.Root>
+    );
+  const moreActive = more.some((n) => location.pathname.startsWith(n.to));
   if (!state.ready)
     return (
       <div className={s.boot} role="status">
@@ -95,7 +156,7 @@ export default function App() {
           path="*"
           element={
             <Navigate
-              to={location.pathname === "/" ? "/welcome" : "/welcome?mode=signin"}
+              to={location.pathname === "/" && !loggedOut ? "/welcome" : "/welcome?mode=signin"}
               replace
             />
           }
@@ -103,7 +164,7 @@ export default function App() {
       </Routes>
     );
   return (
-    <div className={s.app} key={state.user.id}>
+    <div className={sh.app} key={state.user.id}>
       <a
         href="#main"
         className={s.skip}
@@ -115,168 +176,47 @@ export default function App() {
       >
         Skip to content
       </a>
-      <aside className={s.sidebar}>
-        <Link to="/" className={s.logo}>
-          <span>
-            <BookOpen size={22} />
+      <aside className={sh.sidebar}>
+        <Link to="/" className={sh.brand} title={BRAND}>
+          <span className={sh.brandMark}>
+            <BookOpen size={18} />
           </span>
-          {BRAND}
-          <i>✦</i>
+          <span className={sh.label}>{BRAND}</span>
         </Link>
-        {/* Keep workspace details non-interactive: there is no menu to open. */}
-        <div className={s.workspace}>
-          <Avatar user={state.user} version={state.photoVersion} alt="" />
-          <span>
-            <strong>My workspace</strong>
-            <small>A little room to think</small>
-          </span>
-        </div>
-        <nav aria-label="Main navigation">
+        {newMenu(sh.newButton, "bottom", "start")}
+        <nav className={sh.nav} aria-label="Main navigation">
           {nav.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === "/"}
-              className={({ isActive }) =>
-                `${s.navItem} ${isActive ? s.navActive : ""}`
-              }
-            >
-              <Icon size={19} />
-              {label}
-              {label === "Notes" && <small>{state.notes.length}</small>}
-            </NavLink>
+            <div key={to}>
+              <NavLink to={to} end={to === "/" || to === "/courses"} className={sh.navItem} title={label}>
+                <Icon size={19} />
+                <span className={sh.label}>{label}</span>
+              </NavLink>
+              {label === "Courses" && state.courses.length > 0 && (
+                <div className={sh.courseList}>
+                  {state.courses.map((c) => (
+                    <NavLink key={c.id} to={`/courses/${c.id}`} className={sh.courseItem}>
+                      <i className={sh.dot} style={{ background: c.color }} />
+                      <span>{c.code}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </nav>
-        <div className={s.sideSection}>
-          <div className={s.sideLabel}>
-            YOUR COURSES{" "}
-            <button
-              type="button"
-              aria-label="Add a course"
-              onClick={() => setAddingCourse(true)}
-            >
-              <Plus size={15} />
-            </button>
-          </div>
-          {state.courses.map((c) => (
-            <NavLink
-              className={({ isActive }) =>
-                `${s.courseNav} ${isActive ? s.navActive : ""}`
-              }
-              to={`/courses/${c.id}`}
-              key={c.id}
-            >
-              <i style={{ background: c.color }} />
-              <span>
-                {c.code}
-                <small>{c.name}</small>
-              </span>
-            </NavLink>
-          ))}
-        </div>
-        <button
-          className={s.sideUpload}
-          onClick={() => setImportKind("syllabus")}
-        >
-          <span>
-            <UploadCloud size={19} />
-          </span>
-          <strong>A semester, sorted.</strong>
-          <small>
-            Upload a syllabus. We’ll help
-            <br />
-            you see what’s ahead.
-          </small>
-          <span className={s.textLink}>
-            Add your syllabus <ArrowUpRight size={14} />
-          </span>
-        </button>
-        <NavLink to="/settings" className={s.navItem}>
-          <SettingsIcon size={18} /> Settings
-        </NavLink>
-        <button
-          type="button"
-          className={`${s.navItem} ${s.signOutNav}`}
-          disabled={signingOut}
-          onClick={() => void signOut()}
-        >
-          <LogOut size={18} /> {signingOut ? "Logging out…" : "Log out"}
-        </button>
-        <div className={s.sideFooter}>
-          <span>
-            <strong>{state.user.name}</strong>
-          </span>
-        </div>
+        {accountMenu(sh.account, "top", true)}
       </aside>
-      <div className={s.mainWrap}>
-        <header className={s.topbar}>
-          {/* Card 165: phones hide the left menu, so the top bar shows the name there instead. */}
-          <Link to="/" className={s.topBrand}>
-            <span>
-              <BookOpen size={17} />
+      <div className={sh.mainWrap}>
+        <header className={sh.topbar}>
+          <Link to="/" className={sh.brand}>
+            <span className={sh.brandMark}>
+              <BookOpen size={18} />
             </span>
             {BRAND}
           </Link>
-          <span className={s.breadcrumb}>
-            My workspace <span>/</span>{" "}
-            {location.pathname === "/"
-              ? "Today"
-              : location.pathname.split("/")[1]}
-          </span>
-          <Link
-            className={s.topSearch}
-            to="/notes"
-            aria-label="Search your space"
-          >
-            <Search size={16} />
-            <span>Search your space</span>
-          </Link>
-          <div className={s.topActions}>
-            <span className={s.term}>Fall semester ’26</span>
-            <Menu.Root>
-              <Menu.Trigger className={s.iconButton} aria-label="Create">
-                <Plus size={20} />
-              </Menu.Trigger>
-              <Menu.Portal>
-                <Menu.Positioner sideOffset={8}>
-                  <Menu.Popup className={s.menu}>
-                    {[
-                      ["Blank note", FileText, () => void create()],
-                      [
-                        "Upload document",
-                        UploadCloud,
-                        () => setImportKind("document"),
-                      ],
-                      ["Scan photos", Camera, () => setImportKind("scan")],
-                      [
-                        "Upload syllabus",
-                        BookOpen,
-                        () => setImportKind("syllabus"),
-                      ],
-                      ["Course event", CalendarDays, () => setEvent(true)],
-                    ].map(([label, Icon, fn]) => {
-                      const I = Icon as typeof FileText;
-                      return (
-                        <Menu.Item
-                          key={label as string}
-                          className={s.menuItem}
-                          onClick={fn as () => void}
-                        >
-                          <I size={17} />
-                          {label as string}
-                        </Menu.Item>
-                      );
-                    })}
-                  </Menu.Popup>
-                </Menu.Positioner>
-              </Menu.Portal>
-            </Menu.Root>
-            <Link className={s.avatar} to="/settings" aria-label="Your account">
-              <Avatar user={state.user} version={state.photoVersion} className={s.accountLinkAvatar} alt="Your profile photo" />
-            </Link>
-          </div>
+          {accountMenu(sh.account, "bottom", false)}
         </header>
-        <main id="main" tabIndex={-1} className={s.main}>
+        <main id="main" tabIndex={-1} className={sh.main}>
           {state.error && (
             <div className={s.error} role="alert">
               {state.error}
@@ -305,44 +245,41 @@ export default function App() {
             <Route path="/assignments" element={<Assignments />} />
             <Route path="/notes" element={<Notes />} />
             <Route path="/notes/:id" element={<NoteWorkspace />} />
+            <Route path="/courses" element={<Courses onAddCourse={() => setAddingCourse(true)} />} />
             <Route path="/courses/:id" element={<CoursePage />} />
             <Route path="/friends" element={<Friends />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-          <footer className={s.mainFooter}>
-            <span>A little more organized. A lot more headspace.</span>
-            <span>
-              Made for your mind. <i>✦</i>
-            </span>
-          </footer>
         </main>
       </div>
-      <nav className={s.mobileNav} aria-label="Mobile navigation">
-        {[
-          ...nav,
-          { to: "/settings", label: "Settings", icon: SettingsIcon },
-        ].map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === "/"}
-            className={({ isActive }) => (isActive ? s.navActive : "")}
-          >
+      <nav className={sh.tabbar} aria-label="Mobile navigation">
+        {tabs.map(({ to, label, icon: Icon }) => (
+          <NavLink key={to} to={to} end={to === "/" || to === "/courses"} className={sh.tab}>
             <Icon size={20} />
             <span>{label}</span>
           </NavLink>
         ))}
-        <button
-          type="button"
-          className={s.signOutNav}
-          disabled={signingOut}
-          onClick={() => void signOut()}
-        >
-          <LogOut size={20} />
-          <span>{signingOut ? "Logging out…" : "Log out"}</span>
-        </button>
+        <Menu.Root>
+          <Menu.Trigger className={sh.tab} data-active={moreActive} aria-current={moreActive ? "page" : undefined}>
+            <Ellipsis size={20} />
+            <span>More</span>
+          </Menu.Trigger>
+          <Menu.Portal>
+            <Menu.Positioner side="top" align="end" sideOffset={8}>
+              <Menu.Popup className={sh.menu}>
+                {more.map(({ to, label, icon: Icon }) => (
+                  <Menu.Item key={to} className={sh.menuItem} render={<Link to={to} />}>
+                    <Icon size={18} />
+                    {label}
+                  </Menu.Item>
+                ))}
+              </Menu.Popup>
+            </Menu.Positioner>
+          </Menu.Portal>
+        </Menu.Root>
       </nav>
+      {newMenu(sh.fab, "top", "end")}
       {addingCourse && (
         <AddCourseDialog onClose={() => setAddingCourse(false)} />
       )}

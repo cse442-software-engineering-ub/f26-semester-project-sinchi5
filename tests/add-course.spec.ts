@@ -1,5 +1,6 @@
 ﻿import type { Page } from "@playwright/test";
 import { test, expect } from "./support/account-fixture";
+import { openNew } from "./support/shell";
 import { SYLLABUS, textFile } from "./support/syllabus";
 
 const password = "Sample river password 42!";
@@ -117,14 +118,7 @@ test("left menu + opens the Add a course window", async ({ page }) => {
     }),
   ).toBeVisible();
 
-  const sidebar = page.locator("aside");
-
-  await sidebar
-    .getByRole("button", {
-      name: "Add a course",
-      exact: true,
-    })
-    .click();
+  await openNew(page, "Course");
 
   await expect(
     page.getByRole("dialog", {
@@ -191,7 +185,7 @@ test("a course added from Home appears everywhere", async ({ page }) => {
 
     await expect(
     page.locator("aside").getByRole("link", {
-        name: /CSE 250\s*Data Structures/,
+        name: "CSE 250", exact: true,
     }),
     ).toBeVisible();
 
@@ -211,7 +205,7 @@ test("a course added from Home appears everywhere", async ({ page }) => {
 
     await expect(
     page.locator("aside").getByRole("link", {
-        name: /CSE 250\s*Data Structures/,
+        name: "CSE 250", exact: true,
     }),
     ).toBeVisible();
 });

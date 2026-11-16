@@ -1,0 +1,311 @@
+/* Application shell: sidebar (>=1024), icon rail (768-1023), top bar + tab bar + floating New (<768). Tokens only. */
+.app {
+  --rail: clamp(220px, 16vw, 280px);
+  --tabbar: 64px;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+}
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 24px 16px 16px;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 8px;
+  font-size: 1.25rem;
+  font-weight: 650;
+  letter-spacing: -0.05em;
+}
+.brandMark {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--sage);
+  color: var(--text);
+}
+.newButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  margin: 20px 0 16px;
+  padding: 0 16px;
+  border-radius: 10px;
+  background: var(--primary);
+  color: var(--primary-text);
+  font-size: 0.85rem;
+  font-weight: 550;
+}
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.navItem[aria-current="page"] {
+  background: var(--nav);
+  color: var(--text);
+  font-weight: 600;
+}
+.courseList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 0 6px 22px;
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
+}
+.courseItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  min-width: 0;
+}
+.courseItem > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.courseItem[aria-current="page"] {
+  background: var(--nav);
+  color: var(--text);
+  font-weight: 600;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.account {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  text-align: left;
+  font-size: 0.85rem;
+  font-weight: 550;
+}
+.account > span:not(:first-child) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.label {
+  min-width: 0;
+}
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.menu {
+  min-width: 200px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  z-index: 30;
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity 140ms var(--ease-out),
+    transform 140ms var(--ease-out);
+}
+.menu[data-starting-style],
+.menu[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.96);
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+}
+.menuItem[data-highlighted] {
+  background: var(--nav);
+  outline: none;
+}
+.menuItem:focus-visible,
+.menuItem[data-highlighted]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+.mainWrap {
+  min-width: 0;
+}
+.main {
+  padding: clamp(20px, 3vw, 48px) clamp(16px, 3.5vw, 56px) clamp(24px, 3vw, 48px);
+}
+.topbar,
+.tabbar,
+.fab {
+  display: none;
+}
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 56px;
+  padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.topbar .brand {
+  padding: 0;
+  font-size: 1.1rem;
+}
+.topbar .account {
+  width: auto;
+  margin: 0;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0;
+  border: 0;
+  justify-content: center;
+}
+.tabbar {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 15;
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+.tabbar > a,
+.tabbar > button {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: var(--tabbar);
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+.tab[aria-current="page"],
+.tab[data-active="true"] {
+  color: var(--text);
+  font-weight: 600;
+}
+.fab {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: calc(var(--tabbar) + env(safe-area-inset-bottom) + 16px);
+  z-index: 16;
+  min-height: 48px;
+  padding: 0 20px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 24px;
+  background: var(--primary);
+  color: var(--primary-text);
+  box-shadow: var(--shadow);
+  font-size: 0.85rem;
+  font-weight: 550;
+}
+@media (max-width: 1023px) {
+  .app {
+    --rail: 72px;
+  }
+  .sidebar {
+    align-items: stretch;
+    padding: 20px 12px 12px;
+  }
+  .brand,
+  .navItem,
+  .account {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .label,
+  .courseList {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .newButton {
+    padding: 0;
+  }
+  .account > span:not(:first-child) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}
+@media (max-width: 767px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sidebar {
+    display: none;
+  }
+  .topbar {
+    display: flex;
+  }
+  .tabbar {
+    display: flex;
+  }
+  .fab {
+    display: inline-flex;
+  }
+  .main {
+    padding-bottom: calc(var(--tabbar) + env(safe-area-inset-bottom) + 96px);
+  }
+}

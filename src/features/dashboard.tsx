@@ -148,14 +148,6 @@ export function Dashboard({
           "friend"
         }.`}
         description="A fresh page. A clear mind. Let’s make today a good one."
-        actions={
-          <button
-            className={s.primary}
-            onClick={onCreate}
-          >
-            <Plus size={17} /> New note
-          </button>
-        }
       />
 
       <section

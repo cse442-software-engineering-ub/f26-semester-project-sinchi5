@@ -1,6 +1,7 @@
 // Shared steps for the syllabus upload specs (cards 45-48), run against the mocked API in
 // account-fixture.ts, so no server or API credits are needed.
 import { expect, type Page } from "@playwright/test";
+import { openNew } from "./shell";
 
 // The acceptance tests' cse442-syllabus.txt.
 export const SYLLABUS = [
@@ -49,8 +50,7 @@ export async function signUpWithCourse(page: Page, email = "notely-syllabus-442@
 }
 
 export async function openUpload(page: Page) {
-  await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Upload syllabus", exact: true }).click();
+  await openNew(page, "Upload syllabus");
   await expect(page.getByRole("dialog", { name: "Your semester, sorted" })).toBeVisible();
   return page.getByRole("dialog");
 }

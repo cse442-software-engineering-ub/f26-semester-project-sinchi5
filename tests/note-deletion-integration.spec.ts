@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { test, expect } from "./support/account-fixture";
+import { logOut as logOutShell, openNew } from "./support/shell";
 
 // Card 120: signed-in accounts use the server-backed notes repository. The
 // account fixture stands in for the PHP API, so state survives reloads and
@@ -31,7 +32,7 @@ async function signUp(page: Page, name: string, email: string, course?: string) 
 }
 
 async function logOut(page: Page) {
-  await page.getByRole("button", { name: "Log out", exact: true }).click();
+  await logOutShell(page);
   // Logging out shows either the welcome choices or the sign-in form.
   await expect(page.getByRole("button", { name: /^(Log In|I already have an account)$/ })).toBeVisible();
 }

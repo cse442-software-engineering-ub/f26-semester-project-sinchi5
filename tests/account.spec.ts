@@ -1,4 +1,5 @@
 import { test, expect } from "./support/account-fixture";
+import { accountButton, logOut } from "./support/shell";
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
@@ -36,12 +37,12 @@ test("navigation logout returns to sign in and blocks notes after Back or direct
   await register(page);
   await page.goto("/notes");
   await expect(page.getByRole("heading", { name: "Your notes" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Log out", exact: true })).toBeVisible();
+  await expect(accountButton(page)).toBeVisible();
 
-  await page.getByRole("button", { name: "Log out", exact: true }).click();
+  await logOut(page);
   await expect(page).toHaveURL(/\/welcome\?mode=signin$/);
   await expect(page.getByRole("heading", { name: "Good to see you again." })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Log out", exact: true })).toHaveCount(0);
+  await expect(accountButton(page)).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Notes", exact: true })).toHaveCount(0);
 
   await page.goBack();
