@@ -1,0 +1,54 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>215 Backend: Keep highlights on the right words after emoji and restores</title>
+<link rel="stylesheet" href="../../shared/runner.css">
+<script type="module">
+// Backend test: real API, no screen code. Imports nothing from src/.
+import { page, test, expect, api, signIn, signOut } from "../../shared/runner.js";
+
+page({ card: "215", title: "Backend: Keep highlights on the right words after emoji and restores", kind: "backend" });
+const A = "notely-task215-442@example.edu";
+const NOTES = ["t-hl emoji", "t-hl restore"];
+const SAVE = "backend/lib/notes.php → noteHighlights (utf16Length)";
+const RESTORE = "backend/lib/notes.php → noteRoute (the note-restore branch)";
+const outside = { error: "Highlights must be inside the note." };
+
+// Start and end clean: delete the notes this page made. Accounts are never deleted.
+async function clean() {
+  await signIn(A);
+  for (const n of (await api("notes")).body.notes ?? []) if (NOTES.includes(n.title)) await api("note-delete", { id: n.id });
+}
+await clean();
+
+const body = "Exam day \u{1F389} bring a calculator";
+const start = body.indexOf("calculator"); // UTF-16 units, like the browser's selectionStart
+const end = start + "calculator".length;
+let emoji;
+await test("1. A highlight on the word after an emoji is refused", SAVE, async () => {
+  emoji = (await api("note-create", { title: NOTES[0], body })).body.note.id;
+  const r = await api("note-save", { id: emoji, title: NOTES[0], body, highlights: [{ start, end, color: "yellow" }] });
+  expect(r.status).toBe(200);
+  expect(r.body.note.highlights).toEqual([{ start, end, color: "yellow" }]);
+  expect((await api("note", undefined, { id: emoji })).body.note.highlights).toEqual([{ start, end, color: "yellow" }]);
+});
+await test("2. A highlight past the end of the note is accepted", SAVE, async () => {
+  for (const bad of [{ start, end: end + 1 }, { start: end, end: end + 1 }, { start: 3, end: 3 }, { start: -1, end: 2 }])
+    expect(await api("note-save", { id: emoji, title: NOTES[0], body, highlights: [{ ...bad, color: "green" }] })).toEqual(422, outside);
+  expect((await api("note", undefined, { id: emoji })).body.note.highlights).toEqual([{ start, end, color: "yellow" }]);
+});
+await test("3. Restoring a shorter version keeps a highlight past its end, or drops one that fits", RESTORE, async () => {
+  const id = (await api("note-create", { title: NOTES[1], body: "Alpha" })).body.note.id;
+  const longer = "Alpha beta gamma delta";
+  const highlights = [{ start: 0, end: 5, color: "pink" }, { start: 17, end: 22, color: "green" }];
+  expect((await api("note-save", { id, title: NOTES[1], body: longer, highlights })).status).toBe(200);
+  const alpha = (await api("note-versions", undefined, { id })).body.versions.find((v) => v.body === "Alpha");
+  const r = await api("note-restore", { id, versionId: alpha.id });
+  expect(r.status).toBe(200);
+  expect([r.body.note.body, r.body.note.highlights]).toEqual(["Alpha", [{ start: 0, end: 5, color: "pink" }]]);
+  expect((await api("note", undefined, { id })).body.note.highlights).toEqual([{ start: 0, end: 5, color: "pink" }]);
+});
+
+await clean();
+await signOut();
+</script>
