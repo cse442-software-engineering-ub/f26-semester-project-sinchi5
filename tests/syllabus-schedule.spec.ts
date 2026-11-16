@@ -175,7 +175,9 @@ test("View schedule opens on the first class when classes come before due dates"
   await expect(page.getByRole("button", { name: /CSE 442 Lecture/ })).toBeVisible();
 });
 
-test("weekly classes stay out of Home's heads-up list and the course's coming-up list", async ({ page }) => {
+// Card 136 replaced Home's "A little heads-up" with "Your week at a glance" (and "Coming up"), so the
+// week card is the Home list that must leave weekly classes out.
+test("weekly classes stay out of Home's week card and the course's coming-up list", async ({ page }) => {
   await signUpWithCourse(page);
   // Dates around today, because both lists show what's coming.
   const day = (offset: number) => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10);
@@ -186,10 +188,10 @@ test("weekly classes stay out of Home's heads-up list and the course's coming-up
   await dialog.getByRole("button", { name: "Add to schedule" }).click();
   await dialog.getByRole("button", { name: "All done" }).click();
   await page.goto("/");
-  const headsUp = page.locator("section", { has: page.getByRole("heading", { name: "A little heads-up" }) });
-  await expect(headsUp).toContainText("Homework 3");
-  await expect(headsUp).not.toContainText("CSE 442 Lecture");
-  await expect(headsUp).not.toContainText("CSE 442 Lab");
+  const week = page.getByRole("region", { name: "Your week at a glance" });
+  await expect(week).toContainText("Homework 3");
+  await expect(week).not.toContainText("CSE 442 Lecture");
+  await expect(week).not.toContainText("CSE 442 Lab");
   await page.getByRole("link", { name: /CSE 442/ }).first().click();
   const comingUp = page.locator("section", { has: page.getByRole("heading", { name: "Coming up in this course" }) });
   await expect(comingUp).toContainText("Homework 3");
