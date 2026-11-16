@@ -58,12 +58,16 @@ function record(label, lookAt, pass, message) {
 }
 
 // Cases run in the order test() is called, one at a time. A thrown error fails that case; the run continues.
+// hooks.before/after let a harness (tests/frontend/harness.tsx) reset and check around every case; an after hook may throw.
+export const hooks = { before: [], after: [] };
 export function test(label, lookAt, fn) {
   started = true; busy++; clearTimeout(idleTimer);
   queue = queue.then(async () => {
-    try { await fn(); record(label, lookAt, true); }
-    catch (e) { record(label, lookAt, false, e?.expectation ?? `threw ${e?.message ?? e}`); }
-    finally { busy--; poke(); }
+    let err;
+    try { for (const h of hooks.before) await h(); await fn(); } catch (e) { err = e; }
+    try { for (const h of hooks.after) await h(); } catch (e) { err = e; }
+    if (err) record(label, lookAt, false, err.expectation ?? `threw ${err.message ?? err}`); else record(label, lookAt, true);
+    busy--; poke();
   });
   return queue;
 }
