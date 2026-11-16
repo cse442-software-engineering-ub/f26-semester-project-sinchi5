@@ -4,36 +4,8 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  color-scheme: light;
-  --bg: #f8f9f6;
-  --surface: #fff;
-  --surface-soft: #f1f4ed;
-  --text: #304c58;
-  --muted: #5d6c63;
-  --line: #e5e9e1;
-  --primary: #8b5d33;
-  --primary-text: #fff;
-  --sage: #e5eddf;
-  --mint: #a7cdbd;
-  --nav: #edf1e8;
-  --shadow: 0 16px 64px #273c3020;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
-}
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --bg: #19211e;
-  --surface: #212c27;
-  --surface-soft: #29362e;
-  --text: #dbe9e1;
-  --muted: #a7b8ac;
-  --line: #36453b;
-  --primary: #a7cdbd;
-  --primary-text: #192820;
-  --sage: #334638;
-  --mint: #a7cdbd;
-  --nav: #283a2d;
-  --shadow: 0 16px 64px #0005;
 }
 * {
   box-sizing: border-box;

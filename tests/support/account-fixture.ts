@@ -43,6 +43,7 @@ export const test = base.extend<{ accountApi: void }>({
     const accounts = new Map<string, Account>();
     let nextAccount = 42;
     let user: Account | null = null;
+    let prefs = { mode: "system", scheme: "sage" }; // shortcut: one shared answer for every fixture account
     // In-memory stand-in for the card 120 note routes, following the PHP access rules.
     const notes = new Map<string, Note>();
     const editors = new Map<string, Map<string, "view" | "edit">>();
@@ -430,7 +431,7 @@ export const test = base.extend<{ accountApi: void }>({
             user.photo = { content: body.content, mime };
           }
           const completed = user.completed;
-          await route.fulfill({ json: { user: publicUser(user), onboarding: { completed, step: completed ? 3 : 0 }, csrfToken: "fixture-csrf" } });
+          await route.fulfill({ json: { user: publicUser(user), onboarding: { completed, step: completed ? 3 : 0 }, csrfToken: "fixture-csrf", preferences: prefs } });
         } catch (e) {
           await route.fulfill({ status: (e as ApiError).status ?? 500, json: { error: (e as Error).message } });
         }
@@ -442,6 +443,12 @@ export const test = base.extend<{ accountApi: void }>({
         } catch (e) {
           await route.fulfill({ status: (e as ApiError).status ?? 500, json: { error: (e as Error).message } });
         }
+        return;
+      }
+      if (action === "preferences") {
+        if (!user) { await route.fulfill({ status: 401, json: { error: "Sign in to continue." } }); return; }
+        prefs = { mode: body.mode, scheme: body.scheme };
+        await route.fulfill({ json: { preferences: prefs } });
         return;
       }
       if (IMPORT_ROUTES.includes(action)) {
@@ -484,7 +491,7 @@ export const test = base.extend<{ accountApi: void }>({
         else { account.password = body.password; user = null; account.code = "CDEF-5678-CDEF-5678-CDEF-5678-CDEF-5678"; recoveryCode = account.code; }
       }
       const completed = !!user && user.completed;
-      await route.fulfill({ status, json: error ? { error } : { user: publicUser(user), onboarding: { completed, step: completed ? 3 : 0 }, csrfToken: "fixture-csrf", ...(recoveryCode ? { recoveryCode } : {}) } });
+      await route.fulfill({ status, json: error ? { error } : { user: publicUser(user), onboarding: { completed, step: completed ? 3 : 0 }, csrfToken: "fixture-csrf", preferences: prefs, ...(recoveryCode ? { recoveryCode } : {}) } });
     });
     await use();
   }, { auto: true }],

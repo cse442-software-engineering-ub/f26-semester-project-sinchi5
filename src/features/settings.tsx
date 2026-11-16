@@ -1,12 +1,62 @@
 import { AccountSettings } from "./account";
 import { useState } from "react";
-import { Sun, Moon, Monitor, Plus, BookOpen } from "lucide-react";
+import { Plus, BookOpen } from "lucide-react";
 import { useApp } from "../app/context";
 import { Modal, PageHeading } from "../shared/ui";
 import { AddCourseDialog } from "./course-dialog";
 import s from "../app/App.module.css";
+import a from "./appearance.module.css";
+import type { ColorScheme, ThemeMode } from "../domain";
+
+const MODES: [ThemeMode, string][] = [["system", "System"], ["light", "Light"], ["dark", "Dark"]];
+// Preview colors: bg, surface, primary of each scheme in light mode (the same values as tokens.css).
+const SCHEMES: [ColorScheme, string, string[]][] = [
+  ["sage", "Sage", ["#f8f9f6", "#fff", "#8b5d33"]],
+  ["fjord", "Fjord", ["#eceff4", "#f8f9fb", "#496a92"]],
+  ["rose", "Rosé", ["#faf4ed", "#fffaf3", "#286983"]],
+  ["mocha", "Mocha", ["#eff1f5", "#fff", "#7a2fd6"]],
+];
+
+// Native radios give the arrow-key and Tab behavior of a radio group.
+function Appearance() {
+  const { state, setPreferences } = useApp();
+  const [failed, setFailed] = useState(false);
+  const current = state.preferences;
+  async function choose(next: typeof current) {
+    setFailed(false);
+    if (!(await setPreferences(next))) setFailed(true);
+  }
+  return (
+    <>
+      <fieldset className={a.group}>
+        <legend>Mode</legend>
+        <div className={a.options}>
+          {MODES.map(([key, label]) => (
+            <label key={key} className={a.option}>
+              <input type="radio" name="mode" checked={current.mode === key} onChange={() => choose({ ...current, mode: key })} />
+              {label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <fieldset className={a.group}>
+        <legend>Color scheme</legend>
+        <div className={a.options}>
+          {SCHEMES.map(([key, label, colors]) => (
+            <label key={key} className={a.option}>
+              <input type="radio" name="scheme" checked={current.scheme === key} onChange={() => choose({ ...current, scheme: key })} />
+              <span className={a.swatch} aria-hidden="true">{colors.map((c) => <span key={c} style={{ background: c }} />)}</span>
+              {label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      {failed && <p className={a.alert} role="alert">Your appearance could not be saved. Please try again.</p>}
+    </>
+  );
+}
 export function Settings() {
-  const { state, repo, refresh, setTheme } = useApp();
+  const { state, repo, refresh } = useApp();
   const [reset, setReset] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [adding, setAdding] = useState(false);
@@ -26,26 +76,7 @@ export function Settings() {
             <h2 id="appearance-heading">Appearance</h2>
             <p className={s.muted}>Choose a theme, or follow your device.</p>
           </div>
-          <div className={s.themeOptions}>
-            {[
-              ["light", "Light", Sun],
-              ["dark", "Dark", Moon],
-              ["system", "System", Monitor],
-            ].map(([key, label, Icon]) => {
-              const I = Icon as typeof Sun;
-              return (
-                <button
-                  key={key as string}
-                  aria-pressed={state.theme === key}
-                  className={state.theme === key ? s.activeButton : ""}
-                  onClick={() => setTheme(key as string)}
-                >
-                  <I size={22} />
-                  {label as string}
-                </button>
-              );
-            })}
-          </div>
+          <Appearance />
         </section>
         <section className={s.panel} aria-labelledby="courses-heading">
           <div className={s.settingsHeading}>

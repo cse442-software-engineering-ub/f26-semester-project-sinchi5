@@ -39,6 +39,8 @@ export function createAppRepositories(
   }
   const forget = () => { generation++; select(null); };
   const auth: AuthRepository = {
+    preferences: () => serverAuth.preferences(),
+    savePreferences: (next) => serverAuth.savePreferences(next),
     async session() {
       const version = generation;
       try {

@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { createAppRepositories } from "../services/app-repositories";
-import type { User, Course, Note, CourseEvent, Repositories } from "../domain";
+import type { User, Course, Note, CourseEvent, Repositories, Preferences } from "../domain";
 type State = {
   user: User | null;
   photoVersion: number;
@@ -17,7 +17,7 @@ type State = {
   courses: Course[];
   notes: Note[];
   events: CourseEvent[];
-  theme: string;
+  preferences: Preferences;
   error: string;
 };
 const initial: State = {
@@ -28,14 +28,14 @@ const initial: State = {
   courses: [],
   notes: [],
   events: [],
-  theme: localStorage.getItem("notely-theme") || "system",
+  preferences: { mode: "system", scheme: "sage" },
   error: "",
 };
 const Context = createContext<{
   state: State;
   repo: Repositories;
   refresh: (options?: { photoChanged?: boolean }) => Promise<void>;
-  setTheme: (theme: string) => void;
+  setPreferences: (next: Preferences) => Promise<boolean>;
   setError: (error: string) => void;
 }>(null!);
 export function Provider({ children }: { children: ReactNode }) {
@@ -46,6 +46,7 @@ export function Provider({ children }: { children: ReactNode }) {
   );
   const refreshVersion = useRef(0);
   const photoVersion = useRef(0);
+  const saving = useRef(0);
   async function refresh({ photoChanged = false }: { photoChanged?: boolean } = {}) {
     // Keep invalidation even if a newer focus/session refresh supersedes this request.
     if (photoChanged) photoVersion.current++;
@@ -54,7 +55,7 @@ export function Provider({ children }: { children: ReactNode }) {
       const user = await repo.auth.session();
       if (version !== refreshVersion.current) return;
       if (!user) {
-        dispatch({ user: null, completed: false, courses: [], notes: [], events: [], ready: true, error: "" });
+        dispatch({ user: null, completed: false, courses: [], notes: [], events: [], ready: true, error: "", preferences: { mode: "system", scheme: "sage" } });
         return;
       }
       const [onboarding, courses, notes, events] = await Promise.all([
@@ -74,6 +75,8 @@ export function Provider({ children }: { children: ReactNode }) {
         events,
         ready: true,
         error: "",
+        // A save in flight owns the screen; the next refresh brings the server's answer.
+        ...(saving.current ? {} : { preferences: repo.auth.preferences() }),
       });
     } catch (e) {
       if (version !== refreshVersion.current) return;
@@ -90,25 +93,31 @@ export function Provider({ children }: { children: ReactNode }) {
   }, []);
   useEffect(() => {
     const media = matchMedia("(prefers-color-scheme: dark)");
-    const apply = () =>
-      (document.documentElement.dataset.theme =
-        state.theme === "system"
-          ? media.matches
-            ? "dark"
-            : "light"
-          : state.theme);
+    const { mode, scheme } = state.preferences;
+    const apply = () => {
+      document.documentElement.dataset.theme = mode === "system" ? (media.matches ? "dark" : "light") : mode;
+      document.documentElement.dataset.scheme = scheme;
+    };
     apply();
     media.addEventListener("change", apply);
-    localStorage.setItem("notely-theme", state.theme);
     return () => media.removeEventListener("change", apply);
-  }, [state.theme]);
+  }, [state.preferences]);
+  // Applies at once; on a failed save the old look comes back and the caller shows the message.
+  async function setPreferences(next: Preferences) {
+    const before = state.preferences;
+    saving.current++;
+    dispatch({ preferences: next });
+    try { await repo.auth.savePreferences(next); return true; }
+    catch { dispatch({ preferences: before }); return false; }
+    finally { saving.current--; }
+  }
   return (
     <Context.Provider
       value={{
         state,
         repo,
         refresh,
-        setTheme: (theme) => dispatch({ theme }),
+        setPreferences,
         setError: (error) => dispatch({ error }),
       }}
     >
