@@ -7,7 +7,7 @@ const dialog = (page: Page) => page.getByRole("dialog", { name: "Reminder" });
 
 async function openNote(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Create your workspace" }).click();
+  await page.getByRole("button", { name: "Create account" }).click();
   await page.getByLabel("Your name").fill("Reminder Student");
   await page.getByLabel("Email address").fill("notely-reminder-442@example.edu");
   await page.getByLabel("Password", { exact: true }).fill(password);
@@ -15,9 +15,6 @@ async function openNote(page: Page) {
   await page.getByRole("button", { name: "Create account", exact: true }).click();
   await page.getByLabel("I saved my recovery code").check();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "Skip for now" }).click();
-  await page.getByRole("button", { name: /do this later/ }).click();
-  await page.getByRole("button", { name: /begin/ }).click();
   await page.goto("/notes");
   await page.getByRole("button", { name: "Create Note" }).click();
   const create = page.getByRole("dialog", { name: "Create Note" });
