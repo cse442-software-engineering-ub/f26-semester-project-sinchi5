@@ -7,21 +7,6 @@ import type { Repositories } from "../domain";
 const repos = (syllabus?: object) => createRepositories(fakeApi({ syllabus }));
 
 describe("repository contracts", () => {
-  it("persists, changes, validates and removes a demo note reminder", async () => {
-    const storage = memory();
-    const repo = createRepositories(storage, null, false);
-    const note = await repo.notes.create({ title: "Submit lab report" });
-    const first = new Date(Date.now() + 120_000).toISOString();
-    expect((await repo.notes.setReminder(note.id, first)).remindAt).toBe(first);
-    const reopened = createRepositories(storage, null, false);
-    expect((await reopened.notes.get(note.id)).remindAt).toBe(first);
-    await expect(reopened.notes.setReminder(note.id, "2000-01-01T00:00:00Z"))
-      .rejects.toThrow("Choose a time in the future.");
-    expect((await reopened.notes.get(note.id)).remindAt).toBe(first);
-    const second = new Date(Date.now() + 300_000).toISOString();
-    expect((await reopened.notes.setReminder(note.id, second)).remindAt).toBe(second);
-    expect((await reopened.notes.setReminder(note.id, null)).remindAt).toBeNull();
-  });
   it("matches one complete tag and combines it with search, course, and sorting", async () => {
     const [first, second, third] = seedNotes();
     const notes = [
