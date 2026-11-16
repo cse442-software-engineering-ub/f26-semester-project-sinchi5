@@ -21,6 +21,10 @@ async function mockLogin(page: Page, options: { fail?: boolean; completed?: bool
       await route.fulfill({ json: { events: [] } });
       return;
     }
+    if (action === "courses") {
+      await route.fulfill({ json: { courses: [] } });
+      return;
+    }
     if (action === "login") {
       expect(route.request().method()).toBe("POST");
       credentials.push(route.request().postDataJSON());
@@ -52,7 +56,7 @@ async function expectLogin(page: Page) {
   await expect(page).toHaveURL(/welcome/);
 }
 
-test("valid login submits credentials and opens the authenticated notes page", async ({ page }) => {
+test("valid login submits credentials and opens Today", async ({ page }) => {
   const credentials = await mockLogin(page);
   await openLogin(page);
   const emailInput = page.getByLabel("Email address");
@@ -71,8 +75,8 @@ test("valid login submits credentials and opens the authenticated notes page", a
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Log in", exact: true })).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { name: "Your notes", exact: true })).toBeVisible();
-  await expect(page).toHaveURL(/notes/);
+  await expect(page.getByRole("heading", { name: "Your week at a glance", exact: true })).toBeVisible();
+  await expect(page).not.toHaveURL(/notes|welcome/);
   expect(credentials).toEqual([{ email, password }]);
   const stored = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
   expect(stored).not.toContain(password);
@@ -140,7 +144,7 @@ test("pending login disables the form and prevents duplicate submissions", async
       form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
   } finally { release(); }
-  await expect(page.getByRole("heading", { name: "Your notes", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your week at a glance", exact: true })).toBeVisible();
   expect(credentials).toHaveLength(1);
 });
 
@@ -150,7 +154,7 @@ test("login sends an account left mid-setup straight to the app", async ({ page 
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Log in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Your notes", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your week at a glance", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "What are you learning?" })).not.toBeVisible();
   expect(credentials).toEqual([{ email, password }]);
 });
