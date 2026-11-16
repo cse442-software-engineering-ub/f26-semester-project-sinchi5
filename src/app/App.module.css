@@ -1474,6 +1474,11 @@ and a highlighter swipes across
   margin-left: auto;
   font-size: 0.68rem;
 }
+.reminderSummary {
+  margin: 0 0 18px;
+  color: var(--text);
+  font-size: 0.78rem;
+}
 .editorLayout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
