@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import {
   useSearchParams,
   useLocation,
@@ -11,6 +11,7 @@ import {
   LayoutGrid,
   List,
   Plus,
+  Pin,
   X,
 } from "lucide-react";
 import { useApp } from "../app/context";
@@ -39,6 +40,8 @@ export function Notes() {
   // Set when "New note" is chosen from an empty category, so the new note lands in that category.
   const [draftCategory, setDraftCategory] = useState<NoteCategory>();
   const [noteToDelete, setNoteToDelete] = useState<Note>();
+  const [pinning, setPinning] = useState("");
+  const [pinError, setPinError] = useState("");
   // Card 158: notes friends shared with this student through a course (card 156).
   const [shared, setShared] = useState<Note[]>([]);
   useEffect(() => {
@@ -170,6 +173,21 @@ export function Notes() {
     }
   }
 
+  // One request per click; the list reloads from the provider afterwards, so the order comes from the server.
+  async function togglePin(note: Note) {
+    if (pinning) return;
+    setPinning(note.id);
+    setPinError("");
+    try {
+      await repo.notes.setPinned(note.id, !note.pinned);
+      await refresh();
+    } catch (e) {
+      setPinError((e as Error).message);
+    } finally {
+      setPinning("");
+    }
+  }
+
   async function deleteNote(note: Note) {
     await repo.notes.delete(note.id);
     // Search, filters, sort, and view live in the URL and stay untouched.
@@ -187,7 +205,7 @@ export function Notes() {
       <PageHeading
         eyebrow="Good ideas live here"
         title="Your notes"
-        description="A place for every thought, and every thought in its place."
+        description={`${countOf(notes.length, "note")} in your space`}
         actions={
           <button
             className={s.primary}
@@ -293,7 +311,7 @@ export function Notes() {
         </div>
       </div>
       {filters && (
-        <div className={css.filters}>
+        <div className={css.filters} role="group" aria-label="Filter notes">
           <label>
             Course
             <select
@@ -362,8 +380,8 @@ export function Notes() {
           </label>
         </div>
       )}
+      {(active.length > 0 || params.get("q")) && (
       <div className={css.libraryMeta}>
-        <span>{countOf(notes.length, "note")} in your space</span>
         <div className={both.actions}>
           {active.map((k) => (
             <button className={css.chip} key={k} onClick={() => set(k, "")}
@@ -381,9 +399,15 @@ export function Notes() {
           )}
         </div>
       </div>
+      )}
       {announcement && (
         <p role="status" className={s.notice}>
           {announcement}
+        </p>
+      )}
+      {pinError && (
+        <p role="alert" className={s.error}>
+          {pinError}
         </p>
       )}
       {error ? (
@@ -391,35 +415,48 @@ export function Notes() {
           {error}
         </p>
       ) : loading ? (
-        <p role="status">Gathering your notes…</p>
+        <p role="status" className={css.loading}>Gathering your notes…</p>
       ) : notes.length ? (
         // Card 42: notes sit under their category heading (with a count); a selected
         // category filter leaves just that one group.
         groupNotesByCategory(notes).map(({ category, notes: group }) => (
           <section
             key={category}
-            className={css.categoryGroup}
+            className={`${css.categoryGroup} ${css.group}`}
             aria-labelledby={`category-heading-${category}`}
           >
             <h2 id={`category-heading-${category}`} className={css.categoryHeading}>
               {category} ({group.length})
             </h2>
             <div
-              className={`${s.noteGrid} ${params.get("view") === "list" ? s.noteList : ""}`}
+              className={`${s.noteGrid} ${params.get("view") === "list" ? `${s.noteList} ${css.list}` : css.grid}`}
             >
-              {group.map((n) => (
-                <NoteCard
-                  key={n.id}
-                  note={n}
-                  onDelete={
-                    n.ownerId === state.user?.id
-                      ? () => {
-                          setAnnouncement("");
-                          setNoteToDelete(n);
-                        }
-                      : undefined
-                  }
-                />
+              {group.map((n, i) => (
+                <div key={n.id} className={css.cell} style={{ "--i": Math.min(i, 8) } as CSSProperties}>
+                  <NoteCard
+                    note={n}
+                    onDelete={
+                      n.ownerId === state.user?.id
+                        ? () => {
+                            setAnnouncement("");
+                            setNoteToDelete(n);
+                          }
+                        : undefined
+                    }
+                  />
+                  {n.ownerId === state.user?.id && (
+                    <button
+                      type="button"
+                      className={css.pinButton}
+                      aria-label={`${n.pinned ? "Unpin" : "Pin"} ${n.title}`}
+                      aria-pressed={Boolean(n.pinned)}
+                      disabled={!!pinning}
+                      onClick={() => togglePin(n)}
+                    >
+                      <Pin size={14} aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </section>
@@ -433,12 +470,25 @@ export function Notes() {
         </Empty>
       ) : (
         <Empty title="No notes found">
-          Try another keyword or clear a filter to find your way back.
+          {active.length > 0 || params.get("q") ? (
+            <>
+              Nothing matches right now. Try another keyword or clear a filter to find your way back.{" "}
+              <button className={s.secondary} onClick={() => setParams({})}>Clear search and filters</button>
+            </>
+          ) : (
+            <>
+              Your space is empty. Write your first note and it will show up here.{" "}
+              <button className={s.primary} onClick={() => openCreateNote()}>
+                <Plus size={18} /> New note
+              </button>
+            </>
+          )}
         </Empty>
       )}
       {!!shared.length && (
-        <section className={css.categoryGroup} aria-labelledby="shared-with-me-heading">
+        <section className={`${css.categoryGroup} ${css.group} ${css.sharedSection}`} aria-labelledby="shared-with-me-heading">
           <h2 id="shared-with-me-heading" className={css.categoryHeading}>Shared with me</h2>
+          <p className={css.sharedHint}>{countOf(shared.length, "note")} friends shared through your courses. You can read them but not change them.</p>
           <ul className={css.sharedList}>
             {shared.map((n) => (
               <li key={n.id}>
