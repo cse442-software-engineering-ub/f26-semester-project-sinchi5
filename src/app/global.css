@@ -160,7 +160,7 @@ button:active:not(:disabled) {
 }
 ::selection {
   background: var(--mint);
-  color: #233d32;
+  color: var(--selection-ink);
 }
 [data-keyboard] *,
 [data-keyboard] *::before,

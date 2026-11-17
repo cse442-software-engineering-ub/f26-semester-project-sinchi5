@@ -2,7 +2,7 @@
 import "@fontsource-variable/inter";
 import "../../../src/app/tokens.css";
 import "../../../src/app/global.css";
-import "../../../src/app/App.module.css";
+import "../styles";
 import "../../../src/app/shell.module.css";
 import { MemoryRouter } from "react-router-dom";
 import { page, test, expect } from "../../shared/runner.js";
@@ -46,7 +46,7 @@ await test(`1. A banned word is on the landing form or the create form (${LIST})
   await waitFor(() => byLabel("Confirm password"));
   expect(found(root)).toEqual([]);
 });
-await test(`2. A banned word is on Today or Notes (${LIST})`, "src/features/dashboard.tsx → Dashboard, src/features/notes.tsx → Notes", async () => {
+await test(`2. A banned word is on Today or Notes (${LIST})`, "src/features/dashboard.tsx → Dashboard, src/features/notes-list.tsx → Notes", async () => {
   stubApi(routes({ events: { events: [event("e1", today, "09:00")] }, notes: { notes: [note("n1")] } }));
   let root = mount(at("/"));
   await waitFor(() => byText("TODAY"));
@@ -55,7 +55,7 @@ await test(`2. A banned word is on Today or Notes (${LIST})`, "src/features/dash
   await waitFor(() => byText(/in your space/));
   expect(found(root)).toEqual([]);
 });
-await test(`3. A banned word is on Courses or a course page (${LIST})`, "src/features/courses.tsx → Courses, src/features/notes.tsx → CoursePage", async () => {
+await test(`3. A banned word is on Courses or a course page (${LIST})`, "src/features/courses.tsx → Courses, src/features/course-page.tsx → CoursePage", async () => {
   stubApi(routes());
   let root = mount(at("/courses"));
   await waitFor(() => byRole("heading", "Courses"));
@@ -79,7 +79,7 @@ await test(`5. A banned word is on Settings, or its Account line still says "sig
   await waitFor(() => byText("Manage how you log in and keep your account secure."));
   expect(found(root)).toEqual([]);
 });
-await test("6. The Notes page says \"1 notes\" or \"0 note\" (bug 5: 0, 1 and 2 notes)", "src/features/notes.tsx → Notes (countOf in src/shared/ui.tsx)", async () => {
+await test("6. The Notes page says \"1 notes\" or \"0 note\" (bug 5: 0, 1 and 2 notes)", "src/features/notes-list.tsx → Notes (countOf in src/shared/ui.tsx)", async () => {
   for (const [notes, want] of [[[], "0 notes in your space"], [[note("n1")], "1 note in your space"], [[note("n1"), note("n2")], "2 notes in your space"]] as const) {
     stubApi(routes({ notes: { notes } }));
     mount(at("/notes"));
@@ -96,7 +96,7 @@ await test("7. Today says \"1 events\" or \"2 classes\" for events dated today (
   }
   expect(seen).toEqual(["1 event", "2 events"]);
 });
-await test("8. The course page shows \"2026-12-01 · 17:00\" or an empty time (bug 7)", "src/features/notes.tsx → CoursePage, src/shared/ui.tsx → formatEventWhen", async () => {
+await test("8. The course page shows \"2026-12-01 · 17:00\" or an empty time (bug 7)", "src/features/course-page.tsx → CoursePage, src/shared/ui.tsx → formatEventWhen", async () => {
   stubApi(routes({ events: { events: [event("e1", "2026-12-01", "17:00", "exam"), event("e2", "2026-12-01", "")] } }));
   const root = mount(at("/courses/c1"));
   await waitFor(() => byText("Event e1"));
@@ -110,7 +110,7 @@ await test("9. The window is called \"Add a course\" instead of \"Add course\"",
   await waitFor(() => byRole("dialog", "Add course"));
   expect(byRole("dialog", "Add a course")).toBe(null);
 });
-await test("10. The calendar's today chip keeps the same green in every color scheme", "src/app/App.module.css → .miniWeek .weekToday", async () => {
+await test("10. The calendar's today chip keeps the same green in every color scheme", "src/features/dashboard.module.css → .miniWeek .weekToday", async () => {
   stubApi(routes());
   const root = mount(at("/"));
   const chip = () => document.querySelector<HTMLElement>('[class*="weekToday"]')!;

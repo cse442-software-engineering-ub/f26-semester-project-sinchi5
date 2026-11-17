@@ -1,0 +1,48 @@
+.settingsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 760px;
+}
+.settingsGrid .panel {
+  padding: 24px;
+}
+.courseEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  padding: 28px 20px;
+  margin-bottom: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+.courseEmpty strong {
+  color: var(--text);
+  font-size: 0.8rem;
+}
+/* Card 154: a long name or email with no spaces wraps instead of widening the page. */
+.friendName {
+  overflow-wrap: anywhere;
+}
+/* Card 157: one checkbox row per friend in "Share your … notes". Each row is a 44px tap target. */
+.shareFriends {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  margin: 0 0 18px;
+  padding: 0;
+  border: 0;
+}
+.shareFriend {
+  align-items: center;
+  min-height: 44px;
+}
+.shareFriend .friendName {
+  display: grid;
+  min-width: 0;
+}

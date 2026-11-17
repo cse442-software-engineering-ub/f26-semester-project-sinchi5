@@ -309,3 +309,24 @@
     padding-bottom: calc(var(--tabbar) + env(safe-area-inset-bottom) + 96px);
   }
 }
+
+.boot {
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.85rem;
+}
+.skip {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  transform: translateY(-150%);
+  z-index: 100;
+  background: var(--surface);
+  padding: 12px;
+}
+.skip:focus {
+  transform: none;
+}

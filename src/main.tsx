@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter, HashRouter } from "react-router-dom";
 import "@fontsource-variable/inter";
 import "./app/tokens.css";
+import "./shared/ui.module.css"; // first, so feature modules can override shared rules
 import "./app/global.css";
 import App from "./app/App";
 import { Provider } from "./app/context";

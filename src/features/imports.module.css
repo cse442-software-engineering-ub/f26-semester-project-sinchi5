@@ -1,0 +1,239 @@
+.completionActions {
+  justify-content: center;
+}
+.dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border: 1px dashed var(--dropzone-line);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  padding: 35px 20px;
+  gap: 14px;
+  width: 100%;
+  cursor: pointer;
+  margin-bottom: 20px;
+  position: relative;
+  flex-direction: column;
+}
+.dropzone > svg {
+  color: var(--glyph-3);
+}
+.dropzone > strong {
+  font-size: 0.85rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.dropzone > span {
+  font-size: 0.65rem;
+  color: var(--muted);
+}
+.dropzone input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.dropzone:focus-within {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+.spinner {
+  animation: spin 0.8s linear infinite;
+}
+/* Card 45: while Gemini reads,
+a little page gets highlighted line by line,
+and a highlighter swipes across
+   each playful line. */
+.readingPage {
+  display: grid;
+  gap: 7px;
+  width: 52px;
+  padding: 12px 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  animation: readingTilt 2.4s cubic-bezier(0.77, 0, 0.175, 1) infinite alternate;
+}
+.readingPage i {
+  position: relative;
+  display: block;
+  height: 5px;
+  overflow: hidden;
+  background: var(--line);
+  border-radius: 3px;
+}
+.readingPage i:last-child {
+  width: 62%;
+}
+.readingPage i::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--reading-mark);
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: readingSweep 3.2s linear infinite;
+}
+.readingPage i:nth-child(2)::after {
+  animation-delay: 0.5s;
+}
+.readingPage i:nth-child(3)::after {
+  animation-delay: 1s;
+}
+.readingPage i:nth-child(4)::after {
+  animation-delay: 1.5s;
+}
+.readingLine {
+  color: var(--text);
+}
+.readingLine span {
+  position: relative;
+  display: inline-block;
+  padding: 1px 6px;
+  isolation: isolate;
+  animation: readingRise 240ms var(--ease-out) both;
+}
+.readingLine span::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--reading-mark);
+  border-radius: 2px 6px 3px 8px;
+  transform: rotate(-1deg) scaleX(0);
+  transform-origin: left;
+  animation: readingSwipe 700ms var(--ease-out) 120ms both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .readingPage {
+      animation: none;
+    }
+  .readingPage i::after {
+      transform: none;
+      animation-name: readingPulse;
+    }
+  .readingLine span {
+      animation-name: readingFade;
+    }
+  .readingLine span::before {
+      transform: rotate(-1deg);
+      animation: none;
+    }
+}
+.successIcon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--sage);
+  display: grid;
+  place-items: center;
+  color: var(--text);
+}
+@media (max-width: 767px) {
+  .importMetadata {
+      grid-template-columns: minmax(0, 1fr);
+    }
+}
+/* Card 45: the syllabus upload's steps,
+helper text,
+and tips. */
+.steps {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.steps li {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-top: 8px;
+  border-top: 3px solid var(--line);
+}
+.steps li[data-done] {
+  border-top-color: var(--mint);
+}
+.steps li[aria-current="step"] {
+  border-top-color: var(--primary);
+  color: var(--text);
+  font-weight: 600;
+}
+.tips {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  line-height: 1.5;
+}
+.inlineLink {
+  color: var(--text);
+  font-weight: 500;
+  text-decoration: underline;
+}
+.reviewHeading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 8px 0 0;
+  font-size: 0.95rem;
+}
+.reviewSubheading {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes readingTilt {
+  from {
+    transform: rotate(-4deg);
+  }
+  to {
+    transform: rotate(3deg);
+  }
+}
+@keyframes readingSweep {
+  18%,
+  80% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+}
+@keyframes readingRise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes readingSwipe {
+  to {
+    transform: rotate(-1deg) scaleX(1);
+  }
+}
+@keyframes readingPulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes readingFade {
+  from {
+    opacity: 0;
+  }
+}

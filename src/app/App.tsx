@@ -30,7 +30,9 @@ import { useApp } from "./context";
 import { Dashboard } from "../features/dashboard";
 import { Schedule, EventDialog } from "../features/schedule";
 import { Assignments } from "../features/assignments";
-import { Notes, NoteWorkspace, CoursePage } from "../features/notes";
+import { Notes } from "../features/notes-list";
+import { NoteWorkspace } from "../features/note-editor";
+import { CoursePage } from "../features/course-page";
 import { Settings } from "../features/settings";
 import { Friends } from "../features/friends";
 import { Onboarding } from "../features/onboarding";
@@ -39,7 +41,7 @@ import { BRAND, type UploadKind } from "../domain";
 import { AddCourseDialog } from "../features/course-dialog";
 import { Avatar } from "../shared/ui";
 import { Courses } from "../features/courses";
-import s from "./App.module.css";
+import s from "../shared/ui.module.css";
 import sh from "./shell.module.css";
 const nav = [
   { to: "/", label: "Today", icon: Sun },
@@ -152,7 +154,7 @@ export default function App() {
   const moreActive = more.some((n) => location.pathname.startsWith(n.to));
   if (!state.ready)
     return (
-      <div className={s.boot} role="status">
+      <div className={sh.boot} role="status">
         <BookOpen size={32} /> Opening your space…
       </div>
     );
@@ -175,7 +177,7 @@ export default function App() {
     <div className={sh.app} key={state.user.id}>
       <a
         href="#main"
-        className={s.skip}
+        className={sh.skip}
         onClick={(event) => {
           // Focus content without replacing a hash-based page route.
           event.preventDefault();

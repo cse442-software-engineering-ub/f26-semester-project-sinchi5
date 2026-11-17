@@ -5,7 +5,10 @@ import type { Friend, FriendLists } from "../domain";
 import { createHttpFriends } from "../services/friends-http";
 import { Modal, PageHeading } from "../shared/ui";
 import { FieldError } from "./account";
-import s from "../app/App.module.css";
+import css from "./friends.module.css";
+import s from "../shared/ui.module.css";
+// Shared classes this screen's own rules also name (see friends.module.css), applied together.
+const both = { panel: `${s.panel} ${css.panel}` };
 
 // Card 154: send classmates friend requests by email, answer the ones you get, and remove friends.
 export function Friends() {
@@ -53,7 +56,7 @@ export function Friends() {
     void run(() => api.respond(friend.id, accept), setPageError);
   };
   const person = (friend: Friend) => (
-    <span className={s.friendName}>
+    <span className={css.friendName}>
       <strong>{friend.name}</strong>
       <small>{friend.email}</small>
     </span>
@@ -62,9 +65,9 @@ export function Friends() {
   return (
     <>
       <PageHeading title="Friends" description="Add the classmates you study with by email." />
-      <div className={s.settingsGrid}>
+      <div className={css.settingsGrid}>
         {pageError && <p className={s.error} role="alert">{pageError}</p>}
-        <section className={s.panel} aria-labelledby="friend-add-heading">
+        <section className={both.panel} aria-labelledby="friend-add-heading">
           <div className={s.settingsHeading}>
             <h2 id="friend-add-heading">Add a classmate</h2>
             <p className={s.muted}>They’ll see your request the next time they open Friends.</p>
@@ -80,7 +83,7 @@ export function Friends() {
           </form>
         </section>
         {!!lists?.incoming.length && (
-          <section className={s.panel} aria-labelledby="friend-incoming-heading">
+          <section className={both.panel} aria-labelledby="friend-incoming-heading">
             <div className={s.settingsHeading}><h2 id="friend-incoming-heading">Requests for you</h2></div>
             <ul className={s.settingRows}>
               {lists.incoming.map((friend) => (
@@ -98,7 +101,7 @@ export function Friends() {
           </section>
         )}
         {!!lists?.outgoing.length && (
-          <section className={s.panel} aria-labelledby="friend-outgoing-heading">
+          <section className={both.panel} aria-labelledby="friend-outgoing-heading">
             <div className={s.settingsHeading}><h2 id="friend-outgoing-heading">Sent requests</h2></div>
             <ul className={s.settingRows}>
               {lists.outgoing.map((friend) => (
@@ -110,7 +113,7 @@ export function Friends() {
             </ul>
           </section>
         )}
-        <section className={s.panel} aria-labelledby="friend-list-heading">
+        <section className={both.panel} aria-labelledby="friend-list-heading">
           <div className={s.settingsHeading}><h2 id="friend-list-heading">Your friends</h2></div>
           {!lists ? (
             !pageError && <p role="status" className={s.muted}>Loading your friends…</p>
@@ -125,7 +128,7 @@ export function Friends() {
               ))}
             </ul>
           ) : (
-            <div className={s.courseEmpty}>
+            <div className={css.courseEmpty}>
               <Users size={22} aria-hidden="true" />
               <span>No friends yet. Add a classmate by email.</span>
             </div>

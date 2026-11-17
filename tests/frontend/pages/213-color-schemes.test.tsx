@@ -2,7 +2,7 @@
 import "@fontsource-variable/inter";
 import "../../../src/app/tokens.css";
 import "../../../src/app/global.css";
-import "../../../src/app/App.module.css";
+import "../styles";
 import "../../../src/app/shell.module.css";
 import { MemoryRouter } from "react-router-dom";
 import { page, test, expect } from "../../shared/runner.js";

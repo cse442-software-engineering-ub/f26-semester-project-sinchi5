@@ -5,7 +5,8 @@ import type { Course, CourseShare, Friend } from "../domain";
 import { createHttpFriends } from "../services/friends-http";
 import { createHttpNoteShares } from "../services/note-shares-http";
 import { Modal } from "../shared/ui";
-import s from "../app/App.module.css";
+import s from "../shared/ui.module.css";
+import css from "./friends.module.css";
 
 // Card 157: "Shared with Ana and Bea" under the course, or "Not shared with any friends.".
 export function sharedLabel(shares: CourseShare[]) {
@@ -65,13 +66,13 @@ export function ShareNotesDialog({ course, shares, onSaved, onClose }: {
       {!friends ? (
         !error && <p role="status" className={s.muted}>Loading your friends…</p>
       ) : friends.length ? (
-        <fieldset className={s.shareFriends} disabled={saving}>
+        <fieldset className={css.shareFriends} disabled={saving}>
           <legend className={s.srOnly}>Friends</legend>
           {friends.map((friend) => (
-            <label key={friend.userId} className={`${s.checkLabel} ${s.shareFriend}`}>
+            <label key={friend.userId} className={`${s.checkLabel} ${css.shareFriend}`}>
               <input type="checkbox" checked={chosen.has(friend.userId)}
                 onChange={(e) => toggle(friend.userId, e.target.checked)} />
-              <span className={s.friendName}>
+              <span className={css.friendName}>
                 <strong>{friend.name}</strong>
                 <small>{friend.email}</small>
               </span>
@@ -79,7 +80,7 @@ export function ShareNotesDialog({ course, shares, onSaved, onClose }: {
           ))}
         </fieldset>
       ) : (
-        <p className={s.courseEmpty}>
+        <p className={css.courseEmpty}>
           <span>Add friends first to share your notes.</span>
           <Link className={s.textLink} to="/friends" onClick={onClose}>Go to Friends</Link>
         </p>

@@ -5,8 +5,10 @@ import { useApp } from "../app/context";
 import { FieldError, PasswordRequirements, RecoveryCode } from "./account";
 import { PASSWORD_MIN, emailError, nameError, passwordCharacterError, passwordError, recoveryCodeError } from "../services/validation";
 import { BRAND } from "../domain";
-import s from "../app/App.module.css";
+import s from "../shared/ui.module.css";
 import o from "./onboarding.module.css";
+// Shared classes this screen's own rules also name (see onboarding.module.css), applied together.
+const both = { eyebrow: `${s.eyebrow} ${o.eyebrow}`, form: `${s.form} ${o.form}`, muted: `${s.muted} ${o.muted}`, primary: `${s.primary} ${o.primary}`, textLink: `${s.textLink} ${o.textLink}` };
 export function Onboarding() {
   const { state, repo, refresh } = useApp();
   const navigate = useNavigate();
@@ -79,11 +81,11 @@ export function Onboarding() {
     setTouched({}); setSubmitted(false);
   }
   return (
-    <div className={s.onboarding}>
-      <aside className={s.onboardingArt}>
+    <div className={o.onboarding}>
+      <aside className={o.onboardingArt}>
         <LinkLogo />
         <div>
-          <span className={s.eyebrow}>Less scattered. More connected.</span>
+          <span className={both.eyebrow}>Less scattered. More connected.</span>
           <h1>
             A little more organized.
             <br />
@@ -94,7 +96,7 @@ export function Onboarding() {
             <br />
             Give them a place to come together.
           </p>
-          <div className={s.paperStack} aria-hidden="true">
+          <div className={o.paperStack} aria-hidden="true">
             <div />
             <div />
             <article>
@@ -114,8 +116,8 @@ export function Onboarding() {
         </div>
         <small>Made for curious minds.</small>
       </aside>
-      <main className={s.onboardingMain}>
-        <div className={`${s.onboardingContent} ${o.enter}`}>
+      <main className={o.onboardingMain}>
+        <div className={`${o.onboardingContent} ${o.enter}`}>
           {recoveryCode ? <RecoveryCode code={recoveryCode} onDone={async () => {
             if (pending.current) return;
             setError("");
@@ -131,17 +133,17 @@ export function Onboarding() {
             } else { setRecoveryCode(""); changeMode("signin"); setMessage("Password reset. Log in with your new password."); }
           }} /> : (
             <>
-              <span className={s.eyebrow}>Your next chapter</span>
+              <span className={both.eyebrow}>Your next chapter</span>
               <h2>
                 {mode === "signup"
                   ? "A fresh start."
                   : mode === "recover" ? "Recover your account." : "Good to see you again."}
               </h2>
-              <p className={s.muted}>
+              <p className={both.muted}>
                 A small step toward a more organized semester.
               </p>
                 <form
-                  className={s.form}
+                  className={both.form}
                   noValidate
                   aria-busy={busy}
                   onSubmit={(e) => {
@@ -204,8 +206,8 @@ export function Onboarding() {
                     <label>Confirm password<input type="password" required autoComplete="new-password" aria-describedby="signup-password-help" value={confirmation} onChange={e => setConfirmation(e.target.value)} /></label>
                     <PasswordRequirements id="signup-password-help" password={password} confirmation={confirmation} />
                   </>}
-                  {mode === "recover" && <p className={s.muted}>Enter the code you saved at signup. A successful reset logs out all sessions and gives you a replacement code.</p>}
-                  <button disabled={busy} className={s.primary}>
+                  {mode === "recover" && <p className={both.muted}>Enter the code you saved at signup. A successful reset logs out all sessions and gives you a replacement code.</p>}
+                  <button disabled={busy} className={both.primary}>
                     {busy
                       ? "Opening your space…"
                       : mode === "signup"
@@ -213,14 +215,14 @@ export function Onboarding() {
                         : mode === "recover" ? "Reset password" : "Log in"}{" "}
                     <ArrowRight size={16} />
                   </button>
-                  {mode === "signin" && <button type="button" className={s.textLink} onClick={() => changeMode("recover")}>Forgot password?</button>}
+                  {mode === "signin" && <button type="button" className={both.textLink} onClick={() => changeMode("recover")}>Forgot password?</button>}
                   {mode === "signin" ? (
                     <p className={o.switch}>
                       New to Notely?{" "}
-                      <button type="button" className={s.textLink} onClick={() => changeMode("signup")}>Create account</button>
+                      <button type="button" className={both.textLink} onClick={() => changeMode("signup")}>Create account</button>
                     </p>
                   ) : (
-                    <button type="button" className={s.textLink} onClick={() => changeMode("signin")}>
+                    <button type="button" className={both.textLink} onClick={() => changeMode("signin")}>
                       Already have an account? Log in
                     </button>
                   )}
@@ -234,7 +236,7 @@ export function Onboarding() {
               {error || state.error}
             </p>
           )}
-          {state.user && !recoveryCode && <button className={s.textLink} disabled={busy} onClick={async () => {
+          {state.user && !recoveryCode && <button className={both.textLink} disabled={busy} onClick={async () => {
             try { await repo.auth.signOut(); changeMode("signin"); await refresh(); }
             catch (e) { setError((e as Error).message); }
           }}>Log out</button>}
@@ -246,7 +248,7 @@ export function Onboarding() {
 }
 function LinkLogo() {
   return (
-    <div className={s.logo}>
+    <div className={o.logo}>
       <span>
         <BookOpen size={23} />
       </span>

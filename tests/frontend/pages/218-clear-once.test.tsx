@@ -2,7 +2,7 @@
 import "@fontsource-variable/inter";
 import "../../../src/app/tokens.css";
 import "../../../src/app/global.css";
-import "../../../src/app/App.module.css";
+import "../styles";
 import "../../../src/app/shell.module.css";
 import { MemoryRouter } from "react-router-dom";
 import { page, test, expect } from "../../shared/runner.js";
@@ -89,7 +89,7 @@ await test("7. The old error stays while a retry runs", SET + " (setError before
   expect(dialog()!.querySelector('[role="alert"]')).toBe(null);
   await waitFor(() => !dialog());
 });
-await test("8. The Settings page scrolls sideways at 320 px, with the window closed or open", "src/features/settings.tsx, src/app/App.module.css → .settingsGrid", async () => {
+await test("8. The Settings page scrolls sideways at 320 px, with the window closed or open", "src/features/settings.tsx, src/features/friends.module.css → .settingsGrid", async () => {
   stubApi({ ...routes });
   mount(ui(), { width: 320 });
   const frame = document.querySelector("iframe")!.contentDocument!;

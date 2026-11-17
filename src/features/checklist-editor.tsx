@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { checklistDraft, type ChecklistDraft } from "../services/checklists";
-import s from "../app/App.module.css";
+import css from "./note-editor.module.css";
+import s from "../shared/ui.module.css";
 
 export function ChecklistEditor({ items, onChange, disabled }: {
   items: ChecklistDraft[];
@@ -26,15 +27,15 @@ export function ChecklistEditor({ items, onChange, disabled }: {
   function update(key: string, patch: Partial<Pick<ChecklistDraft, "text" | "done">>) {
     if (!disabled) onChange(items.map((item) => item.key === key ? { ...item, ...patch } : item));
   }
-  return <section aria-label="Checklist" className={s.checklist}>
+  return <section aria-label="Checklist" className={css.checklist}>
     {items.length ? <>
       <h3>Checklist</h3>
-      {items.map((item, index) => <div key={item.key} className={s.checklistRow}>
+      {items.map((item, index) => <div key={item.key} className={css.checklistRow}>
         <input type="checkbox" aria-label={`Complete ${item.text || `item ${index + 1}`}`}
           checked={item.done} disabled={disabled}
           onChange={(event) => update(item.key, { done: event.target.checked })} />
         <input type="text" aria-label={`Checklist item ${index + 1}`} value={item.text} disabled={disabled}
-          className={item.done ? s.checklistDone : undefined}
+          className={item.done ? css.checklistDone : undefined}
           ref={(input) => { if (input) inputs.current.set(item.key, input); else inputs.current.delete(item.key); }}
           onChange={(event) => update(item.key, { text: event.target.value })}
           onKeyDown={(event) => {

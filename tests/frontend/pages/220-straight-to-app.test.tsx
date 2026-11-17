@@ -2,7 +2,7 @@
 import "@fontsource-variable/inter";
 import "../../../src/app/global.css";
 // Load the screen styles up front so the phone-width iframe copies them.
-import "../../../src/app/App.module.css";
+import "../styles";
 import "../../../src/app/shell.module.css";
 import "../../../src/features/onboarding.module.css";
 import { MemoryRouter } from "react-router-dom";
@@ -10,7 +10,7 @@ import { page, test, expect } from "../../shared/runner.js";
 import { mount, stubApi, byRole, byText, byLabel, click, type, waitFor, pageScrollWidth } from "../harness";
 import { Provider } from "../../../src/app/context";
 import { RecoveryCode } from "../../../src/features/account";
-import s from "../../../src/app/App.module.css";
+import s from "../../../src/features/onboarding.module.css";
 import App from "../../../src/app/App";
 
 page({ card: "220", title: "Frontend: Send new accounts straight to the app after the recovery code", kind: "frontend" });
@@ -111,7 +111,7 @@ await test("6. A failed onboarding request leaves the student stuck without a me
   expect(byRole("heading", "Save your recovery code") !== null).toBe(true);
   expect(continueButton().disabled).toBe(false);
 });
-await test("7. The recovery code screen scrolls sideways on a 320 px phone", "src/app/App.module.css → .onboarding, .recoveryCode", async () => {
+await test("7. The recovery code screen scrolls sideways on a 320 px phone", "src/features/settings.module.css → .recoveryCode (src/features/onboarding.module.css → .onboarding)", async () => {
   // The screen as Onboarding lays it out; typing the sign-up form into a phone-width iframe is not supported by the harness.
   mount(<div className={s.onboarding}><main className={s.onboardingMain}><div className={s.onboardingContent}><RecoveryCode code={CODE} onDone={() => {}} /></div></main></div>, { width: 320 });
   await waitFor(() => byRole("heading", "Save your recovery code"));

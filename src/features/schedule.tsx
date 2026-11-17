@@ -26,7 +26,10 @@ import {
   type CourseEvent,
   type EventKind,
 } from "../domain";
-import s from "../app/App.module.css";
+import s from "../shared/ui.module.css";
+import css from "./schedule.module.css";
+// Shared classes this screen's own rules also name (see schedule.module.css), applied together.
+const both = { actions: `${s.actions} ${css.actions}`, agenda: `${s.agenda} ${css.agenda}`, sectionHeading: `${s.sectionHeading} ${css.sectionHeading}` };
 
 const WEEKDAYS = [
   "Sunday",
@@ -472,7 +475,7 @@ export function EventDialog({
             </Link>
           )}
 
-        <div className={s.actions}>
+        <div className={both.actions}>
           {event && (
             <button
               type="button"
@@ -615,7 +618,7 @@ function DeleteEventDialog({
         </p>
       )}
 
-      <div className={s.actions}>
+      <div className={both.actions}>
         <Dialog.Close
           className={s.secondary}
           disabled={Boolean(
@@ -835,19 +838,19 @@ export function Schedule() {
 
       <div
         className={
-          s.scheduleLayout
+          css.scheduleLayout
         }
       >
         <section
-          className={`${s.panel} ${s.calendarPanel} ${
+          className={`${s.panel} ${css.calendarPanel} ${
             view === "agenda"
-              ? s.mobileHide
+              ? css.mobileHide
               : ""
           }`}
         >
           <div
             className={
-              s.sectionHeading
+              both.sectionHeading
             }
           >
             <h2>
@@ -862,7 +865,7 @@ export function Schedule() {
 
             <div
               className={
-                s.actions
+                both.actions
               }
             >
               <button
@@ -910,7 +913,7 @@ export function Schedule() {
           </div>
 
           <div
-            className={s.calendar}
+            className={css.calendar}
           >
             {[
               "Sun",
@@ -923,7 +926,7 @@ export function Schedule() {
             ].map((d) => (
               <span
                 className={
-                  s.weekday
+                  css.weekday
                 }
                 key={d}
               >
@@ -964,14 +967,14 @@ export function Schedule() {
                   aria-pressed={
                     key === selected
                   }
-                  className={`${s.day} ${
+                  className={`${css.day} ${
                     key === selected
-                      ? s.selectedDay
+                      ? css.selectedDay
                       : ""
                   } ${
                     d.getMonth() !==
                     date.getMonth()
-                      ? s.outside
+                      ? css.outside
                       : ""
                   }`}
                   onClick={() =>
@@ -985,7 +988,7 @@ export function Schedule() {
                     className={
                       key ===
                       dateKey()
-                        ? s.todayNumber
+                        ? css.todayNumber
                         : ""
                     }
                   >
@@ -1038,11 +1041,11 @@ export function Schedule() {
         </section>
 
         <section
-          className={`${s.panel} ${s.agenda}`}
+          className={`${s.panel} ${both.agenda}`}
         >
           <div
             className={
-              s.sectionHeading
+              both.sectionHeading
             }
           >
             <div>
@@ -1068,7 +1071,7 @@ export function Schedule() {
             </div>
 
             <button
-              className={`${s.secondary} ${s.mobileOnly}`}
+              className={`${s.secondary} ${css.mobileOnly}`}
               onClick={() =>
                 set(
                   "view",
@@ -1087,7 +1090,7 @@ export function Schedule() {
 
           <label
             className={
-              s.mobileOnly
+              css.mobileOnly
             }
           >
             Jump to date

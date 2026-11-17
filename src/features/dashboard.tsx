@@ -26,7 +26,10 @@ import {
   type CourseEvent,
   type UploadKind,
 } from "../domain";
-import s from "../app/App.module.css";
+import css from "./dashboard.module.css";
+import s from "../shared/ui.module.css";
+// Shared classes this screen's own rules also name (see dashboard.module.css), applied together.
+const both = { dashboardAside: `${s.dashboardAside} ${css.dashboardAside}` };
 
 export function Dashboard({
   onImport,
@@ -152,7 +155,7 @@ export function Dashboard({
       />
 
       <section
-        className={s.weekCard}
+        className={css.weekCard}
         aria-labelledby="week-heading"
       >
         <h2 id="week-heading">
@@ -161,7 +164,7 @@ export function Dashboard({
 
         {weekCount ? (
           <>
-            <p className={s.weekSummary}>
+            <p className={css.weekSummary}>
               {weekCount}{" "}
               {weekCount === 1
                 ? "thing"
@@ -171,7 +174,7 @@ export function Dashboard({
 
             {week.map((group) => (
               <section
-                className={s.weekDay}
+                className={css.weekDay}
                 key={group.date}
                 aria-label={
                   group.label
@@ -185,7 +188,7 @@ export function Dashboard({
                       key={`${item.id}-${item.date}`}
                       type="button"
                       className={
-                        s.weekRow
+                        css.weekRow
                       }
                       onClick={() =>
                         openEvent(
@@ -195,7 +198,7 @@ export function Dashboard({
                     >
                       <span
                         className={
-                          s.weekTime
+                          css.weekTime
                         }
                       >
                         {item.time
@@ -207,7 +210,7 @@ export function Dashboard({
 
                       <span
                         className={
-                          s.weekInfo
+                          css.weekInfo
                         }
                       >
                         <strong>
@@ -257,7 +260,7 @@ export function Dashboard({
 
       <div
         className={
-          s.dashboardGrid
+          css.dashboardGrid
         }
       >
         <div>
@@ -329,7 +332,7 @@ export function Dashboard({
 
             <div
               className={
-                s.quickActions
+                css.quickActions
               }
             >
               <button
@@ -427,7 +430,7 @@ export function Dashboard({
 
             <div
               className={
-                s.courseTiles
+                css.courseTiles
               }
             >
               {state.courses.map(
@@ -438,7 +441,7 @@ export function Dashboard({
                   >
                     <span
                       className={
-                        s.courseDot
+                        css.courseDot
                       }
                       style={{
                         background:
@@ -467,7 +470,7 @@ export function Dashboard({
 
         <aside
           className={
-            s.dashboardAside
+            both.dashboardAside
           }
         >
           <section
@@ -496,7 +499,7 @@ export function Dashboard({
             </div>
 
             <div
-              className={s.miniWeek}
+              className={css.miniWeek}
             >
               {Array.from(
                 { length: 7 },
@@ -519,7 +522,7 @@ export function Dashboard({
                       className={
                         dateKey(d) ===
                         today
-                          ? s.weekToday
+                          ? css.weekToday
                           : ""
                       }
                     >
@@ -546,7 +549,7 @@ export function Dashboard({
 
             <div
               className={
-                s.smallHeading
+                css.smallHeading
               }
             >
               <span>TODAY</span>
@@ -597,7 +600,7 @@ export function Dashboard({
               </h2>
 
               <span
-                className={s.count}
+                className={css.count}
               >
                 {upcoming.length}
               </span>
@@ -608,7 +611,7 @@ export function Dashboard({
                 <button
                   type="button"
                   className={
-                    s.comingUpRow
+                    css.comingUpRow
                   }
                   key={`${item.id}-${item.date}`}
                   onClick={() =>
@@ -619,7 +622,7 @@ export function Dashboard({
                 >
                   <span
                     className={
-                      s.comingUpIcon
+                      css.comingUpIcon
                     }
                     aria-hidden="true"
                   >
@@ -630,7 +633,7 @@ export function Dashboard({
 
                   <span
                     className={
-                      s.comingUpInfo
+                      css.comingUpInfo
                     }
                   >
                     <strong>
@@ -680,7 +683,7 @@ export function Dashboard({
               0 && (
               <p
                 className={
-                  s.comingUpEmpty
+                  css.comingUpEmpty
                 }
               >
                 No exams or projects
@@ -690,7 +693,7 @@ export function Dashboard({
           </section>
 
           <div
-            className={s.quietNote}
+            className={css.quietNote}
           >
             <Sparkles size={20} />
 
