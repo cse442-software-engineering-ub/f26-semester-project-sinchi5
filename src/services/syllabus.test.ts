@@ -73,6 +73,19 @@ describe("cleaning what the reader found (card 44)", () => {
     ]);
   });
 
+  it("Card 235 - a span or week item loses its range, or the same title in two weeks becomes one, or a deadline kind is dropped", () => {
+    const [lab, other, deadline] = normalizeEvents([
+      { title: "Lab report", kind: "assignment", date: "", rangeStart: "2026-10-12", rangeEnd: "2026-10-18", meeting: "lab" },
+      { title: "Lab report", kind: "assignment", date: "", week: 7, meeting: "lab" },
+      { title: "Project", kind: "deadline", date: "2026-11-20", week: 9, meeting: "lab" },
+    ]);
+    expect(lab).toMatchObject({ rangeStart: "2026-10-12", rangeEnd: "2026-10-18", meeting: "lab", needsReview: true });
+    expect(other).toMatchObject({ week: 7, meeting: "lab" });
+    // An item with a real date keeps no range.
+    expect(deadline).toMatchObject({ kind: "deadline", date: "2026-11-20" });
+    expect(deadline).not.toHaveProperty("week");
+  });
+
   it("Task test 8 - text is lost, duplicates pile up, or the list has no limit", () => {
     expect(normalizeEvents([{ title: "Exposé – final draft", kind: "deadline", date: "2026-12-01" }])[0].title).toBe("Exposé – final draft");
     expect(normalizeEvents([{ title: "Quiz​ 1‮", date: "2026-11-02" }])[0].title).toBe("Quiz 1");

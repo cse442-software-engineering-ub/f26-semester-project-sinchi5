@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../app/context";
 import { fileTypeProblem } from "../services/syllabus-file";
-import { checkMeeting } from "../services/syllabus";
+import { applyPlacement, checkMeeting, needsSectionPick, placementContext, sectionQuestions, type SectionAnswers } from "../services/syllabus";
 import { formatEventTime, Modal } from "../shared/ui";
 import { CLASS_KINDS, type DetectedEvent, type DetectedMeeting, type EventKind, type UploadKind, type UploadJob } from "../domain";
 import css from "./imports.module.css";
@@ -176,6 +176,8 @@ export function ImportDialog({
   const [importError, setImportError] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // Card 235: which section the student attends, per class type; "" is "Not sure".
+  const [answers, setAnswers] = useState<SectionAnswers>({});
   const [saved, setSaved] = useState({ created: 0, skipped: 0, first: "" });
   const [courseId, setCourseId] = useState(
     startingCourseId ?? state.courses[0]?.id ?? "",
@@ -251,6 +253,7 @@ export function ImportDialog({
     setImportError("");
     setFile(undefined);
     setJob(undefined);
+    setAnswers({});
     setPhase("pick");
   }
   // Card 46: a student can always add an event the readers missed, even when they found none.
@@ -281,6 +284,7 @@ export function ImportDialog({
     // An invalid choice replaces the earlier file, so Continue can't send the wrong one.
     setFile(invalid ? undefined : f);
     setJob(undefined);
+    setAnswers({});
   }
   async function confirm() {
     if (!job) return;
@@ -292,7 +296,7 @@ export function ImportDialog({
     setError("");
     setBusy(true);
     try {
-      setSaved(await repo.imports.confirm(job));
+      setSaved(await repo.imports.confirm({ ...job, events: rows }));
       await refresh();
       setPhase("completed");
     } catch (e) {
@@ -302,6 +306,10 @@ export function ImportDialog({
     }
   }
   const meetings = job?.meetings ?? [];
+  // Card 235: span and week items sit on the day the student's section gives them, live as the answers change.
+  const questions = job ? sectionQuestions(job.events, meetings) : [];
+  const placing = placementContext(meetings, job?.noClassDates, answers, state.courses.find((c) => c.id === job?.metadata.courseId)?.classesStart);
+  const rows = (job?.events ?? []).map((e) => applyPlacement(e, placing));
   const foundEvents = job?.events.filter((e) => e.source === "imported").length ?? 0;
   const foundCount = foundEvents + meetings.length;
   // Nothing to show at all: no classes, no dated work, and nothing the student has added yet.
@@ -532,10 +540,10 @@ export function ImportDialog({
               Check each one against your syllabus: fix anything that’s wrong, uncheck what you don’t want, and add
               anything that’s missing.
               {(() => {
-                const undated = job.events.filter((e) => e.needsReview && e.include === false).length;
+                const undated = rows.filter((e) => e.needsReview && e.include === false).length;
                 return undated ? ` ${undated} ${undated === 1 ? "has no posted date, so it starts" : "have no posted date, so they start"} unchecked.` : "";
               })()}
-              {(job.events.some((e) => e.needsReview && e.include !== false) || meetings.some((m) => m.include && (!m.starts || !m.ends)))
+              {(rows.some((e) => e.needsReview && e.include !== false) || meetings.some((m) => m.include && (!m.starts || !m.ends)))
                 && " Some details need your attention. Look for “Needs review” below."}
             </p>
           )}
@@ -627,7 +635,12 @@ export function ImportDialog({
                   {/* A class offered at several times: the student attends one, so none is assumed. */}
                   {meeting.section && meetings.filter((m) => m.kind === meeting.kind && m.section).length > 1
                     && !meetings.slice(0, i).some((m) => m.kind === meeting.kind && m.section) && (
-                    <p className={css.reviewSubheading}>Pick your {meeting.kind} section</p>
+                    <>
+                      <p className={css.reviewSubheading}>Pick your {meeting.kind} section</p>
+                      {needsSectionPick(meeting.kind, job.events, meetings) && (
+                        <p className={s.hint}>Some work is due “that week” with no day. Tick your section and we’ll put it on that day.</p>
+                      )}
+                    </>
                   )}
                   <ClassReview
                     meeting={meeting}
@@ -638,6 +651,33 @@ export function ImportDialog({
               ))}
             </>
           )}
+          {kind === "syllabus" && questions.length > 0 && (
+            <fieldset className={css.sectionQuestions}>
+              <legend>Which section is yours?</legend>
+              <p className={s.hint}>Some work is due “that week” with no day. Tell us when you meet and we’ll put it on that day.</p>
+              {questions.map((type) => {
+                const answer = answers[type] ?? { choice: "", time: "" };
+                const set = (change: Partial<typeof answer>) => setAnswers({ ...answers, [type]: { ...answer, ...change } });
+                return (
+                  <Fragment key={type}>
+                    <label>
+                      Your {type} day
+                      <select value={answer.choice} onChange={(e) => set({ choice: e.target.value })}>
+                        <option value="">Not sure</option>
+                        {[1, 2, 3, 4, 5, 6, 0].map((d) => <option key={d} value={`d${d}`}>{WEEKDAYS[d]}</option>)}
+                      </select>
+                    </label>
+                    {answer.choice && (
+                      <label>
+                        <span>Your {type} time <span className={s.hint}>(optional)</span></span>
+                        <input type="time" value={answer.time} onChange={(e) => set({ time: e.target.value })} />
+                      </label>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </fieldset>
+          )}
           {kind === "syllabus" && !meetings.length && foundEvents > 0 && (
             <p className={s.hint}>We didn’t find weekly class times in this file.</p>
           )}
@@ -647,10 +687,12 @@ export function ImportDialog({
           )}
           {/* Card 46: each event can be corrected or left out. Included events need a title and a
               date, so the browser asks for any that are missing before anything is added. */}
-          {job.events.map((event, i) => {
+          {rows.map((event, i) => {
             const included = event.include !== false;
+            // Choosing a day or time by hand ends the placing: the row keeps what the student sees.
             const update = (change: Partial<DetectedEvent>) =>
-              setJob({ ...job, events: job.events.map((v, j) => (j === i ? { ...v, ...change } : v)) });
+              setJob({ ...job, events: job.events.map((v, j) => (j !== i ? v : "date" in change || "time" in change
+                ? { ...event, hint: undefined, rangeStart: undefined, rangeEnd: undefined, week: undefined, ...change } : { ...v, ...change })) });
             return (
               <fieldset key={i}>
                 <legend>{event.source === "manual" ? "Added by you" : `Detected ${event.kind}`}</legend>
@@ -662,6 +704,7 @@ export function ImportDialog({
                     {event.description && ` The syllabus says “${event.description}”.`}
                   </p>
                 )}
+                {event.hint && <p className={css.placedHint}>{event.hint}</p>}
                 {/* The quote lets the student check a date against the file at a glance. */}
                 {!event.needsReview && event.source === "imported" && event.description && (
                   <p className={s.hint}>From your syllabus: “{event.description}”</p>
@@ -744,12 +787,12 @@ export function ImportDialog({
               </div>
               <p className={s.hint} aria-live="polite">
                 {(() => {
-                  const count = job.events.filter((e) => e.include !== false).length;
+                  const count = rows.filter((e) => e.include !== false).length;
                   const classes = meetings.filter((m) => m.include).length;
                   const course = state.courses.find((c) => c.id === job.metadata.courseId)?.code ?? "this course";
                   const parts = [
                     classes ? `${classes} weekly ${classes === 1 ? "class" : "classes"}` : "",
-                    count ? `${count} of ${job.events.length} ${job.events.length === 1 ? "event" : "events"}` : "",
+                    count ? `${count} of ${rows.length} ${rows.length === 1 ? "event" : "events"}` : "",
                   ].filter(Boolean);
                   return parts.length
                     ? `${parts.join(" and ")} will be added to ${course}.`
@@ -765,7 +808,7 @@ export function ImportDialog({
           )}
           <button
             className={s.primary}
-            disabled={busy || (kind === "syllabus" && !job.events.some((e) => e.include !== false) && !meetings.some((m) => m.include))}
+            disabled={busy || (kind === "syllabus" && !rows.some((e) => e.include !== false) && !meetings.some((m) => m.include))}
           >
             {busy
               ? "Saving…"

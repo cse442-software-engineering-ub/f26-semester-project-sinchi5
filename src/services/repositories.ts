@@ -139,7 +139,8 @@ export function createRepositories(server: {
           events = normalizeEvents(result.events).map(({ source, time, location, needsReview, ...event }) => ({
             ...event, id: "", courseId, time: time ?? "", location: location ?? "", description: source, source: "imported",
             // With no date posted it stays unchecked: the student sees it, and adds a date only if they want it.
-            ...(needsReview ? { needsReview, include: false } : {}),
+            // A span or week item is placed on the review screen, which decides whether it starts checked.
+            ...(needsReview ? (event.rangeStart || event.week ? { needsReview } : { needsReview, include: false }) : {}),
           }));
           const found = normalizeMeetings(result.meetings);
           // A class offered at several times is one the student attends only once, so they pick theirs.
