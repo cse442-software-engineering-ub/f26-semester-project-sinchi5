@@ -74,9 +74,12 @@ try {
   assert.deepEqual((await taskRead()).checklist, []);
   await taskSave(first);
   const before = await taskRead();
-  for (const key of ["title", "body", "category", "tags", "ownerId", "createdAt"]) {
+  for (const key of ["title", "category", "tags", "ownerId", "createdAt"]) {
     assert.deepEqual(before[key], taskCreated.data.note[key]);
   }
+  // Card 240: the body is HTML and a text note's tasks are part of it.
+  const taskList = (items) => `<ul data-type="taskList">${items.map((t) => `<li data-type="taskItem" data-checked="${t.done}"><p>${t.text}</p></li>`).join("")}</ul>`;
+  assert.equal(before.body, `<p>Keep body</p>${taskList(first)}`);
   assert.equal(before.pinned, true);
   assert.deepEqual((await studentA.call(`note-versions&id=${taskId}`)).data.versions, []);
   assert.deepEqual((await studentA.call("notes")).data.notes.find((n) => n.id === taskId).checklist, first);
@@ -84,7 +87,7 @@ try {
     assert.equal((await studentA.call("note-save", { id: taskId, title: "Must not persist", checklist: invalid })).status, 422);
     assert.deepEqual(await taskRead(), before);
   }
-  assert.equal((await studentA.call("note-save", { id: taskId, checklist: [{ text: "x".repeat(9000), done: false }] })).status, 413);
+  assert.equal((await studentA.call("note-save", { id: taskId, checklist: [{ text: "x".repeat(1024 * 1024 + 9000), done: false }] })).status, 413);
   const malformed = await fetch(`${endpoint}?route=note-save`, {
     method: "POST", headers: { Origin: origin, "Content-Type": "application/json" }, body: '{"checklist":[',
   });
@@ -99,19 +102,20 @@ try {
   await studentA.call("note-permission", { id: taskId, userId: bId, permission: "edit" });
   assert.equal((await studentB.call("note-save", { id: taskId, checklist: second })).status, 200);
   assert.deepEqual((await taskRead()).checklist, second);
-  // Legacy title/body saves create text versions and never erase current tasks.
+  // Legacy title/body saves never erase current tasks. Since card 240 a version is the note as HTML with its tasks,
+  // and restoring it brings those tasks back inside the body.
   assert.equal((await studentA.call("note-save", { id: taskId, title: "Tasks revised", body: "New body" })).status, 200);
   assert.deepEqual((await taskRead()).checklist, second);
   const history = (await studentA.call(`note-versions&id=${taskId}`)).data.versions;
   assert.equal(history.length, 1);
   const restored = await studentA.call("note-restore", { id: taskId, versionId: history[0].id });
-  assert.equal(restored.data.note.body, "Keep body");
-  assert.deepEqual(restored.data.note.checklist, second);
+  assert.equal(restored.data.note.body, `<p>Keep body</p>${taskList(second)}`);
+  assert.deepEqual(restored.data.note.checklist, []);
   assert.equal((await studentA.call("logout", {})).status, 200);
   studentA.cookie = "";
   await studentA.call("session");
   assert.equal((await studentA.call("login", { email: studentA.email, password })).status, 200);
-  assert.deepEqual((await taskRead()).checklist, second);
+  assert.equal((await taskRead()).body, `<p>Keep body</p>${taskList(second)}`);
   assert.equal((await studentA.call("note-delete", { id: taskId })).status, 200);
   const withTasks = await studentA.call("note-create", { title: "Initial tasks", checklist: first });
   assert.equal(withTasks.status, 201);
@@ -137,7 +141,7 @@ try {
   assert.deepEqual(await titles(studentB), ["Shared study guide"]);
   const opened = await studentB.call(`note&id=${id}`);
   assert.equal(opened.status, 200);
-  assert.equal(opened.data.note.body, "Chapter 2");
+  assert.equal(opened.data.note.body, "<p>Chapter 2</p>");
   assert.equal((await studentB.call(`note-comments&id=${id}`)).data.comments.length, 1);
   assert.equal((await studentB.call("note-delete", { id })).status, 403);
   assert.equal((await studentB.call("note-invite", { id, email: studentA.email })).status, 403);

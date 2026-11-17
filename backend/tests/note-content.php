@@ -38,6 +38,11 @@ function text(array $note): array
 {
     return array_intersect_key($note, ['id' => 0, 'title' => 0, 'body' => 0]);
 }
+// Card 240: a plain-text body comes back as escaped paragraphs with its exact text.
+function html(string $text): string
+{
+    return legacyNoteHtml($text, [], []);
+}
 function testUser(PDO $db, array $config, array &$users): array
 {
     query($db, 'INSERT INTO notely_users (name, email, password_hash, recovery_code_hash) VALUES (?, ?, ?, ?)',
@@ -56,33 +61,33 @@ try {
     query($db, 'UPDATE notely_notes SET body = ? WHERE id = ?', ['Original body', $id]);
     $before = query($db, 'SELECT id, owner_user_id, title, created_at FROM notely_notes WHERE id = ?', [$id])->fetch();
     $updated = " \tUpdated notes\r\n\u{1F600}\u{00E9} \n";
-    check(noteAction($db, $owner, 'note-content', ['id' => $id, 'body' => $updated])['note']['body'] === $updated,
+    check(noteAction($db, $owner, 'note-content', ['id' => $id, 'body' => $updated])['note']['body'] === html($updated),
         'Owner update failed.');
-    check(text(noteAction($db, $owner, 'note', [])['note']) === ['id' => $id, 'title' => 'CSE 442 Notes', 'body' => $updated],
+    check(text(noteAction($db, $owner, 'note', [])['note']) === ['id' => $id, 'title' => 'CSE 442 Notes', 'body' => html($updated)],
         'Body did not persist exactly or title changed.');
     check(query($db, 'SELECT id, owner_user_id, title, created_at FROM notely_notes WHERE id = ?', [$id])->fetch() === $before,
         'Body update changed unrelated note fields.');
     expectStatus($db, fn () => noteAction($db, $other, 'note-content',
         ['id' => $id, 'body' => 'Intruder', 'owner_user_id' => $users[1], 'user_id' => $users[0], 'permission' => 'edit']), 403);
     expectStatus($db, fn () => noteAction($db, ['user_id' => null], 'note-content', ['id' => $id, 'body' => 'Anonymous']), 401);
-    check(noteAction($db, $owner, 'note', [])['note']['body'] === $updated, 'Rejected update changed body.');
+    check(noteAction($db, $owner, 'note', [])['note']['body'] === html($updated), 'Rejected update changed body.');
     expectStatus($db, fn () => noteAction($db, $other, 'note', []), 404);
     query($db, "INSERT INTO notely_note_editors (note_id, user_id, permission) VALUES (?, ?, 'view')", [$id, $users[1]]);
     expectStatus($db, fn () => noteAction($db, $other, 'note-content', ['id' => $id, 'body' => 'Viewer']), 403);
-    check(noteAction($db, $other, 'note', [])['note']['body'] === $updated, 'Viewer rejection changed body.');
+    check(noteAction($db, $other, 'note', [])['note']['body'] === html($updated), 'Viewer rejection changed body.');
     query($db, "UPDATE notely_note_editors SET permission = 'edit' WHERE note_id = ? AND user_id = ?", [$id, $users[1]]);
     noteAction($db, $other, 'note-content', ['id' => $id, 'body' => 'Editor body', 'title' => 'Ignored title']);
-    check(noteAction($db, $other, 'note', [])['note']['body'] === 'Editor body', 'Editor update did not persist.');
+    check(noteAction($db, $other, 'note', [])['note']['body'] === html('Editor body'), 'Editor update did not persist.');
     check(query($db, 'SELECT permission FROM notely_note_editors WHERE note_id = ? AND user_id = ?', [$id, $users[1]])->fetchColumn() === 'edit',
         'Body update changed collaborator permission.');
     noteAction($db, $owner, 'note-title', ['id' => $id, 'title' => 'CSE 442 Notes']);
-    check(noteAction($db, $owner, 'note', [])['note']['body'] === 'Editor body', 'Title update changed body.');
+    check(noteAction($db, $owner, 'note', [])['note']['body'] === html('Editor body'), 'Title update changed body.');
     expectStatus($db, fn () => noteAction($db, $owner, 'note-content', ['id' => '9999999999999999999', 'body' => 'Ghost']), 404);
     check((int) query($db, 'SELECT COUNT(*) FROM notely_notes WHERE owner_user_id = ?', [$users[0]])->fetchColumn() === 1,
         'Missing-note update created a note.');
     foreach ([[], ['body' => null], ['body' => 123], ['body' => "\xFF"]] as $input) {
         expectStatus($db, fn () => noteAction($db, $owner, 'note-content', ['id' => $id] + $input), 422);
-        check(noteAction($db, $owner, 'note', [])['note']['body'] === 'Editor body', 'Invalid input changed body.');
+        check(noteAction($db, $owner, 'note', [])['note']['body'] === html('Editor body'), 'Invalid input changed body.');
     }
     expectStatus($db, fn () => noteAction($db, $owner, 'note-content', ['id' => '0', 'body' => 'Bad ID']), 422);
     noteAction($db, $owner, 'note-content', ['id' => $id, 'body' => '']);

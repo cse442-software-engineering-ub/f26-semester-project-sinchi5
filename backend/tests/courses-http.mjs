@@ -162,7 +162,7 @@ try {
   assert.deepEqual((await a.call("course-delete", { id: "c-1" })).data, { deleted: true });
   assert.deepEqual((await a.call("events")).data.events, []);
   const kept = (await a.call("note", undefined, { query: `&id=${note.data.note.id}` })).data.note;
-  assert.deepEqual([kept.body, kept.courseId], ["text", ""]);
+  assert.deepEqual([kept.body, kept.courseId], ["<p>text</p>", ""]);
   assert.equal((await a.call("courses")).data.courses.length, 1);
   err(await a.call("course-delete", { id: "c-1" }), 404, "This course could not be found.");
   pass("deleting a course removes its events, keeps its notes without a course, and leaves other courses");

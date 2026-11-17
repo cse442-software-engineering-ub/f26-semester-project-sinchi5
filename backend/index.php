@@ -46,10 +46,12 @@ try {
             throw new HttpError(415, 'Send requests as JSON.');
         }
         // Cap reads even when the client omits or lies about Content-Length.
-        // Only the named upload/import routes may exceed the usual 8 KB limit.
+        // Only the named upload, import, and note-body routes may exceed the usual 8 KB limit.
         $upload = $route === 'syllabus-upload';
         $limit = $upload ? SYLLABUS_MAX_BODY : ($route === 'import-confirm' ? IMPORT_CONFIRM_MAX_BODY : 8192);
         if ($route === 'profile-photo') $limit = PROFILE_PHOTO_MAX_BODY;
+        // Card 240: noteBody measures the note itself (512 KB); the request may be larger by its JSON escaping.
+        if (in_array($route, NOTE_BODY_ROUTES, true)) $limit = 2 * NOTE_MAX_BYTES + 8192;
         if ($upload) {
             // The body, its decoded JSON, and the file bytes are all in memory at once.
             ini_set('memory_limit', '256M');

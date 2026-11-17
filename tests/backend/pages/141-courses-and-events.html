@@ -158,7 +158,7 @@ await test("16. Deleting a course keeps its events, or removes its notes, or oth
   expect(await api("course-delete", { id: "t141-c1" })).toEqual(200, { deleted: true });
   expect((await api("events")).body.events).toEqual([]);
   const kept = (await api("note", undefined, { id: note.body.note.id })).body.note;
-  expect([kept.body, kept.courseId]).toEqual(["text", ""]);
+  expect([kept.body, kept.courseId]).toEqual(["<p>text</p>", ""]); // card 240: bodies come back as HTML
   expect((await api("courses")).body.courses.length).toBe(1);
   expect(await api("course-delete", { id: "t141-c1" })).toEqual(404, { error: "This course could not be found." });
   await api("note-delete", { id: note.body.note.id });

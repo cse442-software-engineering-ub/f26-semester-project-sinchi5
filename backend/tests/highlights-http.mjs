@@ -1,4 +1,4 @@
-// WP-HL: highlights are measured in UTF-16 units and restores drop highlights that no longer fit.
+// WP-HL: highlights are measured in UTF-16 units; since card 240 a restore brings back the version's own marks.
 // NOTELY_TEST_ISOLATED=1 NOTELY_TEST_URL=http://127.0.0.1:8141/api/index.php node backend/tests/highlights-http.mjs
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -47,21 +47,23 @@ try {
   }
   assert.deepEqual((await call("note", undefined, `&id=${id}`)).data.note.highlights, [{ start, end, color: "yellow" }]);
   pass("a highlight past the end (in UTF-16 units) is still refused with the same message and nothing changes");
-  // Restoring a shorter version drops highlights that no longer fit and keeps the ones that do.
+  // Card 240 (bug 2): a version is the note as HTML with its own marks. Restoring "Alpha" (saved with no
+  // highlight) brings none of the newer marks; restoring the longer version brings back exactly its own.
   const note = (await call("note-create", { title: "Restore", body: "Alpha" })).data.note.id;
   const longer = "Alpha beta gamma delta";
   const highlights = [{ start: 0, end: 5, color: "pink" }, { start: 17, end: 22, color: "green" }];
   assert.equal((await call("note-save", { id: note, title: "Restore", body: longer, highlights })).status, 200);
   const versions = (await call("note-versions", undefined, `&id=${note}`)).data.versions;
-  const alpha = versions.find((v) => v.body === "Alpha");
+  const alpha = versions.find((v) => v.body === "<p>Alpha</p>");
   const restored = await call("note-restore", { id: note, versionId: alpha.id });
   assert.equal(restored.status, 200);
-  assert.deepEqual([restored.data.note.body, restored.data.note.highlights], ["Alpha", [{ start: 0, end: 5, color: "pink" }]]);
-  assert.deepEqual((await call("note", undefined, `&id=${note}`)).data.note.highlights, [{ start: 0, end: 5, color: "pink" }]);
-  pass("restoring a shorter version drops highlights past its end and keeps the ones that fit");
-  const back = (await call("note-versions", undefined, `&id=${note}`)).data.versions.find((v) => v.body === longer);
-  assert.deepEqual((await call("note-restore", { id: note, versionId: back.id })).data.note.highlights, [{ start: 0, end: 5, color: "pink" }]);
-  pass("restoring the longer version again does not bring the dropped highlight back");
+  assert.deepEqual([restored.data.note.body, restored.data.note.highlights], ["<p>Alpha</p>", []]);
+  assert.equal((await call("note", undefined, `&id=${note}`)).data.note.body, "<p>Alpha</p>");
+  pass("restoring a shorter version brings none of the newer highlights onto it");
+  const marked = '<p><mark data-color="pink">Alpha</mark> beta gamma <mark data-color="green">delta</mark></p>';
+  const back = (await call("note-versions", undefined, `&id=${note}`)).data.versions.find((v) => v.body === marked);
+  assert.equal((await call("note-restore", { id: note, versionId: back.id })).data.note.body, marked);
+  pass("restoring the longer version brings back its own highlights");
 } finally {
   await call("delete", { password }).catch(() => {});
 }
