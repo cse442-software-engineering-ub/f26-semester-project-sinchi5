@@ -1,6 +1,12 @@
 /* Color schemes. Fjord is built on Nord (MIT, Sven Greb), Rose on Rose Pine (MIT, Rose Pine contributors),
    Mocha on Catppuccin Latte/Mocha (MIT, Catppuccin). Sage is the original Notely look and the default. */
 :root {
+  /* motion (card 248): 120 to 240 ms, transform and opacity only */
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 240ms;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   color-scheme: light;
   --bg: #f8f9f6;
   --surface: #fff;

@@ -53,7 +53,22 @@ const nav = [
 ];
 const tabs = nav.filter((n) => ["Today", "Schedule", "Notes", "Courses"].includes(n.label));
 const more = nav.filter((n) => ["Assignments", "Friends"].includes(n.label));
+// Card 248: the fifth click on the logo within 2 s gives it a quick flourish.
+function useLogoFlourish() {
+  const clicks = useRef<number[]>([]);
+  const [on, setOn] = useState(false);
+  const click = () => {
+    const now = Date.now();
+    clicks.current = [...clicks.current.filter((t) => now - t < 2000), now];
+    if (clicks.current.length < 5) return;
+    clicks.current = [];
+    setOn(true);
+    setTimeout(() => setOn(false), 700);
+  };
+  return { click, mark: { "data-flourish": on ? "" : undefined } };
+}
 export default function App() {
+  const logo = useLogoFlourish();
   const { state, repo, refresh, setError } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
@@ -187,8 +202,8 @@ export default function App() {
         Skip to content
       </a>
       <aside className={sh.sidebar}>
-        <Link to="/" className={sh.brand} title={BRAND}>
-          <span className={sh.brandMark}>
+        <Link to="/" className={sh.brand} title={BRAND} onClick={logo.click}>
+          <span className={sh.brandMark} {...logo.mark}>
             <BookOpen size={18} />
           </span>
           <span className={sh.label}>{BRAND}</span>
@@ -218,8 +233,8 @@ export default function App() {
       </aside>
       <div className={sh.mainWrap}>
         <header className={sh.topbar}>
-          <Link to="/" className={sh.brand}>
-            <span className={sh.brandMark}>
+          <Link to="/" className={sh.brand} onClick={logo.click}>
+            <span className={sh.brandMark} {...logo.mark}>
               <BookOpen size={18} />
             </span>
             {BRAND}
@@ -239,6 +254,7 @@ export default function App() {
               </button>
             </div>
           )}
+          <div className={sh.page} key={location.pathname.split("/")[1]}>
           <Routes>
             <Route path="/welcome" element={<Navigate to="/" replace />} />
             <Route
@@ -261,6 +277,7 @@ export default function App() {
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </div>
         </main>
       </div>
       <nav className={sh.tabbar} aria-label="Mobile navigation">

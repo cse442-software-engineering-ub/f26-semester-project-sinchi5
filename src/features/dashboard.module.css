@@ -482,6 +482,44 @@
     transform: none;
   }
 }
+.courseTiles a:active,
+.quickActions > button:active {
+  transform: scale(0.985);
+}
+.season {
+  color: var(--primary);
+  display: inline-flex;
+}
+.burst {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 60;
+}
+.burst i {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--primary);
+  animation: burst 640ms var(--ease-out) forwards;
+}
+.burst i:nth-child(3n) {
+  background: var(--mint);
+}
+.burst i:nth-child(3n + 1) {
+  background: var(--sage);
+  border: 1px solid var(--primary);
+}
+@keyframes burst {
+  to {
+    transform: translate(var(--dx), var(--dy)) rotate(var(--spin));
+    opacity: 0;
+  }
+}
 @keyframes rise {
   from {
     opacity: 0;

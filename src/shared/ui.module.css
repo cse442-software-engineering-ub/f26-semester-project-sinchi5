@@ -327,7 +327,7 @@
   background: var(--overlay);
   backdrop-filter: blur(3px);
   z-index: 40;
-  transition: opacity 250ms var(--ease-out);
+  transition: opacity var(--motion-slow) var(--ease-out);
 }
 .modal {
   position: fixed;
@@ -344,8 +344,8 @@
   box-shadow: var(--shadow);
   z-index: 50;
   transition:
-    opacity 250ms var(--ease-out),
-    transform 250ms var(--ease-out);
+    opacity var(--motion-slow) var(--ease-out),
+    transform var(--motion-slow) var(--ease-out);
 }
 .modal[data-starting-style],
 .modal[data-ending-style] {
@@ -648,6 +648,12 @@
   flex-wrap: nowrap;
   padding: 13px 0;
 }
+.noteCard {
+  transition: border-color var(--motion-base) var(--ease-out), box-shadow var(--motion-base) var(--ease-out), transform var(--motion-fast) var(--ease-out);
+}
+.noteCard:active {
+  transform: scale(0.985);
+}
 @media (hover: hover) and (pointer: fine) {
   .noteCard:hover {
       border-color: var(--hover-line);
@@ -834,8 +840,8 @@
       border-radius: 18px 18px 0 0;
       padding: 25px 22px max(25px, env(safe-area-inset-bottom));
       transition:
-        transform 250ms var(--ease-drawer),
-        opacity 200ms var(--ease-out);
+        transform var(--motion-slow) var(--ease-drawer),
+        opacity var(--motion-base) var(--ease-out);
     }
   .modal[data-starting-style],
   .modal[data-ending-style] {

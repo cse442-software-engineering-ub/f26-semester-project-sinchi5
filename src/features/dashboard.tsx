@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowUpRight,
@@ -30,6 +30,24 @@ import css from "./dashboard.module.css";
 import s from "../shared/ui.module.css";
 // Shared classes this screen's own rules also name (see dashboard.module.css), applied together.
 const both = { dashboardAside: `${s.dashboardAside} ${css.dashboardAside}` };
+
+// Card 248: autumn gets a leaf, December to February a snowflake; other months nothing.
+export function seasonGlyph(d: Date): "leaf" | "snow" | null {
+  const m = d.getMonth();
+  return m >= 8 && m <= 10 ? "leaf" : m === 11 || m <= 1 ? "snow" : null;
+}
+const SEASON_PATH = {
+  leaf: "M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12",
+  snow: "M2 12h20 M12 2v20 M20 16l-4-4 4-4 M4 8l4 4-4 4 M16 4l-4 4-4-4 M8 20l4-4 4 4",
+};
+// In memory only: a day that already celebrated an empty list does not do it again this session.
+export const celebratedDays = new Set<string>();
+const calm = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+const PIECES = Array.from({ length: 16 }, (_, i) => {
+  const a = (i / 16) * Math.PI * 2;
+  const r = 90 + (i % 3) * 30;
+  return { "--dx": `${Math.round(Math.cos(a) * r)}px`, "--dy": `${Math.round(Math.sin(a) * r + 40)}px`, "--spin": `${(i % 2 ? 1 : -1) * (180 + i * 20)}deg` } as React.CSSProperties;
+});
 
 export function Dashboard({
   onImport,
@@ -114,6 +132,17 @@ export function Dashboard({
     today,
   );
 
+  const [burst, setBurst] = useState(false);
+  // Today has no "mark done" control, so the burst marks the first time a day has nothing left due.
+  useEffect(() => {
+    if (day.length || !state.courses.length || celebratedDays.has(today) || calm()) return;
+    celebratedDays.add(today);
+    setBurst(true);
+    const t = setTimeout(() => setBurst(false), 900);
+    return () => clearTimeout(t);
+  }, [day.length, state.courses.length, today]);
+  const season = seasonGlyph(new Date());
+
   const hour =
     new Date().getHours();
 
@@ -152,7 +181,21 @@ export function Dashboard({
           "friend"
         }.`}
         description="A fresh page. A clear mind. Let’s make today a good one."
+        actions={
+          season && (
+            <span className={css.season} data-season={season} aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d={SEASON_PATH[season]} />
+              </svg>
+            </span>
+          )
+        }
       />
+      {burst && (
+        <div className={css.burst} data-burst aria-hidden="true">
+          {PIECES.map((style, i) => <i key={i} style={style} />)}
+        </div>
+      )}
 
       <div className={css.today}>
       <div className={css.grid}>

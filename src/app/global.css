@@ -4,8 +4,6 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 * {
   box-sizing: border-box;
@@ -162,6 +160,9 @@ button:active:not(:disabled) {
   background: var(--mint);
   color: var(--selection-ink);
 }
+[data-keyboard] [data-burst] {
+  display: none !important;
+}
 [data-keyboard] *,
 [data-keyboard] *::before,
 [data-keyboard] *::after {
@@ -178,6 +179,10 @@ button:active:not(:disabled) {
   }
   button:active {
     transform: none !important;
+  }
+  [data-burst],
+  [data-flourish] {
+    display: none !important;
   }
 }
 @media (prefers-contrast: more) {
