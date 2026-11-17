@@ -11,7 +11,7 @@ page({ card: "240", title: "Backend: Store notes as cleaned formatted text", kin
 const A = "notely-task240-442@example.edu";
 const B = "notely-task240b-442@example.edu";
 const T = (s) => `t-240 ${s}`;
-const NOTES = ["xss", "format", "plain", "old", "restore html", "restore text", "size", "search", "shared", "private"].map(T);
+const NOTES = ["xss", "format", "plain", "old", "restore html", "restore text", "size", "search", "shared", "private", "limits", "versions"].map(T);
 const CLEAN = "backend/lib/notes.php → cleanNoteHtml (the allow-list)";
 const READ = "backend/lib/notes.php → noteJson, legacyNoteHtml (read-time conversion)";
 const denied = { error: "You do not have permission to edit this note." };
@@ -209,6 +209,25 @@ await test("9. A viewer, another student, or a signed-out visitor can change a n
   expect(await api("note-content", { id: shared.id, body: "<p>x</p>", format: "html" })).toEqual(401, { error: "Sign in to continue." });
   await signIn(A);
   expect((await read(mine.id)).body).toBe("<p>secret</p>");
+});
+
+await test("10. A huge tag or deep nesting is parsed (slow) or cut short, or text after a stray </body> is lost", "backend/lib/notes.php → cleanNoteHtml (the tag, depth, and </body> checks)", async () => {
+  const id = (await create("limits", "<p>kept</p>")).id;
+  const unreadable = { error: "This note has formatting we can't read. Paste it as plain text and try again." };
+  for (const body of [`<p title="${"a".repeat(4100)}">x</p>`, "<b>".repeat(300) + "deep"])
+    for (const route of ["note-save", "note-content"]) expect(await api(route, { id, body, format: "html" })).toEqual(422, unreadable);
+  expect((await read(id)).body).toBe("<p>kept</p>");
+  expect((await api("note-content", { id, body: `<p title="${"a".repeat(4000)}">x</p>`, format: "html" })).body.note.body).toBe("<p>x</p>");
+  expect((await api("note-save", { id, body: "<p>a</p></BODY ></html><p>after</p>", format: "html" })).body.note.body).toBe("<p>a</p><p>after</p>");
+});
+
+await test("11. Escaping grows a note past 512 KB, or versions pile up past 50", "backend/lib/notes.php → cleanNoteHtml (the size check), keepVersion (NOTE_MAX_VERSIONS)", async () => {
+  const id = (await create("versions", "<p>v0</p>")).id;
+  // 200,000 "&" is 200 KB in, but 1 MB once escaped as &amp;.
+  expect(await api("note-save", { id, body: "&".repeat(200000), format: "html" })).toEqual(413, { error: "Notes can be at most 512 KB. Split this note into two." });
+  for (let i = 1; i <= 52; i++) await api("note-content", { id, body: `<p>v${i}</p>`, format: "html" });
+  const versions = (await api("note-versions", undefined, { id })).body.versions;
+  expect([versions.length, versions[0].body, versions.at(-1).body]).toEqual([50, "<p>v51</p>", "<p>v2</p>"]);
 });
 
 await clean();

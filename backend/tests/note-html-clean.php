@@ -67,7 +67,8 @@ $payloads = [
     '<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>',
     '<a href="https://ok.example/" onclick="alert(1)" target="_blank">ok</a>',
     "<p>a\0<script>alert(1)</script></p>",
-    str_repeat('<span style="color: #000">', 300) . 'deep<script>alert(1)</script>' . str_repeat('</span>', 300),
+    // Under libxml's 256-level limit, past the cleaner's own 64-level text fallback.
+    str_repeat('<span style="color: #000">', 200) . 'deep<script>alert(1)</script>' . str_repeat('</span>', 200),
 ];
 foreach ($payloads as $i => $payload) {
     $clean = cleanNoteHtml($payload);
@@ -128,3 +129,19 @@ check(status(fn () => noteChecklist([['text' => str_repeat('x', 70000), 'done' =
 check(status(fn () => noteHighlights(array_fill(0, 2000, ['start' => 0, 'end' => 1, 'color' => 'yellow']), 'x')) === 422,
     'oversized highlights refused');
 echo "PASS: format input, the 512 KB cap, and the 64 KB checklist and highlight columns\n";
+
+// Security review follow-up: CPU, size, and silent-loss limits of the cleaner.
+$unreadable = "This note has formatting we can't read. Paste it as plain text and try again.";
+$message = static function (callable $fn): array {
+    try { $fn(); } catch (HttpError $e) { return [$e->status, $e->getMessage()]; }
+    return [0, ''];
+};
+check($message(fn () => cleanNoteHtml('<p title="' . str_repeat('a', 4100) . '">x</p>')) === [422, $unreadable], 'a tag over 4 KB is refused');
+$started = microtime(true);
+check($message(fn () => cleanNoteHtml(str_repeat('<p ' . str_repeat('a ', 3000), 100))) === [422, $unreadable]
+    && microtime(true) - $started < 1, 'many huge tags are refused before libxml parses them');
+check(cleanNoteHtml('<p title="' . str_repeat('a', 4000) . '">x</p>') === '<p>x</p>', 'a tag just under 4 KB is read');
+check($message(fn () => cleanNoteHtml(str_repeat('<b>', 300) . 'deep')) === [422, $unreadable], 'nesting past libxml\'s limit is refused, not cut');
+same(cleanNoteHtml('<p>a</p></BODY ></html><p>after</p>'), '<p>a</p><p>after</p>', 'text after a literal </body> is kept');
+check($message(fn () => cleanNoteHtml(str_repeat('&', 200000))) === [413, NOTE_TOO_LONG], 'escaping past 512 KB is refused');
+echo "PASS: huge tags, deep nesting, stray </body>, and escaped growth are refused or kept, never cut silently\n";

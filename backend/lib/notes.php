@@ -16,6 +16,9 @@ const NOTE_COLUMNS = 'n.id, n.owner_user_id, n.title, n.body, n.body_format, n.b
 // Card 240: a note body is cleaned HTML. The incoming string is measured; backend/index.php lets these routes read twice
 // this much so JSON escaping of quotes still fits.
 const NOTE_MAX_BYTES = 524288;
+const NOTE_TOO_LONG = 'Notes can be at most 512 KB. Split this note into two.';
+// Card 240: each note keeps its newest versions only, so repeated large saves can't fill the database.
+const NOTE_MAX_VERSIONS = 50;
 const NOTE_BODY_ROUTES = ['note-content', 'note-save'];
 const NOTE_EXCERPT_LENGTH = 300;
 // The XSS wall: only these tags survive cleanNoteHtml. Other tags are unwrapped to their text,
@@ -88,7 +91,7 @@ function noteBody(array $input): string
 {
     $body = field($input, 'body');
     if (strlen($body) > NOTE_MAX_BYTES) {
-        throw new HttpError(413, 'Notes can be at most 512 KB. Split this note into two.');
+        throw new HttpError(413, NOTE_TOO_LONG);
     }
     if (!preg_match('//u', $body)) {
         throw new HttpError(422, 'The note body contains characters we could not read.');
@@ -117,14 +120,27 @@ function noteEscape(string $text): string
 function cleanNoteHtml(string $html): string
 {
     if ($html === '') return '';
+    $unreadable = "This note has formatting we can't read. Paste it as plain text and try again.";
+    // libxml is quadratic in attributes per tag, so a huge tag is refused before parsing (CPU DoS).
+    if (preg_match('/<[^>]{4096}/', $html)) throw new HttpError(422, $unreadable);
+    // A literal </body> or </html> would make libxml drop everything after it while the save succeeds.
+    $html = preg_replace('~</(?:body|html)\b[^>]*>~i', '', str_replace("\0", '', $html));
     $doc = new DOMDocument();
     $errors = libxml_use_internal_errors(true);
     $doc->loadHTML('<!DOCTYPE html><html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head><body>'
-        . str_replace("\0", '', $html) . '</body></html>', LIBXML_NONET);
+        . $html . '</body></html>', LIBXML_NONET);
+    // A fatal error (nesting past libxml's depth limit) stops the parse and loses the rest, so refuse instead.
+    // It is always the last error; libxml_get_errors() would copy every warning and can exhaust memory.
+    $fatal = libxml_get_last_error();
+    $fatal = $fatal && $fatal->level === LIBXML_ERR_FATAL;
     libxml_clear_errors();
     libxml_use_internal_errors($errors);
+    if ($fatal) throw new HttpError(422, $unreadable);
     $body = $doc->getElementsByTagName('body')->item(0);
-    return $body ? cleanNoteNodes($body, 0) : '';
+    $clean = $body ? cleanNoteNodes($body, 0) : '';
+    // Escaping can grow the text (512 KB of & becomes 2.5 MB), so the cap applies to the stored HTML too.
+    if (strlen($clean) > NOTE_MAX_BYTES) throw new HttpError(413, NOTE_TOO_LONG);
+    return $clean;
 }
 
 function cleanNoteNodes(DOMNode $parent, int $depth): string
@@ -577,6 +593,10 @@ function keepVersion(PDO $db, string $id, array $user, array $next): void
         $html = noteRowHtml($previous);
         query($db, "INSERT INTO notely_note_versions (note_id, title, body, body_format, body_text, author_name, created_at)
             VALUES (?, ?, ?, 'html', ?, ?, ?)", [$id, $previous['title'], $html, notePlain($html), $user['name'], $previous['updated_at']]);
+        // The derived table lets MySQL read the kept ids from the table it deletes from.
+        query($db, 'DELETE FROM notely_note_versions WHERE note_id = ? AND id NOT IN (SELECT id FROM (SELECT id
+            FROM notely_note_versions WHERE note_id = ? ORDER BY created_at DESC, id DESC LIMIT ' . NOTE_MAX_VERSIONS . ') AS kept)',
+            [$id, $id]);
     }
 }
 
