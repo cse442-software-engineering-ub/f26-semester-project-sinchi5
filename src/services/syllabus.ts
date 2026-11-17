@@ -1,6 +1,7 @@
 // Card 44: cleans what the server's reader (Gemini, card 127) found in a syllabus, and turns each weekly
 // class into its dates. Nothing here touches the schedule.
-import { CLASS_KINDS, type ClassKind } from "../domain";
+import { CLASS_KINDS, type ClassKind, type DetectedEvent, type DetectedMeeting } from "../domain";
+import { placeRangedEvent, type ChosenMeeting, type PlacementContext } from "./syllabus-placement";
 
 export type SyllabusEventKind = "assignment" | "exam" | "quiz" | "deadline" | "other";
 export const SYLLABUS_EVENT_KINDS: readonly SyllabusEventKind[] = ["assignment", "exam", "quiz", "deadline", "other"];
@@ -22,6 +23,11 @@ export interface ProposedEvent {
   source: string;
   // Set when the date is missing; the student must pick it.
   needsReview?: true;
+  // Card 235: a span or week the file gave instead of a day (only when date is ""), and the class it belongs to.
+  rangeStart?: string;
+  rangeEnd?: string;
+  week?: number;
+  meeting?: ClassKind;
 }
 
 // A weekly class as the reader found it. days are numbers, with 0 for Sunday.
@@ -71,7 +77,12 @@ export function normalizeEvents(items: unknown): ProposedEvent[] {
     const date = realDate(raw.date);
     const time = clockTime(raw.time);
     const location = plainText(raw.location, 120);
-    const key = `${title.toLowerCase()}|${date}|${time}`;
+    const rangeStart = date ? "" : realDate(raw.rangeStart);
+    const rangeEnd = date ? "" : realDate(raw.rangeEnd);
+    const week = !date && Number.isInteger(raw.week) && (raw.week as number) >= 1 && (raw.week as number) <= 30 ? (raw.week as number) : 0;
+    const meeting = !date && CLASS_KINDS.includes(raw.meeting as ClassKind) ? (raw.meeting as ClassKind) : undefined;
+    // The same title in different weeks is different work.
+    const key = `${title.toLowerCase()}|${date}|${time}|${rangeStart}|${rangeEnd}|${week}`;
     if (seen.has(key)) continue;
     seen.add(key);
     events.push({
@@ -82,6 +93,9 @@ export function normalizeEvents(items: unknown): ProposedEvent[] {
       ...(location ? { location } : {}),
       source: plainText(raw.source, 500),
       ...(date ? {} : { needsReview: true as const }),
+      ...(rangeStart && rangeEnd ? { rangeStart, rangeEnd } : {}),
+      ...(week ? { week } : {}),
+      ...(meeting ? { meeting } : {}),
     });
   }
   return events;
@@ -138,4 +152,43 @@ export function meetingDates(meeting: { days: number[]; starts: string; ends: st
     if (meeting.days.includes(day.getUTCDay()) && !noClass.some((range) => date >= range.from && date <= range.to)) dates.push(date);
   }
   return dates;
+}
+
+// Card 235: the review screen asks for the student's section only where a span or week item needs it.
+export const isRanged = (e: Pick<DetectedEvent, "rangeStart" | "week">) => !!(e.rangeStart || e.week);
+export type SectionAnswers = Partial<Record<ClassKind, { choice: string; time: string }>>;
+export interface SectionQuestion {
+  kind: ClassKind;
+  // Indexes of the posted sections in the meetings list; empty means ask for a day instead.
+  sections: number[];
+}
+// A type is asked about when a span or week item belongs to it and the read doesn't name exactly one meeting
+// of that type. A choice is "m<index>" for a posted section or "d<0-6>" for a day; "" is "Not sure".
+export function sectionQuestions(events: DetectedEvent[], meetings: DetectedMeeting[]): SectionQuestion[] {
+  return CLASS_KINDS.flatMap((kind) => {
+    const ofKind = meetings.flatMap((m, i) => (m.kind === kind ? [i] : []));
+    if (ofKind.length === 1 || !events.some((e) => isRanged(e) && e.meeting === kind)) return [];
+    return [{ kind, sections: ofKind.filter((i) => meetings[i].section) }];
+  });
+}
+const chosen = (m: DetectedMeeting): ChosenMeeting => ({ days: m.days, time: m.time, first: m.starts || undefined, last: m.ends || undefined });
+export function placementContext(meetings: DetectedMeeting[], noClass: DateRange[] = [], answers: SectionAnswers, classesStart?: string): PlacementContext {
+  const found: PlacementContext["meetings"] = {};
+  for (const kind of CLASS_KINDS) {
+    const ofKind = meetings.filter((m) => m.kind === kind);
+    const { choice = "", time = "" } = answers[kind] ?? {};
+    if (ofKind.length === 1) found[kind] = chosen(ofKind[0]);
+    else if (choice[0] === "m" && meetings[+choice.slice(1)]?.kind === kind) found[kind] = chosen(meetings[+choice.slice(1)]);
+    else if (choice[0] === "d") found[kind] = { days: [+choice.slice(1)], time };
+  }
+  return { meetings: found, noClass, classesStart };
+}
+// The event as the review shows it: a span or week item sits on its placed day, with the reason. When no
+// day can be worked out it stays as the reader gave it (undated and unchecked).
+export function applyPlacement(e: DetectedEvent, ctx: PlacementContext): DetectedEvent & { hint?: string } {
+  if (!isRanged(e) || e.date !== "") return e;
+  const p = placeRangedEvent(e, ctx);
+  return p.derived
+    ? { ...e, date: p.date, time: p.time, needsReview: false, include: e.include ?? true, hint: p.reason }
+    : { ...e, include: e.include ?? false };
 }
