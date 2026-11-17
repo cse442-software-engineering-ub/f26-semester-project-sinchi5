@@ -36,7 +36,7 @@ export function createAuthRepository(
       if (response.status === 401 || response.status === 403) snapshot = undefined;
       throw new AccountError(body?.error || "The account service is unavailable. Please try again later.", response.status);
     }
-    if (route === "preferences" && body?.preferences) return body as Session; // answers only the saved choice
+    if (["preferences", "theme-save", "theme-delete"].includes(route) && body?.preferences) return body as Session; // answers only the saved choice
     if (!body || typeof body.csrfToken !== "string" || !body.onboarding || !("user" in body)) {
       throw new AccountError("The account service is unavailable. Please try again later.", 503);
     }
@@ -53,13 +53,18 @@ export function createAuthRepository(
     if (!snapshot) await read();
     return request(route, data);
   }
+  async function savePrefs(route: string, data: Record<string, string>) {
+    const answer = (await post(route, data) as unknown as { preferences: Preferences }).preferences;
+    const saved = { ...answer, customThemes: answer.customThemes ?? snapshot?.preferences?.customThemes };
+    if (snapshot) snapshot.preferences = saved;
+    return saved;
+  }
   return {
     preferences: () => snapshot?.preferences ?? { mode: "system", scheme: "sage" },
-    async savePreferences(next) {
-      const saved = (await post("preferences", { ...next }) as unknown as { preferences: Preferences }).preferences;
-      if (snapshot) snapshot.preferences = saved;
-      return saved;
-    },
+    // Only mode and scheme are sent; the themes travel through theme-save and theme-delete.
+    savePreferences: (next) => savePrefs("preferences", { mode: next.mode, scheme: next.scheme }),
+    saveTheme: ({ id, ...rest }) => savePrefs("theme-save", id ? { id, ...rest } : rest),
+    deleteTheme: (id) => savePrefs("theme-delete", { id }),
     async session() { return (await read()).user; },
     async onboarding() { return (snapshot || await read()).onboarding; },
     async signIn(email, password) { return (await post("login", { email, password })).user!; },

@@ -22,10 +22,8 @@ function worst(p: { light: Mode; dark: Mode }): [number, string] {
 const readable = (t: Parameters<typeof buildPalette>[0]) => worst(buildPalette(t))[0] >= 4.5;
 
 await test("1. A color variable from tokens.css is missing in the light or the dark set", FILE, () => {
-  // The semantic variables added by card 222 (danger, highlights, artwork...) are not built from three colors yet:
-  // a custom theme inherits them from the sage blocks. Only the core variables must match the palette.
-  const core = tokensCss.replace(/\/\* semantic colors \(card 222\) \*\/[\s\S]*?(?=\n\})/g, "");
-  const names = [...new Set([...core.matchAll(/^\s*(--[a-z-]+):/gm)].map((m) => m[1]))].sort();
+  // Card 234: the palette now builds the semantic variables of card 222 too, so a custom theme inherits nothing.
+  const names = [...new Set([...tokensCss.matchAll(/^\s*(--[a-z0-9-]+):/gm)].map((m) => m[1]))].sort();
   const p = buildPalette(comfy);
   expect(Object.keys(p.light).sort()).toEqual(names);
   expect(Object.keys(p.dark).sort()).toEqual(names);
@@ -79,7 +77,8 @@ await test("9. A value that is not a valid color is produced", FILE, () => {
     const p = buildPalette(t);
     for (const mode of [p.light, p.dark])
       for (const [name, value] of Object.entries(mode)) {
-        const ok = name === "--shadow" ? /^0 16px 64px #[0-9a-f]{8}$/.test(value) : /^#[0-9a-f]{6}$/.test(value);
+        const ok = name.includes("shadow") ? /^0 \d+px \d+px (\d+px )?#[0-9a-f]{6,8}$/.test(value)
+          : name === "--swatch-line" || name.startsWith("--overlay") ? /^#[0-9a-f]{4,8}$/.test(value) : /^#[0-9a-f]{6}$/.test(value);
         if (!ok) throw new Error(`${name} is ${JSON.stringify(value)}`);
       }
   }
