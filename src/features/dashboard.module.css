@@ -9,7 +9,6 @@
 .grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "week" "main" "aside";
   gap: clamp(16px, 2.2vw, 40px);
   align-items: start;
   min-width: 0;
@@ -17,19 +16,29 @@
 .grid > * {
   min-width: 0;
 }
-.main {
-  grid-area: main;
-  display: grid;
+/* One column: main and aside dissolve so today's calendar and Coming up sit right under the week
+   card (visual order only; DOM order stays week, notes, aside). Two and three columns restore them. */
+.main,
+.dashboardAside {
+  display: contents;
   gap: clamp(24px, 2.6vw, 44px);
 }
 .dashboardAside {
-  grid-area: aside;
-  display: grid;
   gap: clamp(16px, 2vw, 32px);
+}
+.dashboardAside {
   grid-template-columns: minmax(0, 1fr);
 }
+.dashboardAside > :nth-child(1) { order: 1; }
+.dashboardAside > :nth-child(2) { order: 2; }
+.main > :nth-child(1) { order: 3; }
+.main > :nth-child(2) { order: 4; }
+.main > :nth-child(3) { order: 5; }
+.dashboardAside > :nth-child(3) { order: 6; }
 .block {
   min-width: 0;
+  container-type: inline-size;
+  container-name: blk;
 }
 .head {
   display: flex;
@@ -76,7 +85,6 @@
 
 /* Week at a glance */
 .weekCard {
-  grid-area: week;
   padding: clamp(18px, 2.2vw, 36px);
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -159,7 +167,7 @@
 /* Notes, quick actions, courses */
 .noteGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: clamp(10px, 1.2vw, 18px);
 }
 .noCourses {
@@ -172,7 +180,7 @@
 }
 .quickActions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: clamp(10px, 1.2vw, 16px);
 }
 .quickActions > button {
@@ -393,6 +401,17 @@
 
 /* Two columns: week and aside side by side, the notes area full width below. */
 @container today (min-width: 620px) {
+  .weekCard { grid-area: week; }
+  .main { grid-area: main; }
+  .dashboardAside { grid-area: aside; }
+  .main,
+  .dashboardAside {
+    display: grid;
+  }
+  .main > *,
+  .dashboardAside > * {
+    order: 0;
+  }
   .grid {
     grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
     grid-template-areas: "week aside" "main main";
@@ -404,9 +423,27 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
     grid-template-areas: "week main aside";
   }
-  .noteGrid {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
-  }
+}
+
+/* Card columns follow the width of their own section; a last card that would sit alone in a
+   two-column row spans the row instead. */
+@container blk (min-width: 30rem) {
+  .noteGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container blk (min-width: 46rem) {
+  .noteGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container blk (min-width: 26rem) {
+  .quickActions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container blk (min-width: 40rem) {
+  .quickActions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container blk (min-width: 30rem) and (max-width: 45.99rem) {
+  .noteGrid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+@container blk (min-width: 26rem) and (max-width: 39.99rem) {
+  .quickActions > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
 
 @media (hover: hover) and (pointer: fine) {
