@@ -41,6 +41,8 @@ export function createAppRepositories(
   const auth: AuthRepository = {
     preferences: () => serverAuth.preferences(),
     savePreferences: (next) => serverAuth.savePreferences(next),
+    saveTheme: (theme) => serverAuth.saveTheme(theme),
+    deleteTheme: (id) => serverAuth.deleteTheme(id),
     async session() {
       const version = generation;
       try {

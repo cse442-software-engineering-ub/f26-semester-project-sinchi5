@@ -8,6 +8,13 @@ export type BuiltPalette = { light: Palette; dark: Palette; adjusted: boolean };
 export const PALETTE_VARIABLES = [
   "--bg", "--surface", "--surface-soft", "--text", "--muted", "--line",
   "--primary", "--primary-text", "--sage", "--mint", "--nav", "--shadow",
+  // The semantic variables of card 222, derived from the core ones (a unit test compares this list with tokens.css).
+  "--danger", "--danger-soft", "--danger-line", "--danger-solid", "--danger-solid-text", "--danger-field", "--success",
+  "--highlight-yellow", "--highlight-green", "--highlight-pink", "--highlight-ink", "--reading-mark",
+  "--art-bg", "--art-ink", "--art-accent", "--art-muted", "--art-1", "--art-2", "--art-paper", "--art-rule",
+  "--logo-ink", "--logo-star", "--tint-a", "--tint-a-ink", "--tint-b", "--tint-b-ink", "--tint-c", "--tint-c-ink",
+  "--glyph-1", "--glyph-2", "--glyph-3", "--hover-line", "--dropzone-line", "--selection-ink",
+  "--overlay", "--overlay-strong", "--shadow-button", "--shadow-pop", "--shadow-card-hover", "--shadow-paper", "--swatch-line",
 ] as const;
 
 const MIN_RATIO = 4.5;
@@ -112,8 +119,17 @@ function buildMode(dark: boolean, given: boolean, input: PaletteInput): { set: P
   const muted = nudge(mix(text, bg, 0.3), [bg, surface]) ?? nudge(mix(text, bg, 0.3), [bg]) ?? text;
   const primary = given ? input.accent : fromLch(dark ? Math.max(aL, 0.78) : Math.min(aL, 0.5), aC, aH);
   const ink = fromLch(0.2, Math.min(aC, 0.03), aH);
-  const primaryText = ["#ffffff", ink, "#000000"].find((c) => contrastRatio(c, primary) >= MIN_RATIO)
-    ?? (contrastRatio("#ffffff", primary) > contrastRatio("#000000", primary) ? "#ffffff" : "#000000");
+  const best = (c: string) => (contrastRatio("#ffffff", c) > contrastRatio("#000000", c) ? "#ffffff" : "#000000");
+  const primaryText = ["#ffffff", ink, "#000000"].find((c) => contrastRatio(c, primary) >= MIN_RATIO) ?? best(primary);
+  const sage = fromLch(bgL + (dark ? 0.09 : -0.045), Math.min(aC * 0.3, 0.04), aH); // takes the accent's hue
+  const mint = fromLch(dark ? 0.82 : 0.8, Math.min(aC * 0.5, 0.07), aH);
+  // Status colors keep their own hues (red, green, yellow, pink) so a danger message never looks like the accent.
+  const dangerSoft = mix(surface, fromLch(0.6, 0.2, 25), dark ? 0.16 : 0.1);
+  const danger = nudge(fromLch(dark ? 0.8 : 0.45, 0.14, 25), [dangerSoft, surface, bg]) ?? text;
+  const dangerSolid = fromLch(0.45, 0.16, 25);
+  const marks = [95, 145, 5].map((h) => fromLch(dark ? 0.42 : 0.87, dark ? 0.09 : 0.15, h));
+  const tints = [mix(surface, primary, 0.18), mix(surface, mint, 0.3), mix(surface, text, 0.08)];
+  const inkOn = (c: string, tintColor: string) => nudge(c, [tintColor]) ?? text;
   const set: Palette = {
     "--bg": bg,
     "--surface": surface,
@@ -123,10 +139,51 @@ function buildMode(dark: boolean, given: boolean, input: PaletteInput): { set: P
     "--line": mix(bg, text, dark ? 0.2 : 0.14),
     "--primary": primary,
     "--primary-text": primaryText,
-    "--sage": fromLch(bgL + (dark ? 0.09 : -0.045), Math.min(aC * 0.3, 0.04), aH), // takes the accent's hue
-    "--mint": fromLch(dark ? 0.82 : 0.8, Math.min(aC * 0.5, 0.07), aH),
+    "--sage": sage,
+    "--mint": mint,
     "--nav": tint(dark ? 0.05 : -0.02, Math.min(bC, 0.04)),
     "--shadow": dark ? "0 16px 64px #00000066" : `0 16px 64px ${text}20`,
+    "--danger": danger,
+    "--danger-soft": dangerSoft,
+    "--danger-line": mix(dangerSoft, danger, 0.45),
+    "--danger-solid": dangerSolid,
+    "--danger-solid-text": best(dangerSolid),
+    "--danger-field": mix(surface, danger, 0.75),
+    "--success": nudge(fromLch(dark ? 0.8 : 0.5, 0.12, 140), [bg, surface]) ?? text,
+    "--highlight-yellow": marks[0],
+    "--highlight-green": marks[1],
+    "--highlight-pink": marks[2],
+    "--highlight-ink": nudge(fromLch(dark ? 0.95 : 0.2, 0.01, 95), marks) ?? best(marks[0]),
+    "--reading-mark": marks[0],
+    "--art-bg": sage,
+    "--art-ink": text,
+    "--art-accent": nudge(mix(primary, text, 0.3), [sage]) ?? text,
+    "--art-muted": nudge(muted, [sage]) ?? text,
+    "--art-1": mix(sage, mint, 0.6),
+    "--art-2": mix(sage, mint, 0.3),
+    "--art-paper": surface,
+    "--art-rule": mix(bg, text, dark ? 0.2 : 0.14),
+    "--logo-ink": nudge(mix(primary, text, 0.2), [bg]) ?? text,
+    "--logo-star": mint,
+    "--tint-a": tints[0],
+    "--tint-a-ink": inkOn(primary, tints[0]),
+    "--tint-b": tints[1],
+    "--tint-b-ink": inkOn(mix(primary, text, 0.4), tints[1]),
+    "--tint-c": tints[2],
+    "--tint-c-ink": inkOn(muted, tints[2]),
+    "--glyph-1": mix(muted, primary, 0.3),
+    "--glyph-2": mix(muted, primary, 0.5),
+    "--glyph-3": mix(muted, mint, 0.4),
+    "--hover-line": mix(bg, text, 0.35),
+    "--dropzone-line": mix(bg, text, 0.4),
+    "--selection-ink": nudge(text, [mint]) ?? best(mint),
+    "--overlay": `${fromLch(0.2, 0.01, bH)}66`,
+    "--overlay-strong": `${fromLch(0.2, 0.01, bH)}99`,
+    "--shadow-button": "0 2px 3px #00000008",
+    "--shadow-pop": "0 1px 4px #0000000d",
+    "--shadow-card-hover": `0 5px 18px ${text}08`,
+    "--shadow-paper": `0 12px 40px ${primary}15`,
+    "--swatch-line": "#8884",
   };
   return { set, adjusted };
 }

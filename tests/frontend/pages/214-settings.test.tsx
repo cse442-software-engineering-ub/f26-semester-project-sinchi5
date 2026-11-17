@@ -55,11 +55,11 @@ await test("5. Sign out or a course list is still on Settings", "src/features/ac
   const exact = (re: RegExp) => [...body().querySelectorAll("button, a, strong")].some((e) => re.test(e.textContent!));
   expect([exact(/^sign out$/i), exact(/^log out$/i), /courses?\b(?!,)/i.test(text.replace("Notes, courses, and events", "")), /prototype|sample workspace/i.test(text)]).toEqual([false, false, false, false]);
 });
-await test("6. Appearance lost the Mode or Color scheme groups", "src/features/settings.tsx → Appearance", async () => {
+await test("6. Appearance lost the Mode, Color scheme or Your themes groups", "src/features/settings.tsx → Appearance", async () => {
   ui();
   await waitFor(() => nav());
   const legends = [...body().querySelectorAll("fieldset legend")].map((l) => l.textContent);
-  expect(legends).toEqual(["Mode", "Color scheme"]);
+  expect(legends).toEqual(["Mode", "Color scheme", "Your themes"]);
 });
 await test("7. Clear workspace does not open \"Start fresh?\", or the Data line is missing", SET + " (Data)", async () => {
   ui();

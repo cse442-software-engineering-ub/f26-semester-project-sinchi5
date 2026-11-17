@@ -9,7 +9,8 @@ import {
 } from "react";
 import { createAppRepositories } from "../services/app-repositories";
 import { createReminderScheduler, showNoteNotification } from "../services/note-reminders";
-import type { User, Course, Note, CourseEvent, Repositories, Preferences } from "../domain";
+import { buildPalette, PALETTE_VARIABLES } from "../services/palette";
+import type { User, Course, Note, CourseEvent, Repositories, Preferences, ThemeInput } from "../domain";
 type State = {
   user: User | null;
   photoVersion: number;
@@ -37,6 +38,8 @@ const Context = createContext<{
   repo: Repositories;
   refresh: (options?: { photoChanged?: boolean }) => Promise<void>;
   setPreferences: (next: Preferences) => Promise<boolean>;
+  saveTheme: (theme: ThemeInput) => Promise<Preferences>;
+  deleteTheme: (id: string) => Promise<Preferences>;
   setError: (error: string) => void;
 }>(null!);
 export function Provider({ children }: { children: ReactNode }) {
@@ -102,7 +105,14 @@ export function Provider({ children }: { children: ReactNode }) {
     const { mode, scheme } = state.preferences;
     const apply = () => {
       document.documentElement.dataset.theme = mode === "system" ? (media.matches ? "dark" : "light") : mode;
-      document.documentElement.dataset.scheme = scheme;
+      const root = document.documentElement;
+      const custom = scheme.startsWith("custom:") ? state.preferences.customThemes?.find((t) => `custom:${t.id}` === scheme) : undefined;
+      root.dataset.scheme = scheme.startsWith("custom:") && !custom ? "sage" : scheme;
+      // A custom theme sets its whole palette for the current mode inline; any other scheme removes it.
+      const palette: Record<string, string> = custom ? buildPalette(custom)[root.dataset.theme === "dark" ? "dark" : "light"] : {};
+      for (const name of PALETTE_VARIABLES) {
+        if (name in palette) root.style.setProperty(name, palette[name]); else root.style.removeProperty(name);
+      }
     };
     apply();
     media.addEventListener("change", apply);
@@ -117,6 +127,12 @@ export function Provider({ children }: { children: ReactNode }) {
     catch { dispatch({ preferences: before }); return false; }
     finally { saving.current--; }
   }
+  // Theme routes answer with the whole saved choice; a save in flight keeps a refresh from overwriting it.
+  async function themeRequest(call: () => Promise<Preferences>) {
+    saving.current++;
+    try { const saved = await call(); dispatch({ preferences: saved }); return saved; }
+    finally { saving.current--; }
+  }
   return (
     <Context.Provider
       value={{
@@ -124,6 +140,8 @@ export function Provider({ children }: { children: ReactNode }) {
         repo,
         refresh,
         setPreferences,
+        saveTheme: (theme) => themeRequest(() => repo.auth.saveTheme(theme)),
+        deleteTheme: (id) => themeRequest(() => repo.auth.deleteTheme(id)),
         setError: (error) => dispatch({ error }),
       }}
     >

@@ -166,10 +166,15 @@ export interface NoteQuery {
 }
 export type ThemeMode = "system" | "light" | "dark";
 export type ColorScheme = "sage" | "fjord" | "rose" | "mocha";
-export interface Preferences { mode: ThemeMode; scheme: ColorScheme }
+export interface CustomTheme { id: string; name: string; accent: string; background: string; text: string }
+export type ThemeInput = Omit<CustomTheme, "id"> & { id?: string };
+// scheme is a built-in name or "custom:<id>"; customThemes comes from the session and the theme routes.
+export interface Preferences { mode: ThemeMode; scheme: ColorScheme | `custom:${string}`; customThemes?: CustomTheme[] }
 export interface AuthRepository {
   preferences(): Preferences;
   savePreferences(next: Preferences): Promise<Preferences>;
+  saveTheme(theme: ThemeInput): Promise<Preferences>;
+  deleteTheme(id: string): Promise<Preferences>;
   session(): Promise<User | null>;
   signIn(email: string, password: string): Promise<User>;
   signUp(name: string, email: string, password: string): Promise<{ user: User; recoveryCode: string }>;
