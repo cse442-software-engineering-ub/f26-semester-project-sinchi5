@@ -80,21 +80,26 @@ await test("1. A syllabus with only exact dates gets a new question, or looks di
   expect([...dialog.querySelectorAll("select")].some((s) => /^Your /.test(s.labels?.[0]?.textContent ?? ""))).toBe(false);
   expect(val(dialog, "Midterm exam", "Due date")).toBe("2026-10-14");
 });
-await test("2. A lab with two posted sections does not ask which one is mine, or does not list day and time, or has no Not sure", PAGE, async () => {
+// Ticks or unticks the existing "Include Lab <name>" box: the student's section.
+async function pick(dialog: HTMLElement, name: string) {
+  await click([...dialog.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find((i) => words(i).startsWith(`Include Lab ${name}`)) ?? null);
+}
+await test("2. A lab with two posted sections asks for the section a second time, or does not explain why picking one matters", PAGE, async () => {
   const { dialog } = await review(withSections);
-  expect(byText("Which section is yours?") !== null).toBe(true);
-  const select = field(dialog, "Your lab section");
-  expect(optionTexts(select)).toEqual(["Not sure", "Section A · Tue · 2:00 PM", "Section B · Thu · 9:00 AM"]);
-  // The one lecture is known, so it is not asked about.
-  expect(field(dialog, "Your lecture section") === null && field(dialog, "Your lecture day") === null).toBe(true);
+  expect(byText("Pick your lab section") !== null).toBe(true);
+  expect((dialog.textContent ?? "").includes("Tick your section and we’ll put it on that day")).toBe(true);
+  // The existing pick is the only control: no second question, and the one lecture is known.
+  expect(byText("Which section is yours?") === null && field(dialog, "Your lab day") === null).toBe(true);
+  expect([...dialog.querySelectorAll("select")].some((s) => /^Your /.test(s.labels?.[0]?.textContent ?? ""))).toBe(false);
 });
 await test("3. Choosing a section leaves the lab exam on Sunday, or does not move it as the choice changes, or shows no reason", PAGE, async () => {
   const { dialog } = await review(withSections);
-  await choose(field(dialog, "Your lab section"), "m2");
+  await pick(dialog, "Section B");
   expect(val(dialog, "Lab exam", "Due date")).toBe("2026-10-15");
   expect(val(dialog, "Lab exam", "Time")).toBe("09:00");
   expect((row(dialog, "Lab exam").textContent ?? "").includes("Date worked out from October 12–18")).toBe(true);
-  await choose(field(dialog, "Your lab section"), "m1");
+  await pick(dialog, "Section B");
+  await pick(dialog, "Section A");
   expect(val(dialog, "Lab exam", "Due date")).toBe("2026-10-13");
   expect(val(dialog, "Lab exam", "Time")).toBe("14:00");
 });
@@ -102,8 +107,12 @@ await test("4. Not sure changes the lab exam from the end of its week, or leaves
   const { dialog } = await review(withSections);
   expect(val(dialog, "Lab exam", "Due date")).toBe("2026-10-18");
   expect(val(dialog, "Lab exam", "Time")).toBe("23:59");
-  await choose(field(dialog, "Your lab section"), "m2");
-  await choose(field(dialog, "Your lab section"), "");
+  await pick(dialog, "Section B");
+  await pick(dialog, "Section B");
+  expect(val(dialog, "Lab exam", "Due date")).toBe("2026-10-18");
+  // Both sections ticked is also "not sure".
+  await pick(dialog, "Section A");
+  await pick(dialog, "Section B");
   expect(val(dialog, "Lab exam", "Due date")).toBe("2026-10-18");
   expect(row(dialog, "Lab exam").querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked).toBe(true);
 });
@@ -118,7 +127,7 @@ await test("5. A syllabus with no posted lab sections does not ask for a day, or
 });
 await test("6. Exact-date items move when a section is chosen, or show a placed hint", PAGE, async () => {
   const { dialog } = await review(withSections);
-  await choose(field(dialog, "Your lab section"), "m2");
+  await pick(dialog, "Section B");
   for (const [title, date] of [["Homework 1", "2026-09-10"], ["Midterm exam", "2026-10-14"], ["Project deadline", "2026-11-20"]]) {
     expect(val(dialog, title, "Due date")).toBe(date);
     expect((row(dialog, title).textContent ?? "").includes("Date worked out")).toBe(false);
@@ -126,7 +135,7 @@ await test("6. Exact-date items move when a section is chosen, or show a placed 
 });
 await test("7. Saving sends the lab exam on the section's day, or changes the shape of an event", PAGE, async () => {
   const { api, dialog } = await review(withSections);
-  await choose(field(dialog, "Your lab section"), "m2");
+  await pick(dialog, "Section B");
   await click([...dialog.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Add to schedule") as HTMLElement);
   const sent = await waitFor(() => api.sent.find((r) => r.route === "import-confirm"));
   const exam = sent.body.events.find((e: { title: string }) => e.title === "Lab exam");
@@ -142,7 +151,7 @@ await test("8. Assignment and deadline items are left out of what is saved", PAG
 });
 await test("9. A placed day the student edits by hand snaps back to the section day, or still shows its hint", PAGE, async () => {
   const { dialog } = await review(withSections);
-  await choose(field(dialog, "Your lab section"), "m2");
+  await pick(dialog, "Section B");
   await type([...row(dialog, "Lab exam").querySelectorAll<HTMLInputElement>("input")].find((i) => i.type === "date") ?? null, "2026-10-16");
   expect(val(dialog, "Lab exam", "Due date")).toBe("2026-10-16");
   expect((row(dialog, "Lab exam").textContent ?? "").includes("Date worked out")).toBe(false);

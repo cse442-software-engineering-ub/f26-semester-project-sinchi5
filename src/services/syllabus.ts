@@ -157,28 +157,27 @@ export function meetingDates(meeting: { days: number[]; starts: string; ends: st
 // Card 235: the review screen asks for the student's section only where a span or week item needs it.
 export const isRanged = (e: Pick<DetectedEvent, "rangeStart" | "week">) => !!(e.rangeStart || e.week);
 export type SectionAnswers = Partial<Record<ClassKind, { choice: string; time: string }>>;
-export interface SectionQuestion {
-  kind: ClassKind;
-  // Indexes of the posted sections in the meetings list; empty means ask for a day instead.
-  sections: number[];
-}
-// A type is asked about when a span or week item belongs to it and the read doesn't name exactly one meeting
-// of that type. A choice is "m<index>" for a posted section or "d<0-6>" for a day; "" is "Not sure".
-export function sectionQuestions(events: DetectedEvent[], meetings: DetectedMeeting[]): SectionQuestion[] {
-  return CLASS_KINDS.flatMap((kind) => {
-    const ofKind = meetings.flatMap((m, i) => (m.kind === kind ? [i] : []));
-    if (ofKind.length === 1 || !events.some((e) => isRanged(e) && e.meeting === kind)) return [];
-    return [{ kind, sections: ofKind.filter((i) => meetings[i].section) }];
+// Class types whose span or week items need a day asked for: the read posts no sections for the type and
+// doesn't name exactly one meeting of it. With posted sections, the student's checked section is the answer.
+export function sectionQuestions(events: DetectedEvent[], meetings: DetectedMeeting[]): ClassKind[] {
+  return CLASS_KINDS.filter((kind) => {
+    const ofKind = meetings.filter((m) => m.kind === kind);
+    return ofKind.length !== 1 && !ofKind.some((m) => m.section) && events.some((e) => isRanged(e) && e.meeting === kind);
   });
 }
+// Whether the kind has several posted sections to pick from, and a span or week item depends on the pick.
+export const needsSectionPick = (kind: ClassKind, events: DetectedEvent[], meetings: DetectedMeeting[]) =>
+  meetings.filter((m) => m.kind === kind && m.section).length > 1 && events.some((e) => isRanged(e) && e.meeting === kind);
 const chosen = (m: DetectedMeeting): ChosenMeeting => ({ days: m.days, time: m.time, first: m.starts || undefined, last: m.ends || undefined });
 export function placementContext(meetings: DetectedMeeting[], noClass: DateRange[] = [], answers: SectionAnswers, classesStart?: string): PlacementContext {
   const found: PlacementContext["meetings"] = {};
   for (const kind of CLASS_KINDS) {
     const ofKind = meetings.filter((m) => m.kind === kind);
     const { choice = "", time = "" } = answers[kind] ?? {};
+    const picked = ofKind.filter((m) => m.include);
     if (ofKind.length === 1) found[kind] = chosen(ofKind[0]);
-    else if (choice[0] === "m" && meetings[+choice.slice(1)]?.kind === kind) found[kind] = chosen(meetings[+choice.slice(1)]);
+    // Several sections: exactly one checked is the student's; none or several is "Not sure".
+    else if (ofKind.some((m) => m.section)) { if (picked.length === 1) found[kind] = chosen(picked[0]); }
     else if (choice[0] === "d") found[kind] = { days: [+choice.slice(1)], time };
   }
   return { meetings: found, noClass, classesStart };

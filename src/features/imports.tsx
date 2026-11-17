@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../app/context";
 import { fileTypeProblem } from "../services/syllabus-file";
-import { applyPlacement, checkMeeting, placementContext, sectionQuestions, type SectionAnswers } from "../services/syllabus";
+import { applyPlacement, checkMeeting, needsSectionPick, placementContext, sectionQuestions, type SectionAnswers } from "../services/syllabus";
 import { formatEventTime, Modal } from "../shared/ui";
 import { CLASS_KINDS, type DetectedEvent, type DetectedMeeting, type EventKind, type UploadKind, type UploadJob } from "../domain";
 import css from "./imports.module.css";
@@ -24,8 +24,6 @@ const PHASE_STEP: Record<string, number> = { pick: 0, queued: 1, processing: 1, 
 const EVENT_TYPES: [EventKind, string][] = [["assignment", "Assignment"], ["exam", "Exam"], ["quiz", "Quiz"], ["deadline", "Deadline"], ["other", "Other"]];
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const shortDate = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-const sectionLabel = (m: DetectedMeeting) =>
-  [m.section, m.days.map((day) => WEEKDAYS[day].slice(0, 3)).join(" "), m.time && formatEventTime(m.time)].filter(Boolean).join(" · ");
 const megabytes = (bytes: number) => `${Math.max(0.1, Math.round(bytes / 104857.6) / 10)} MB`;
 
 // Card 45: Gemini reports no progress while it reads, so these keep the student company instead of a made-up
@@ -637,7 +635,12 @@ export function ImportDialog({
                   {/* A class offered at several times: the student attends one, so none is assumed. */}
                   {meeting.section && meetings.filter((m) => m.kind === meeting.kind && m.section).length > 1
                     && !meetings.slice(0, i).some((m) => m.kind === meeting.kind && m.section) && (
-                    <p className={css.reviewSubheading}>Pick your {meeting.kind} section</p>
+                    <>
+                      <p className={css.reviewSubheading}>Pick your {meeting.kind} section</p>
+                      {needsSectionPick(meeting.kind, job.events, meetings) && (
+                        <p className={s.hint}>Some work is due “that week” with no day. Tick your section and we’ll put it on that day.</p>
+                      )}
+                    </>
                   )}
                   <ClassReview
                     meeting={meeting}
@@ -652,21 +655,19 @@ export function ImportDialog({
             <fieldset className={css.sectionQuestions}>
               <legend>Which section is yours?</legend>
               <p className={s.hint}>Some work is due “that week” with no day. Tell us when you meet and we’ll put it on that day.</p>
-              {questions.map(({ kind: type, sections }) => {
+              {questions.map((type) => {
                 const answer = answers[type] ?? { choice: "", time: "" };
                 const set = (change: Partial<typeof answer>) => setAnswers({ ...answers, [type]: { ...answer, ...change } });
                 return (
                   <Fragment key={type}>
                     <label>
-                      {sections.length ? `Your ${type} section` : `Your ${type} day`}
+                      Your {type} day
                       <select value={answer.choice} onChange={(e) => set({ choice: e.target.value })}>
                         <option value="">Not sure</option>
-                        {sections.length
-                          ? sections.map((i) => <option key={i} value={`m${i}`}>{sectionLabel(meetings[i])}</option>)
-                          : [1, 2, 3, 4, 5, 6, 0].map((d) => <option key={d} value={`d${d}`}>{WEEKDAYS[d]}</option>)}
+                        {[1, 2, 3, 4, 5, 6, 0].map((d) => <option key={d} value={`d${d}`}>{WEEKDAYS[d]}</option>)}
                       </select>
                     </label>
-                    {!sections.length && answer.choice && (
+                    {answer.choice && (
                       <label>
                         <span>Your {type} time <span className={s.hint}>(optional)</span></span>
                         <input type="time" value={answer.time} onChange={(e) => set({ time: e.target.value })} />
