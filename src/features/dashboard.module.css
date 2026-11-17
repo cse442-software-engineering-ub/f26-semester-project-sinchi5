@@ -1,7 +1,83 @@
-.weekCard {
+/* Today: one column on phones, two from a ~620px content width, three from ~1080px.
+   Columns follow the width of the page area (container queries), not the screen, so the sidebar
+   never leaves dead space and nothing ever scrolls sideways. */
+.today {
+  container-type: inline-size;
+  container-name: today;
   min-width: 0;
-  margin-bottom: 32px;
-  padding: clamp(18px, 3vw, 32px);
+}
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "week" "main" "aside";
+  gap: clamp(16px, 2.2vw, 40px);
+  align-items: start;
+  min-width: 0;
+}
+.grid > * {
+  min-width: 0;
+}
+.main {
+  grid-area: main;
+  display: grid;
+  gap: clamp(24px, 2.6vw, 44px);
+}
+.dashboardAside {
+  grid-area: aside;
+  display: grid;
+  gap: clamp(16px, 2vw, 32px);
+  grid-template-columns: minmax(0, 1fr);
+}
+.block {
+  min-width: 0;
+}
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: clamp(12px, 1.2vw, 20px);
+}
+.head h2 {
+  font-size: clamp(1.05rem, 0.95rem + 0.4vw, 1.45rem);
+  font-weight: 550;
+  letter-spacing: -0.03em;
+}
+.head p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: clamp(0.8rem, 0.76rem + 0.15vw, 0.95rem);
+}
+.card {
+  padding: clamp(18px, 1.8vw, 30px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  min-width: 0;
+}
+.dashboardAside .card {
+  margin-bottom: 0;
+}
+.dashboardAside .card h2 {
+  font-size: clamp(1.05rem, 0.95rem + 0.4vw, 1.45rem);
+  font-weight: 550;
+  letter-spacing: -0.03em;
+}
+.dashboardAside .head {
+  margin-bottom: 14px;
+}
+.dashboardAside .head :is(a, button) {
+  min-width: 44px;
+  min-height: 44px;
+}
+.dashboardAside .card > a:last-child {
+  font-size: clamp(0.8rem, 0.76rem + 0.15vw, 0.95rem);
+}
+
+/* Week at a glance */
+.weekCard {
+  grid-area: week;
+  padding: clamp(18px, 2.2vw, 36px);
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--surface);
@@ -9,45 +85,58 @@
 }
 .weekCard h2 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: clamp(1.3rem, 1.1rem + 0.8vw, 2rem);
   font-weight: 500;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.04em;
+}
+.weekCard > a {
+  margin-top: 8px;
+  font-size: clamp(0.8rem, 0.76rem + 0.15vw, 0.95rem);
 }
 .weekSummary {
-  margin: 8px 0 24px;
+  margin: 8px 0 clamp(16px, 2vw, 28px);
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: clamp(0.85rem, 0.8rem + 0.2vw, 1rem);
 }
 .weekDay {
-  margin-bottom: 24px;
+  margin-bottom: clamp(14px, 1.6vw, 24px);
 }
 .weekDay h3 {
-  margin: 0 0 8px;
-  font-size: 0.85rem;
+  margin: 0 0 6px;
+  font-size: clamp(0.8rem, 0.76rem + 0.15vw, 0.95rem);
   font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.01em;
 }
 .weekRow {
   display: grid;
-  grid-template-columns: 5.5rem minmax(0, 1fr) 16px;
+  grid-template-columns: clamp(4.5rem, 5vw, 6rem) minmax(0, 1fr) 16px;
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 60px;
-  padding: 12px 8px;
+  min-height: 56px;
+  padding: 10px 8px;
   border-bottom: 1px solid var(--line);
+  border-radius: 8px;
   color: var(--text);
   text-align: left;
-  border-radius: 6px;
+  transition: background-color 160ms var(--ease-out);
 }
-.weekRow:hover {
-  background: var(--surface-soft);
+.weekRow > svg {
+  color: var(--muted);
 }
-.weekRow:focus-visible {
-  outline: 2px solid var(--text);
+.weekRow:focus-visible,
+.comingUpRow:focus-visible,
+.quickActions > button:focus-visible,
+.courseTiles a:focus-visible,
+.miniWeek > a:focus-visible {
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 .weekTime {
-  font-size: 0.8rem;
+  font-size: clamp(0.8rem, 0.76rem + 0.15vw, 0.92rem);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 .weekInfo {
   min-width: 0;
@@ -59,43 +148,55 @@
   line-height: 1.5;
 }
 .weekInfo strong {
-  font-size: 0.9rem;
+  font-size: clamp(0.9rem, 0.85rem + 0.2vw, 1.05rem);
   font-weight: 550;
 }
 .weekInfo > span {
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: clamp(0.8rem, 0.76rem + 0.15vw, 0.92rem);
 }
-.dashboardGrid {
+
+/* Notes, quick actions, courses */
+.noteGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 302px;
-  gap: 28px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: clamp(10px, 1.2vw, 18px);
+}
+.noCourses {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 0 20px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
 }
 .quickActions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 13px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: clamp(10px, 1.2vw, 16px);
 }
 .quickActions > button {
-  text-align: left;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  padding: 16px;
-  background: var(--surface);
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  min-height: 44px;
+  padding: clamp(14px, 1.4vw, 22px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: left;
+  transition: transform 160ms var(--ease-out), border-color 160ms var(--ease-out);
 }
 .quickActions > button > span {
-  height: 36px;
-  width: 36px;
-  border-radius: 8px;
   display: grid;
   place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 14px;
+  border-radius: 10px;
   background: var(--surface-soft);
   color: var(--glyph-1);
-  margin-bottom: 15px;
 }
 .quickActions > button:nth-child(2) > span {
   background: var(--tint-b);
@@ -106,286 +207,247 @@
   color: var(--tint-c-ink);
 }
 .quickActions strong {
-  font-size: 0.75rem;
+  margin-bottom: 4px;
+  font-size: clamp(0.9rem, 0.85rem + 0.2vw, 1.05rem);
   font-weight: 550;
-  margin-bottom: 5px;
 }
 .quickActions small {
-  font-size: 0.59rem;
   color: var(--muted);
-  line-height: 1.7;
+  font-size: clamp(0.78rem, 0.74rem + 0.15vw, 0.9rem);
+  line-height: 1.55;
 }
 .quickActions > button > svg {
   position: absolute;
-  top: 18px;
+  top: 16px;
   right: 14px;
   color: var(--muted);
 }
 .courseTiles {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: clamp(8px, 1vw, 14px);
 }
 .courseTiles a {
   display: flex;
-  gap: 12px;
   align-items: center;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
+  gap: 12px;
   min-width: 0;
+  min-height: 56px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  transition: transform 160ms var(--ease-out), border-color 160ms var(--ease-out);
 }
 .courseTiles a > div {
   flex: 1;
   min-width: 0;
 }
 .courseTiles strong {
-  font-size: 0.72rem;
+  display: block;
+  font-size: clamp(0.85rem, 0.8rem + 0.2vw, 1rem);
   font-weight: 550;
 }
 .courseTiles small {
   display: block;
-  font-size: 0.61rem;
+  margin-top: 2px;
+  overflow: hidden;
   color: var(--muted);
-  margin-top: 4px;
+  font-size: clamp(0.78rem, 0.74rem + 0.15vw, 0.9rem);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.courseTiles a > svg {
+  color: var(--muted);
 }
 .courseDot {
-  width: 9px;
-  height: 9px;
-  border-radius: 3px;
   flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
 }
+
+/* Aside: week strip, today, coming up */
 .miniWeek {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(44px, 1fr));
   gap: 2px;
-  padding: 8px 0 21px;
+  padding: 4px 0 18px;
+  overflow-x: auto;
 }
 .miniWeek > a {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 9px;
-  font-size: 0.56rem;
-  border-radius: 7px;
-  padding: 9px 9px 6px;
-  min-width: 30px;
+  gap: 6px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 4px 6px;
+  border-radius: 8px;
   color: var(--muted);
+  font-size: clamp(0.72rem, 0.7rem + 0.1vw, 0.82rem);
 }
 .miniWeek strong {
-  font-size: 0.75rem;
-  font-weight: 500;
   color: var(--text);
+  font-size: clamp(0.9rem, 0.85rem + 0.2vw, 1.05rem);
+  font-weight: 500;
 }
 .miniWeek i {
-  width: 3px;
-  height: 3px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background: transparent;
 }
 .miniWeek .weekToday {
   background: var(--sage);
-  color: var(--muted);
-}
-.miniWeek .weekToday strong {
-  color: var(--text);
 }
 .weekToday i {
   background: var(--primary);
 }
 .smallHeading {
-  font-size: 0.54rem;
-  letter-spacing: 0.06em;
   display: flex;
   justify-content: space-between;
+  margin-bottom: 8px;
   color: var(--muted);
-  margin-bottom: 9px;
+  font-size: clamp(0.72rem, 0.7rem + 0.1vw, 0.82rem);
+  letter-spacing: 0.06em;
 }
 .smallHeading > span:last-child {
   letter-spacing: 0;
 }
 .count {
-  font-size: 0.58rem;
+  padding: 3px 8px;
+  border-radius: 6px;
   background: var(--surface-soft);
-  border-radius: 5px;
-  padding: 3px 6px;
+  font-size: clamp(0.72rem, 0.7rem + 0.1vw, 0.82rem);
 }
 .comingUpRow {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
   min-height: 44px;
-  text-align: left;
-  padding: 12px 0;
+  padding: 12px 6px;
   border-bottom: 1px solid var(--line);
+  border-radius: 8px;
+  text-align: left;
+  transition: background-color 160ms var(--ease-out);
 }
-.comingUpRow:last-child {
+.comingUpRow:last-of-type {
   border-bottom: 0;
-  padding-bottom: 0;
-}
-.comingUpRow:hover {
-  background: var(--surface-soft);
 }
 .comingUpIcon {
-  width: 31px;
-  height: 31px;
-  border-radius: 7px;
-  background: var(--surface-soft);
   display: grid;
   place-items: center;
-  color: var(--muted);
   flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--muted);
 }
 .comingUpInfo {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 .comingUpInfo strong {
-  font-size: 0.85rem;
-  font-weight: 500;
   display: block;
+  font-size: clamp(0.9rem, 0.85rem + 0.2vw, 1.05rem);
+  font-weight: 500;
   line-height: 1.5;
 }
 .comingUpInfo small,
 .comingUpInfo time {
-  font-size: 0.75rem;
-  color: var(--muted);
   display: block;
-  margin: 4px 0;
+  margin: 2px 0;
+  color: var(--muted);
+  font-size: clamp(0.78rem, 0.74rem + 0.15vw, 0.9rem);
 }
 .comingUpInfo em {
   display: block;
-  font-style: normal;
-  font-size: 0.75rem;
   color: var(--primary);
+  font-size: clamp(0.78rem, 0.74rem + 0.15vw, 0.9rem);
+  font-style: normal;
 }
 .comingUpEmpty {
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: clamp(0.85rem, 0.8rem + 0.2vw, 1rem);
   line-height: 1.6;
 }
 .quietNote {
   display: flex;
-  gap: 10px;
+  gap: 12px;
+  padding: 4px 6px;
   color: var(--muted);
-  padding: 4px 5px;
 }
 .quietNote p {
-  font-size: 0.63rem;
-  line-height: 1.9;
+  font-size: clamp(0.8rem, 0.76rem + 0.15vw, 0.95rem);
+  line-height: 1.7;
 }
 .quietNote strong {
   font-weight: 450;
 }
 .quietNote > svg {
+  flex-shrink: 0;
   color: var(--glyph-2);
 }
-.miniWeek {
-  overflow-x: auto;
+
+/* Two columns: week and aside side by side, the notes area full width below. */
+@container today (min-width: 620px) {
+  .grid {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    grid-template-areas: "week aside" "main main";
+  }
 }
-.miniWeek > a {
-  min-width: 44px;
-  min-height: 44px;
+/* Three columns: week, notes to pick up, today and coming up. */
+@container today (min-width: 1080px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
+    grid-template-areas: "week main aside";
+  }
+  .noteGrid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  }
 }
+
 @media (hover: hover) and (pointer: fine) {
+  .weekRow:hover,
+  .comingUpRow:hover {
+    background: var(--surface-soft);
+  }
   .quickActions > button:hover,
   .courseTiles a:hover {
-      border-color: var(--hover-line);
-    }
+    border-color: var(--hover-line);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
+  }
 }
-@media (min-width: 1600px) {
-  .dashboardGrid {
-      grid-template-columns: minmax(0, 1fr) 340px;
-    }
+
+@media (prefers-reduced-motion: no-preference) {
+  .grid > * {
+    animation: rise 240ms var(--ease-out) backwards;
+  }
+  .main {
+    animation-delay: 60ms;
+  }
+  .dashboardAside {
+    animation-delay: 120ms;
+  }
 }
-@media (max-width: 1250px) {
-  .dashboardGrid {
-      grid-template-columns: minmax(0, 1fr) 270px;
-      gap: 20px;
-    }
-  .quickActions {
-      gap: 9px;
-    }
-  .quickActions > button {
-      padding: 13px;
-    }
-  .quickActions small {
-      font-size: 0.55rem;
-    }
-}
-@media (max-width: 1023px) {
-  .dashboardGrid {
-      grid-template-columns: 1fr;
-    }
-  .dashboardAside .quietNote {
-      grid-column: 1/-1;
-    }
-  .quickActions small {
-      font-size: 0.6rem;
-    }
-}
-@media (max-width: 767px) {
-  .dashboardGrid {
-      gap: 0;
-    }
-  .quickActions {
-      gap: 9px;
-    }
-  .quickActions > button {
-      padding: 13px 11px;
-    }
-  .quickActions strong {
-      font-size: 0.68rem;
-      line-height: 1.5;
-    }
-  .quickActions small {
-      font-size: 0.56rem;
-    }
-  .quickActions > button > span {
-      width: 32px;
-      height: 32px;
-      margin-bottom: 12px;
-    }
-  .quickActions > button > svg {
-      width: 12px;
-      right: 8px;
-    }
-  .dashboardAside .miniWeek > a {
-      width: 40px;
-      font-size: 0.65rem;
-    }
-  .miniWeek strong {
-      font-size: 0.85rem;
-    }
+@media (prefers-reduced-motion: reduce) {
+  .weekRow,
+  .comingUpRow,
+  .quickActions > button,
   .courseTiles a {
-      padding: 13px 11px;
-      gap: 8px;
-    }
-  .courseTiles strong {
-      font-size: 0.66rem;
-    }
-  .courseTiles small {
-      font-size: 0.55rem;
-    }
-  .courseTiles a > svg {
-      width: 12px;
-    }
+    transition: none;
+  }
+  .quickActions > button:hover,
+  .courseTiles a:hover {
+    transform: none;
+  }
 }
-@media (max-width: 360px) {
-  .quickActions {
-      grid-template-columns: 1fr;
-    }
-  .quickActions > button {
-      display: grid;
-      grid-template-columns: 40px 1fr;
-      gap: 0 10px;
-    }
-  .quickActions > button > span {
-      grid-row: 1/3;
-      margin: 0;
-    }
-  .quickActions > button > small {
-      grid-column: 2;
-    }
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }

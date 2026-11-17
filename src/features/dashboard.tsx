@@ -154,6 +154,8 @@ export function Dashboard({
         description="A fresh page. A clear mind. Let’s make today a good one."
       />
 
+      <div className={css.today}>
+      <div className={css.grid}>
       <section
         className={css.weekCard}
         aria-labelledby="week-heading"
@@ -258,18 +260,13 @@ export function Dashboard({
         </Link>
       </section>
 
-      <div
-        className={
-          css.dashboardGrid
-        }
-      >
-        <div>
+        <div className={css.main}>
           <section
-            className={s.section}
+            className={css.block}
           >
             <div
               className={
-                s.sectionHeading
+                css.head
               }
             >
               <div>
@@ -296,26 +293,34 @@ export function Dashboard({
               </Link>
             </div>
 
-            <div
-              className={
-                s.quickNotes
-              }
-            >
-              {quick.map((n) => (
-                <NoteCard
-                  key={n.id}
-                  note={n}
-                />
-              ))}
-            </div>
+            {quick.length ? (
+              <div
+                className={
+                  css.noteGrid
+                }
+              >
+                {quick.map((n) => (
+                  <NoteCard
+                    key={n.id}
+                    note={n}
+                  />
+                ))}
+              </div>
+            ) : (
+              <Empty title="No notes yet">
+                Start a note below and
+                it will wait for you
+                here.
+              </Empty>
+            )}
           </section>
 
           <section
-            className={s.section}
+            className={css.block}
           >
             <div
               className={
-                s.sectionHeading
+                css.head
               }
             >
               <div>
@@ -405,11 +410,11 @@ export function Dashboard({
           </section>
 
           <section
-            className={s.section}
+            className={css.block}
           >
             <div
               className={
-                s.sectionHeading
+                css.head
               }
             >
               <h2>Your courses</h2>
@@ -428,6 +433,20 @@ export function Dashboard({
               </button>
             </div>
 
+            {state.courses.length === 0 ? (
+              <div className={css.noCourses}>
+                <Empty title="No courses yet">
+                  Add a course to group its notes and events.
+                </Empty>
+                <Link
+                  className={s.primary}
+                  to="/courses"
+                >
+                  <Plus size={15} />{" "}
+                  Add course
+                </Link>
+              </div>
+            ) : (
             <div
               className={
                 css.courseTiles
@@ -465,6 +484,7 @@ export function Dashboard({
                 ),
               )}
             </div>
+            )}
           </section>
         </div>
 
@@ -474,11 +494,11 @@ export function Dashboard({
           }
         >
           <section
-            className={s.panel}
+            className={`${s.panel} ${css.card}`}
           >
             <div
               className={
-                s.sectionHeading
+                css.head
               }
             >
               <h2>
@@ -587,12 +607,12 @@ export function Dashboard({
           </section>
 
           <section
-            className={s.panel}
+            className={`${s.panel} ${css.card}`}
             aria-labelledby="coming-up-heading"
           >
             <div
               className={
-                s.sectionHeading
+                css.head
               }
             >
               <h2 id="coming-up-heading">
@@ -708,6 +728,7 @@ export function Dashboard({
             </p>
           </div>
         </aside>
+      </div>
       </div>
 
       {event && (
