@@ -29,6 +29,153 @@
 .friendName {
   overflow-wrap: anywhere;
 }
+/* Card 233: Friends fills the page area. The page is a container; from ~880px the add form and the
+   requests sit beside a multi-column grid of friend cards, below that everything stacks in one column. */
+.friends {
+  container-type: inline-size;
+  container-name: friends;
+  min-width: 0;
+}
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(16px, 2.2vw, 32px);
+  align-items: start;
+}
+.side {
+  display: grid;
+  gap: clamp(16px, 2vw, 24px);
+  min-width: 0;
+}
+.card {
+  min-width: 0;
+  padding: clamp(16px, 1.6vw, 28px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.head {
+  margin-bottom: clamp(12px, 1.2vw, 18px);
+}
+.head h2 {
+  font-size: clamp(1rem, 0.94rem + 0.3vw, 1.3rem);
+  font-weight: 550;
+  letter-spacing: -0.03em;
+}
+.head p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: clamp(0.76rem, 0.72rem + 0.15vw, 0.9rem);
+}
+.none {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.tall {
+  min-height: 44px;
+}
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.rows > li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.rows > li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.rows > li:last-child {
+  padding-bottom: 0;
+}
+.rowActions {
+  grid-column: 1 / -1;
+}
+.rowActions > button {
+  flex: 1 1 100px;
+  min-height: 44px;
+}
+.pending {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+.avatar {
+  width: 40px;
+  height: 40px;
+}
+.friends .friendName {
+  display: grid;
+  min-width: 0;
+}
+.friendName small {
+  color: var(--muted);
+}
+.friendGrid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap: clamp(10px, 1.2vw, 18px);
+}
+.friendCard {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  transition: transform 160ms ease-out, box-shadow 160ms ease-out;
+}
+.friendCard:hover {
+  border-color: var(--hover-line);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
+}
+.who {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+.friendCard > button {
+  min-height: 44px;
+}
+@container friends (min-width: 880px) {
+  .layout {
+    grid-template-columns: minmax(280px, 26rem) minmax(0, 1fr);
+  }
+  .rows > li {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .rowActions,
+  .pending {
+    grid-column: auto;
+  }
+  .rowActions > button {
+    flex: 0 0 auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .friendCard {
+    transition: none;
+  }
+  .friendCard:hover {
+    transform: none;
+  }
+}
 /* Card 157: one checkbox row per friend in "Share your … notes". Each row is a 44px tap target. */
 .shareFriends {
   display: grid;
