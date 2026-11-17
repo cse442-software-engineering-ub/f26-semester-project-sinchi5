@@ -1,138 +1,194 @@
+/* Schedule: month + day panel side by side from 1024 px, stacked below. The month sizes from its own
+   width (container queries), so it grows with the space and stays compact on phones. */
 .mobileOnly {
   display: none;
 }
 .scheduleLayout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 22px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(16px, 2vw, 32px);
+  align-items: start;
+}
+@media (min-width: 1024px) {
+  .scheduleLayout {
+    grid-template-columns: minmax(0, 1fr) clamp(300px, 26vw, 560px);
+  }
+  .agenda {
+    position: sticky;
+    top: 16px;
+  }
 }
 .calendarPanel {
-  padding: 23px;
+  padding: clamp(14px, 1.6vw, 28px);
+  container-type: inline-size;
+}
+.sectionHeading {
+  flex-wrap: wrap;
+}
+.sectionHeading h2 {
+  font-size: clamp(1.05rem, 0.9rem + 0.5vw, 1.5rem);
+  letter-spacing: -0.03em;
+  font-weight: 600;
+}
+.actions {
+  justify-content: flex-end;
 }
 .calendar {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
 }
 .weekday {
   text-align: center;
-  font-size: 0.6rem;
+  font-size: clamp(0.6rem, 0.5rem + 0.5cqi, 0.8rem);
+  letter-spacing: 0.04em;
   color: var(--muted);
-  padding: 14px 0;
+  padding: 10px 0;
+  background: var(--surface-soft);
 }
 .day {
-  min-height: 100px;
+  min-height: clamp(56px, 11cqi, 168px);
   min-width: 0;
   overflow: hidden;
   border-top: 1px solid var(--line);
   border-right: 1px solid var(--line);
-  padding: 9px 6px;
+  padding: clamp(4px, 1cqi, 10px);
   text-align: left;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: clamp(3px, 0.6cqi, 6px);
+  transition: background-color 140ms var(--ease-out);
 }
 .day:nth-child(7n) {
   border-right: 0;
 }
+.day:focus-visible {
+  outline-offset: -3px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .day:hover {
+    background: var(--surface-soft);
+  }
+}
 .day > span {
-  font-size: 0.7rem;
+  font-size: clamp(0.68rem, 0.55rem + 0.6cqi, 0.95rem);
   display: grid;
   place-items: center;
-  width: 25px;
-  height: 25px;
+  width: clamp(24px, 3.4cqi, 34px);
+  height: clamp(24px, 3.4cqi, 34px);
   border-radius: 50%;
+  font-variant-numeric: tabular-nums;
 }
 .day small {
-  font-size: 0.48rem;
+  font-size: clamp(0.5rem, 0.35rem + 0.6cqi, 0.75rem);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   display: block;
   background: var(--surface-soft);
-  border-radius: 3px;
-  padding: 4px 3px;
+  border-radius: 4px;
+  padding: 3px 5px;
+}
+.day:hover small,
+.selectedDay small {
+  background: var(--surface);
 }
 .day small i {
   display: inline-block;
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  margin-right: 3px;
+  margin-right: 4px;
 }
 .outside {
-  opacity: 0.35;
+  opacity: 0.4;
 }
 .selectedDay {
   background: var(--nav);
+  box-shadow: inset 0 0 0 2px var(--primary);
 }
 .todayNumber {
   background: var(--primary);
   color: var(--primary-text);
 }
-@media (max-width: 1250px) {
-  .scheduleLayout {
-      grid-template-columns: minmax(0, 1fr) 260px;
-      gap: 16px;
-    }
-  .calendarPanel {
-      padding: 16px;
-    }
-  .calendarPanel .sectionHeading {
-      flex-wrap: wrap;
-    }
+/* A narrow month shows each event as a dot; the day list below has the words. */
+@container (max-width: 559px) {
+  .day {
+    padding: 4px 2px;
+    align-items: center;
+    flex-wrap: wrap;
+    flex-direction: row;
+    justify-content: center;
+    align-content: flex-start;
+    gap: 2px;
+  }
+  .day > span {
+    flex: 0 0 24px;
+    margin-inline: calc(50% - 12px);
+  }
+  .day small {
+    font-size: 0;
+    padding: 0;
+    height: 6px;
+    width: 6px;
+    background: transparent;
+    display: flex;
+    align-items: center;
+  }
+  .day small i {
+    margin: 0;
+  }
 }
-@media (max-width: 1023px) {
-  .scheduleLayout {
-      grid-template-columns: 1fr;
-    }
-  .calendarPanel .sectionHeading {
-      flex-wrap: nowrap;
-    }
+.agenda {
+  padding: clamp(14px, 1.6vw, 28px);
+  align-self: start;
+}
+.agenda .sectionHeading {
+  margin-bottom: 8px;
+}
+.fieldRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap: 12px;
+}
+.dayToggles {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 52px));
+  gap: 4px;
+  justify-content: start;
+}
+.dayToggles button {
+  width: 100%;
+  transition: background-color 140ms var(--ease-out);
+}
+.splitActions {
+  justify-content: space-between;
+}
+.splitActions > :last-child {
+  margin-left: auto;
 }
 @media (max-width: 767px) {
   .mobileOnly {
-      display: flex;
-    }
-  .mobileHide {
-      display: none;
-    }
-  .calendarPanel {
-      padding: 14px;
-    }
-  .calendarPanel .sectionHeading {
-      flex-wrap: wrap;
-    }
-  .calendarPanel .actions {
-      gap: 0;
-    }
-  .day {
-      min-height: 66px;
-      padding: 6px 3px;
-    }
-  .day small {
-      font-size: 0;
-      padding: 0;
-      height: 4px;
-      background: transparent;
-    }
-  .day small > i {
-      width: 5px;
-      height: 5px;
-    }
-  .day > span {
-      font-size: 0.65rem;
-    }
-  .weekday {
-      font-size: 0.55rem;
-    }
-  .scheduleLayout {
-      gap: 16px;
-    }
-  .agenda .mobileOnly {
-      margin-bottom: 14px;
-    }
-  .agenda .sectionHeading > .mobileOnly {
-      margin-bottom: 0;
-    }
+    display: flex;
+  }
+  .actions > button {
+    flex: 1 1 auto;
+  }
+  .sectionHeading .actions {
+    gap: 0;
+    flex: 0 1 auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .day,
+  .dayToggles button {
+    transition: none;
+  }
+}
+.optional {
+  display: inline;
+  font-weight: 400;
 }

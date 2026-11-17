@@ -237,7 +237,7 @@ export function EventDialog({
           />
         </label>
 
-        <div className={s.formRow}>
+        <div className={css.fieldRow}>
           <label>
             Course
             <select
@@ -296,7 +296,7 @@ export function EventDialog({
           </label>
         </div>
 
-        <div className={s.formRow}>
+        <div className={css.fieldRow}>
           <label>
             Date
             <input
@@ -363,9 +363,7 @@ export function EventDialog({
             <div
               role="group"
               aria-label="Repeat days"
-              className={
-                s.dayToggles
-              }
+              className={`${s.dayToggles} ${css.dayToggles}`}
             >
               {WEEKDAYS.map(
                 (day, number) => (
@@ -416,7 +414,7 @@ export function EventDialog({
         <label>
           Location{" "}
           <span
-            className={s.muted}
+            className={`${s.muted} ${css.optional}`}
           >
             optional
           </span>
@@ -475,7 +473,7 @@ export function EventDialog({
             </Link>
           )}
 
-        <div className={both.actions}>
+        <div className={`${both.actions} ${event ? css.splitActions : ""}`}>
           {event && (
             <button
               type="button"
@@ -725,10 +723,6 @@ export function Schedule() {
       | undefined
     >();
 
-  const view =
-    params.get("view") ||
-    "agenda";
-
   const set = (
     k: string,
     v: string,
@@ -842,11 +836,7 @@ export function Schedule() {
         }
       >
         <section
-          className={`${s.panel} ${css.calendarPanel} ${
-            view === "agenda"
-              ? css.mobileHide
-              : ""
-          }`}
+          className={`${s.panel} ${css.calendarPanel}`}
         >
           <div
             className={
@@ -1070,22 +1060,6 @@ export function Schedule() {
               </h2>
             </div>
 
-            <button
-              className={`${s.secondary} ${css.mobileOnly}`}
-              onClick={() =>
-                set(
-                  "view",
-                  view ===
-                    "agenda"
-                    ? "month"
-                    : "agenda",
-                )
-              }
-            >
-              {view === "agenda"
-                ? "Calendar"
-                : "Agenda"}
-            </button>
           </div>
 
           <label
@@ -1121,6 +1095,15 @@ export function Schedule() {
             <Empty title="A little breathing room">
               No events on this
               day. Make it yours.
+              {state.events.length === 0 && (
+                <>
+                  {" "}
+                  {state.courses.length === 0
+                    ? "Add a course first and its classes land here."
+                    : "Upload a syllabus and its classes land here."}{" "}
+                  <Link to="/courses">Go to Courses</Link>
+                </>
+              )}
             </Empty>
           )}
 
