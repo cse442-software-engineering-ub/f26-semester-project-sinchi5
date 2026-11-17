@@ -147,8 +147,8 @@
   z-index: 30;
   transform-origin: var(--transform-origin);
   transition:
-    opacity 140ms var(--ease-out),
-    transform 140ms var(--ease-out);
+    opacity var(--motion-fast) var(--ease-out),
+    transform var(--motion-fast) var(--ease-out);
 }
 .menu[data-starting-style],
 .menu[data-ending-style] {
@@ -329,4 +329,25 @@
 }
 .skip:focus {
   transform: none;
+}
+
+.page {
+  animation: pageIn var(--motion-base) var(--ease-out);
+}
+.brandMark[data-flourish] {
+  animation: flourish 600ms var(--ease-out);
+}
+@keyframes pageIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes flourish {
+  40% {
+    transform: rotate(-14deg) scale(1.18);
+  }
+  70% {
+    transform: rotate(8deg) scale(1.05);
+  }
 }

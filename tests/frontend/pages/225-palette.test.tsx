@@ -23,7 +23,7 @@ const readable = (t: Parameters<typeof buildPalette>[0]) => worst(buildPalette(t
 
 await test("1. A color variable from tokens.css is missing in the light or the dark set", FILE, () => {
   // Card 234: the palette now builds the semantic variables of card 222 too, so a custom theme inherits nothing.
-  const names = [...new Set([...tokensCss.matchAll(/^\s*(--[a-z0-9-]+):/gm)].map((m) => m[1]))].sort();
+  const names = [...new Set([...tokensCss.matchAll(/^\s*(--[a-z0-9-]+):/gm)].map((m) => m[1]).filter((n) => !/^--(motion|ease)-/.test(n)))].sort(); // motion variables (card 248) are not colors
   const p = buildPalette(comfy);
   expect(Object.keys(p.light).sort()).toEqual(names);
   expect(Object.keys(p.dark).sort()).toEqual(names);
