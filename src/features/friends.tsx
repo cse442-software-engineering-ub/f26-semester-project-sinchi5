@@ -3,14 +3,13 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Users } from "lucide-react";
 import type { Friend, FriendLists } from "../domain";
 import { createHttpFriends } from "../services/friends-http";
-import { Modal, PageHeading } from "../shared/ui";
+import { Avatar, Modal, PageHeading } from "../shared/ui";
 import { FieldError } from "./account";
 import css from "./friends.module.css";
 import s from "../shared/ui.module.css";
-// Shared classes this screen's own rules also name (see friends.module.css), applied together.
-const both = { panel: `${s.panel} ${css.panel}` };
 
 // Card 154: send classmates friend requests by email, answer the ones you get, and remove friends.
+// Card 233: the add form and requests sit beside a grid of friend cards on wide screens.
 export function Friends() {
   const [api] = useState(() => createHttpFriends());
   const [lists, setLists] = useState<FriendLists>();
@@ -56,72 +55,78 @@ export function Friends() {
     void run(() => api.respond(friend.id, accept), setPageError);
   };
   const person = (friend: Friend) => (
-    <span className={css.friendName}>
-      <strong>{friend.name}</strong>
-      <small>{friend.email}</small>
-    </span>
+    <>
+      <Avatar user={{ id: friend.userId, name: friend.name, email: friend.email, hasPhoto: false }} className={css.avatar} />
+      <span className={css.friendName}>
+        <strong>{friend.name}</strong>
+        <small>{friend.email}</small>
+      </span>
+    </>
   );
+  const none = (text: string) => <p className={css.none}>{text}</p>;
 
   return (
-    <>
+    <div className={css.friends}>
       <PageHeading title="Friends" description="Add the classmates you study with by email." />
-      <div className={css.settingsGrid}>
-        {pageError && <p className={s.error} role="alert">{pageError}</p>}
-        <section className={both.panel} aria-labelledby="friend-add-heading">
-          <div className={s.settingsHeading}>
-            <h2 id="friend-add-heading">Add a classmate</h2>
-            <p className={s.muted}>They’ll see your request the next time they open Friends.</p>
-          </div>
-          <form className={s.form} noValidate onSubmit={send} aria-busy={busy}>
-            <label htmlFor="friend-email">Classmate's email</label>
-            <input id="friend-email" type="email" autoComplete="off" value={email} disabled={busy}
-              aria-invalid={!!emailError} aria-describedby={emailError ? "friend-email-error" : undefined}
-              onChange={(e) => { setEmail(e.target.value); setEmailError(""); setSent(false); }} />
-            <FieldError id="friend-email-error" message={emailError} />
-            <button type="submit" className={s.primary} disabled={busy}>Send request</button>
-            {sent && <p role="status">Request sent.</p>}
-          </form>
-        </section>
-        {!!lists?.incoming.length && (
-          <section className={both.panel} aria-labelledby="friend-incoming-heading">
-            <div className={s.settingsHeading}><h2 id="friend-incoming-heading">Requests for you</h2></div>
-            <ul className={s.settingRows}>
-              {lists.incoming.map((friend) => (
-                <li key={friend.id}>
-                  {person(friend)}
-                  <span className={s.actions}>
-                    <button className={s.primary} disabled={busy} aria-label={`Accept ${friend.name}`}
-                      onClick={() => answer(friend, true)}>Accept</button>
-                    <button className={s.secondary} disabled={busy} aria-label={`Decline ${friend.name}`}
-                      onClick={() => answer(friend, false)}>Decline</button>
-                  </span>
-                </li>
-              ))}
-            </ul>
+      {pageError && <p className={s.error} role="alert">{pageError}</p>}
+      <div className={css.layout}>
+        <div className={css.side}>
+          <section className={css.card} aria-labelledby="friend-add-heading">
+            <div className={css.head}>
+              <h2 id="friend-add-heading">Add a classmate</h2>
+              <p>They’ll see your request the next time they open Friends.</p>
+            </div>
+            <form className={s.form} noValidate onSubmit={send} aria-busy={busy}>
+              <label htmlFor="friend-email">Classmate's email</label>
+              <input id="friend-email" type="email" autoComplete="off" value={email} disabled={busy}
+                aria-invalid={!!emailError} aria-describedby={emailError ? "friend-email-error" : undefined}
+                onChange={(e) => { setEmail(e.target.value); setEmailError(""); setSent(false); }} />
+              <FieldError id="friend-email-error" message={emailError} />
+              <button type="submit" className={`${s.primary} ${css.tall}`} disabled={busy}>Send request</button>
+              {sent && <p role="status">Request sent.</p>}
+            </form>
           </section>
-        )}
-        {!!lists?.outgoing.length && (
-          <section className={both.panel} aria-labelledby="friend-outgoing-heading">
-            <div className={s.settingsHeading}><h2 id="friend-outgoing-heading">Sent requests</h2></div>
-            <ul className={s.settingRows}>
-              {lists.outgoing.map((friend) => (
-                <li key={friend.id}>
-                  {person(friend)}
-                  <span className={s.muted}>Pending</span>
-                </li>
-              ))}
-            </ul>
+          <section className={css.card} aria-labelledby="friend-incoming-heading">
+            <div className={css.head}><h2 id="friend-incoming-heading">Requests for you</h2></div>
+            {!lists ? null : lists.incoming.length ? (
+              <ul className={css.rows}>
+                {lists.incoming.map((friend) => (
+                  <li key={friend.id}>
+                    {person(friend)}
+                    <span className={`${s.actions} ${css.rowActions}`}>
+                      <button className={s.primary} disabled={busy} aria-label={`Accept ${friend.name}`}
+                        onClick={() => answer(friend, true)}>Accept</button>
+                      <button className={s.secondary} disabled={busy} aria-label={`Decline ${friend.name}`}
+                        onClick={() => answer(friend, false)}>Decline</button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : none("No requests waiting for you.")}
           </section>
-        )}
-        <section className={both.panel} aria-labelledby="friend-list-heading">
-          <div className={s.settingsHeading}><h2 id="friend-list-heading">Your friends</h2></div>
+          <section className={css.card} aria-labelledby="friend-outgoing-heading">
+            <div className={css.head}><h2 id="friend-outgoing-heading">Sent requests</h2></div>
+            {!lists ? null : lists.outgoing.length ? (
+              <ul className={css.rows}>
+                {lists.outgoing.map((friend) => (
+                  <li key={friend.id}>
+                    {person(friend)}
+                    <span className={css.pending}>Pending</span>
+                  </li>
+                ))}
+              </ul>
+            ) : none("You have no pending requests.")}
+          </section>
+        </div>
+        <section className={css.card} aria-labelledby="friend-list-heading">
+          <div className={css.head}><h2 id="friend-list-heading">Your friends</h2></div>
           {!lists ? (
             !pageError && <p role="status" className={s.muted}>Loading your friends…</p>
           ) : lists.friends.length ? (
-            <ul className={s.settingRows}>
+            <ul className={css.friendGrid}>
               {lists.friends.map((friend) => (
-                <li key={friend.id}>
-                  {person(friend)}
+                <li key={friend.id} className={css.friendCard}>
+                  <span className={css.who}>{person(friend)}</span>
                   <button className={s.secondary} disabled={busy} aria-label={`Remove ${friend.name}`}
                     onClick={() => { setPageError(""); setRemoving(friend); }}>Remove</button>
                 </li>
@@ -142,7 +147,7 @@ export function Friends() {
             setRemoving(undefined);
           }} />
       )}
-    </>
+    </div>
   );
 }
 
