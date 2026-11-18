@@ -13,6 +13,7 @@ import { meetingDates, normalizeBreaks, normalizeEvents, normalizeMeetings } fro
 import { fileTypeProblem } from "./syllabus-file";
 import { dateKey } from "./fixtures";
 import { detectNoteMetadata } from "./noteMetadata";
+import { plainText } from "./noteText";
 export function filterNotes(
   notes: Note[],
   query: NoteQuery = {},
@@ -22,7 +23,7 @@ export function filterNotes(
     .filter(
       (n) =>
         (!q ||
-          [n.title, n.body, ...n.tags]
+          [n.title, plainText(n.body, n.format), ...n.tags]
             .join(" ")
             .toLowerCase()
             .includes(q)) &&
@@ -182,6 +183,7 @@ export function createRepositories(server: {
         }
         await repo.notes.create({
           ...job.metadata,
+          format: "text",
           body: job.body ?? `Imported from ${job.name}.\n\nYour document is ready to organize. Add your notes here.`,
         });
         return { created: 0, skipped: 0, first: "" };

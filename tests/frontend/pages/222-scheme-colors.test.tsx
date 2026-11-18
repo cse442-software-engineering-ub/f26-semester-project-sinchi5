@@ -10,7 +10,7 @@ import { Provider } from "../../../src/app/context";
 import App from "../../../src/app/App";
 import { Onboarding } from "../../../src/features/onboarding";
 import ui from "../../../src/shared/ui.module.css";
-import editor from "../../../src/features/note-editor.module.css";
+import richEditor from "../../../src/features/rich-editor.module.css";
 
 page({ card: "222", title: "Frontend: Split the stylesheet by feature and make every color follow the scheme", kind: "frontend" });
 
@@ -87,10 +87,10 @@ await test("8. Danger text is under 4.5:1 on its background or on the card in on
   }
   expect(bad).toEqual([]);
 });
-await test("9. A note highlight is the same color in light and dark", "src/features/note-editor.module.css → .highlightYellow (--highlight-yellow in src/app/tokens.css)", async () => {
-  mount(<span className={editor.highlightYellow}>marked</span>);
-  use("sage", "light"); const light = css(await waitFor(() => find("highlightYellow")), "backgroundColor");
-  use("sage", "dark"); const dark = css(find("highlightYellow"), "backgroundColor");
+await test("9. A note highlight is the same color in light and dark", "src/features/rich-editor.module.css → mark[data-color=yellow] (--highlight-yellow in src/app/tokens.css)", async () => {
+  mount(<div className={richEditor.content}><div className="ProseMirror"><mark data-color="yellow">marked</mark></div></div>);
+  use("sage", "light"); const light = css(await waitFor(() => document.querySelector<HTMLElement>("mark")), "backgroundColor");
+  use("sage", "dark"); const dark = css(document.querySelector<HTMLElement>("mark")!, "backgroundColor");
   expect(light !== dark && !!light && !!dark).toBe(true);
 });
 await test("10. Today scrolls sideways on a 320 px phone", "src/features/dashboard.module.css, src/shared/ui.module.css", async () => {

@@ -106,18 +106,18 @@ test("Test 3 - Cancel or a failed delete keeps the editor and unsaved changes", 
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page).toHaveURL(/\/notes\/calculus$/);
-  await expect(page.getByLabel("Note body")).toHaveValue("Draft paragraph");
+  await expect(page.getByLabel("Note body")).toHaveText("Draft paragraph");
 
   await page.evaluate(() => { (window as unknown as Spy).failDelete = true; });
   dialog = await confirmDelete(page);
   await expect(dialog.getByRole("alert")).toContainText("This note could not be deleted.");
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page).toHaveURL(/\/notes\/calculus$/);
-  await expect(page.getByLabel("Note body")).toHaveValue("Draft paragraph");
+  await expect(page.getByLabel("Note body")).toHaveText("Draft paragraph");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("All changes saved", { exact: true })).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel("Note body")).toHaveValue("Draft paragraph");
+  await expect(page.getByLabel("Note body")).toHaveText("Draft paragraph");
 });
 
 for (const permission of ["edit", "view"]) {

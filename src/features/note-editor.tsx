@@ -1,6 +1,5 @@
-import { ChecklistEditor } from "./checklist-editor";
-import { checklistDraft, checklistPayload, type ChecklistDraft } from "../services/checklists";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { editorHtml } from "../services/noteText";
 import {
   useParams,
   useLocation,
@@ -25,12 +24,13 @@ import type {
   Comment,
   CommentScenario,
   Collaborator,
-  HighlightColor ,
-  NoteHighlight ,
 } from "../domain";
 import css from "./note-editor.module.css";
 import s from "../shared/ui.module.css";
 import { Collaborators } from "./collaborators";
+// Card 241: TipTap is its own chunk, fetched when a note opens.
+const RichEditor = lazy(() => import("./rich-editor"));
+const loadingEditor = <p role="status">Loading the editor…</p>;
 // Shared classes this screen's own rules also name (see note-editor.module.css), applied together.
 const both = { muted: `${s.muted} ${css.muted}`, segment: `${s.segment} ${css.segment}`, textLink: `${s.textLink} ${css.textLink}` };
 
@@ -85,14 +85,9 @@ function NoteEditor() {
   const [postScenario, setPostScenario] = useState<CommentScenario>("success");
   const [preview, setPreview] = useState<NoteVersion>();
   const [restore, setRestore] = useState(false);
-  const [draftBody, setDraftBody] = useState("");
-  const [draftHighlights, setDraftHighlights] = useState<NoteHighlight[]>([]);
-  const [highlightMessage, setHighlightMessage] = useState("");
-  const [showHighlightColors, setShowHighlightColors] = useState(false);
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
-  const highlightLayerRef = useRef<HTMLDivElement>(null);
-  const selectionRef = useRef({ start: 0, end: 0 });
-  const [checklist, setChecklist] = useState<ChecklistDraft[]>([]);
+  // The editor's HTML once the writer changes it; null while the body is as saved. editorKey restarts the editor.
+  const [draftBody, setDraftBody] = useState<string | null>(null);
+  const [editorKey, setEditorKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const pendingSave = useRef<Promise<Note>>();
@@ -115,10 +110,7 @@ function NoteEditor() {
     noteRef.current = undefined;
     dirtyRef.current = false;
     setDirty(false);
-    setDraftBody("");
-    setDraftHighlights([]);
-    setHighlightMessage("");
-    setShowHighlightColors(false);
+    setDraftBody(null);
     setTitleDraft("");
     setStatus("All changes saved");
     generation.current++;
@@ -130,9 +122,7 @@ function NoteEditor() {
       .then(([n, v, collaborators]) => {
         if (active) {
           setNote(n);
-          setDraftBody(n.body);
-          setDraftHighlights(n.highlights ?? []);
-          setChecklist(checklistDraft(n.checklist));
+          setEditorKey((k) => k + 1);
           setTitleDraft(n.title);
           noteRef.current = n;
           savedNote.current = n;
@@ -228,157 +218,6 @@ function NoteEditor() {
     setStatus("Saving…");
   }
 
-  function applyHighlight(color: HighlightColor) {
-    const { start, end } = selectionRef.current;
-
-    if (start === end) {
-      setHighlightMessage("Select some text to highlight.");
-      setShowHighlightColors(false);
-      return;
-    }
-
-    const next = draftHighlights.filter(
-      (highlight) => highlight.end <= start || highlight.start >= end,
-    );
-
-    next.push({ start, end, color });
-    next.sort((a, b) => a.start - b.start);
-
-    setDraftHighlights(next);
-    setHighlightMessage("");
-    setShowHighlightColors(false);
-  }
-
-  function removeHighlight() {
-    const { start, end } = selectionRef.current;
-
-    if (start === end) {
-      setHighlightMessage("Select some text to highlight.");
-      return;
-    }
-
-    setDraftHighlights((current) =>
-      current.filter(
-        (highlight) => highlight.end <= start || highlight.start >= end,
-      ),
-    );
-
-    setHighlightMessage("");
-  }
-  function renderHighlightedBody() {
-    const highlights = [...draftHighlights].sort((a, b) => a.start - b.start);
-    const parts = [];
-    let position = 0;
-
-    for (const highlight of highlights) {
-      if (highlight.start > position) {
-        parts.push(draftBody.slice(position, highlight.start));
-      }
-
-      const className =
-        highlight.color === "yellow"
-          ? css.highlightYellow
-          : highlight.color === "green"
-            ? css.highlightGreen
-            : css.highlightPink;
-
-      parts.push(
-        <mark key={`${highlight.start}-${highlight.end}`} className={className}>
-          {draftBody.slice(highlight.start, highlight.end)}
-        </mark>,
-      );
-
-      position = highlight.end;
-    }
-
-    if (position < draftBody.length) {
-      parts.push(draftBody.slice(position));
-    }
-
-    return parts;
-  }
-  function adjustHighlightsForBodyChange(
-    previousBody: string,
-    nextBody: string,
-    highlights: NoteHighlight[],
-  ) {
-    let start = 0;
-
-    while (
-      start < previousBody.length &&
-      start < nextBody.length &&
-      previousBody[start] === nextBody[start]
-    ) {
-      start++;
-    }
-
-    let previousEnd = previousBody.length;
-    let nextEnd = nextBody.length;
-
-    while (
-      previousEnd > start &&
-      nextEnd > start &&
-      previousBody[previousEnd - 1] === nextBody[nextEnd - 1]
-    ) {
-      previousEnd--;
-      nextEnd--;
-    }
-
-    const delta = nextEnd - previousEnd;
-    const adjusted: NoteHighlight[] = [];
-
-    for (const highlight of highlights) {
-      // Highlight is completely before the edited text.
-      if (highlight.end <= start) {
-        adjusted.push(highlight);
-        continue;
-      }
-
-      // Highlight is completely after the edited text.
-      if (highlight.start >= previousEnd) {
-        adjusted.push({
-          ...highlight,
-          start: highlight.start + delta,
-          end: highlight.end + delta,
-        });
-        continue;
-      }
-
-      // Edit happened inside an existing highlight.
-      if (highlight.start < start && highlight.end > previousEnd) {
-        adjusted.push({
-          ...highlight,
-          end: highlight.end + delta,
-        });
-        continue;
-      }
-
-      // Keep the part before the edited text.
-      if (highlight.start < start) {
-        adjusted.push({
-          ...highlight,
-          end: start,
-        });
-        continue;
-      }
-
-      // Keep the part after the edited text.
-      if (highlight.end > previousEnd) {
-        adjusted.push({
-          ...highlight,
-          start: nextEnd,
-          end: highlight.end + delta,
-        });
-      }
-    }
-
-    return adjusted.filter(
-      (highlight) =>
-        highlight.start >= 0 &&
-        highlight.end > highlight.start &&
-        highlight.end <= nextBody.length,
-    );
-  }
   async function saveNote() {
     if (!noteRef.current || !canEdit || savingRef.current) return;
     const title = titleDraft.trim();
@@ -399,9 +238,8 @@ function NoteEditor() {
       const saved = await repo.notes.save({
         ...noteRef.current!,
         title,
-        body: draftBody,
-        highlights: draftHighlights,
-        checklist: checklistPayload(checklist),
+        body: draftBody ?? noteRef.current!.body,
+        format: "html",
       });
       // Task #78 / Story #19 AT1-3: ignore responses after leaving this editor.
       // Disabled controls during Save protect the submitted draft from newer edits.
@@ -410,9 +248,7 @@ function NoteEditor() {
       savedNote.current = saved;
       setNote(saved);
       setTitleDraft(saved.title);
-      setDraftBody(saved.body);
-      setDraftHighlights(saved.highlights ?? []);
-      setChecklist(checklistDraft(saved.checklist));
+      setDraftBody(null);
       dirtyRef.current = false;
       setDirty(false);
       setStatus("All changes saved");
@@ -436,9 +272,8 @@ function NoteEditor() {
   function cancelEdits() {
     if (!note || savingRef.current) return;
     setTitleDraft(note.title);
-    setDraftBody(note.body);
-    setDraftHighlights(note.highlights ?? []);
-    setChecklist(checklistDraft(note.checklist));
+    setDraftBody(null);
+    setEditorKey((k) => k + 1);
     setError("");
     setStatus(dirtyRef.current ? "Saving…" : "All changes saved");
   }
@@ -549,11 +384,7 @@ function NoteEditor() {
     isOwner ||
     currentCollaborator?.permission === "edit";
   const hasDraftChanges =
-  titleDraft !== note.title ||
-  draftBody !== note.body ||
-  JSON.stringify(draftHighlights) !== JSON.stringify(note.highlights ?? []) ||
-  JSON.stringify(checklist.map(({ text, done }) => ({ text, done }))) !==
-    JSON.stringify(note.checklist ?? []);
+  titleDraft !== note.title || draftBody !== null;
   return (
     <>
       <div className={css.editorTop}>
@@ -697,107 +528,10 @@ function NoteEditor() {
             />
           </label>
 
-          <div className={css.highlightToolbar}>
-            <button
-              type="button"
-              className={s.secondary}
-              disabled={!canEdit || saving}
-              onClick={() => {
-                const { start, end } = selectionRef.current;
-
-                if (start === end) {
-                  setHighlightMessage("Select some text to highlight.");
-                  setShowHighlightColors(false);
-                  return;
-                }
-
-                setHighlightMessage("");
-                setShowHighlightColors((show) => !show);
-              }}
-            >
-              Highlight
-            </button>
-
-            {showHighlightColors && (
-              <div className={css.highlightChoices}>
-                <button
-                  type="button"
-                  onClick={() => applyHighlight("yellow")}
-                >
-                  Yellow
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => applyHighlight("green")}
-                >
-                  Green
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => applyHighlight("pink")}
-                >
-                  Pink
-                </button>
-              </div>
-            )}
-
-            <button
-              type="button"
-              className={s.secondary}
-              disabled={!canEdit || saving}
-              onClick={removeHighlight}
-            >
-              Remove highlight
-            </button>
-          </div>
-
-          {highlightMessage && (
-            <p role="status" className={both.muted}>
-              {highlightMessage}
-            </p>
-          )}
-          <div className={css.highlightEditor}>
-            <div
-              ref={highlightLayerRef}
-              className={css.highlightLayer}
-              aria-hidden="true"
-            >
-              {renderHighlightedBody()}
-            </div>
-
-            <textarea
-              ref={bodyRef}
-              className={`${css.noteBody} ${css.highlightTextarea}`}
-              aria-label="Note body"
-              placeholder="Start anywhere. This space is yours…"
-              value={draftBody}
-              disabled={!canEdit || saving}
-              onSelect={(e) => {
-                selectionRef.current = {
-                  start: e.currentTarget.selectionStart,
-                  end: e.currentTarget.selectionEnd,
-                };
-              }}
-              onScroll={(e) => {
-                if (highlightLayerRef.current) {
-                  highlightLayerRef.current.scrollTop = e.currentTarget.scrollTop;
-                  highlightLayerRef.current.scrollLeft = e.currentTarget.scrollLeft;
-                }
-              }}
-              onChange={(e) => {
-                const nextBody = e.target.value;
-
-                setDraftHighlights((current) =>
-                  adjustHighlightsForBodyChange(draftBody, nextBody, current),
-                );
-
-                setDraftBody(nextBody);
-              }}
-            />
-          </div>
-          <ChecklistEditor items={checklist} onChange={setChecklist} disabled={!canEdit || saving} />
+          <Suspense fallback={loadingEditor}>
+            <RichEditor key={editorKey} html={editorHtml(note.body, note.format)} label="Note body"
+              editable={canEdit && !saving} onChange={setDraftBody} />
+          </Suspense>
           <div className={s.actions}>
             <button
               type="button"
@@ -1002,7 +736,11 @@ function NoteEditor() {
           onClose={() => setPreview(undefined)}
         >
           <h3>{preview.title}</h3>
-          <p className={css.previewBody}>{preview.body}</p>
+          <div className={css.previewBody}>
+            <Suspense fallback={loadingEditor}>
+              <RichEditor key={preview.id} html={editorHtml(preview.body)} label="Version text" editable={false} />
+            </Suspense>
+          </div>
           <button
             className={s.primary}
             onClick={async () => {
@@ -1021,9 +759,8 @@ function NoteEditor() {
                 dirtyRef.current = false;
                 setDirty(false);
                 setNote(restored);
-                setDraftBody(restored.body);
-                setDraftHighlights(restored.highlights ?? []);
-                setChecklist(checklistDraft(restored.checklist));
+                setDraftBody(null);
+                setEditorKey((k) => k + 1);
                 setTitleDraft(restored.title);
                 noteRef.current = restored;
                 savedNote.current = restored;
@@ -1046,8 +783,7 @@ function NoteEditor() {
     </>
   );
 }
-// Card 158: a note a friend shared through a course. Read only: no save, pin, delete, highlight, or
-// checklist controls, and none of the owner's history or comments.
+// Card 158: a note a friend shared through a course. Read only: no save, pin, delete, or formatting controls, and none of the owner's history or comments.
 function SharedNote({ note }: { note: Note }) {
   return (
     <>
@@ -1060,16 +796,9 @@ function SharedNote({ note }: { note: Note }) {
         <p className={s.notice}>Shared by {note.sharedBy!.name}. You can read this note.</p>
         <p className={both.muted}>{note.sharedBy!.courseCode}{note.lectureDate ? ` · ${note.lectureDate}` : ""}</p>
         <h1 className={css.sharedTitle}>{note.title}</h1>
-        <div className={css.sharedBody}>{note.body}</div>
-        {!!note.checklist?.length && (
-          <ul className={css.sharedChecklist} aria-label="Checklist">
-            {note.checklist.map((item, index) => (
-              <li key={index} className={item.done ? css.checklistDone : undefined}>
-                {item.text}{item.done && <span className={s.srOnly}> (done)</span>}
-              </li>
-            ))}
-          </ul>
-        )}
+        <Suspense fallback={loadingEditor}>
+          <RichEditor html={editorHtml(note.body, note.format)} label="Note text" editable={false} />
+        </Suspense>
       </article>
     </>
   );

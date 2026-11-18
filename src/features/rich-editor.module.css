@@ -1,0 +1,166 @@
+.editor {
+  min-width: 0;
+}
+.toolbarWrap {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  margin-top: 16px;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.tool,
+.select,
+.textButton {
+  flex: 0 0 auto;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.78rem;
+}
+.tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  padding: 0;
+  cursor: pointer;
+}
+.tool[aria-pressed="true"],
+.tool[aria-expanded="true"] {
+  background: var(--sage);
+  border-color: var(--primary);
+}
+.tool:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.select {
+  width: auto;
+  max-width: 9.5rem;
+  padding: 0 8px;
+}
+.textButton {
+  padding: 0 12px;
+  cursor: pointer;
+}
+.divider {
+  flex: 0 0 1px;
+  align-self: stretch;
+  margin: 4px 4px;
+  background: var(--line);
+}
+.panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 10px;
+}
+.swatch {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.custom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.custom input[type="color"] {
+  width: 44px;
+  height: 36px;
+  padding: 2px;
+}
+.problem {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.75rem;
+}
+.content :global(.ProseMirror) {
+  min-height: 420px;
+  padding: 20px 0;
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+  outline: none;
+}
+.content :global(.ProseMirror:focus-visible) {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+}
+.content :global(.ProseMirror p.is-editor-empty:first-child::before) {
+  content: attr(data-placeholder);
+  color: var(--muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+.content :global(.ProseMirror h1) { font-size: 1.8rem; line-height: 1.25; margin: 0.6em 0 0.3em; }
+.content :global(.ProseMirror h2) { font-size: 1.45rem; line-height: 1.3; margin: 0.6em 0 0.3em; }
+.content :global(.ProseMirror h3) { font-size: 1.2rem; line-height: 1.35; margin: 0.6em 0 0.3em; }
+.content :global(.ProseMirror p) { margin: 0 0 0.6em; }
+.content :global(.ProseMirror ul),
+.content :global(.ProseMirror ol) { padding-left: 1.5rem; }
+.content :global(.ProseMirror blockquote) {
+  margin: 0.8em 0;
+  padding-left: 1rem;
+  border-left: 3px solid var(--line);
+  color: var(--muted);
+}
+.content :global(.ProseMirror code) {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-soft);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+.content :global(.ProseMirror pre) {
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+  overflow-x: auto;
+}
+.content :global(.ProseMirror pre code) { padding: 0; background: none; }
+.content :global(.ProseMirror hr) { border: 0; border-top: 1px solid var(--line); margin: 1.2em 0; }
+.content :global(.ProseMirror a) { color: var(--primary); text-decoration: underline; }
+.content :global(.ProseMirror mark) { padding: 0 2px; border-radius: 3px; color: inherit; }
+.content :global(.ProseMirror mark[data-color="yellow"]) { background: var(--highlight-yellow); color: var(--highlight-ink); }
+.content :global(.ProseMirror mark[data-color="green"]) { background: var(--highlight-green); color: var(--highlight-ink); }
+.content :global(.ProseMirror mark[data-color="pink"]) { background: var(--highlight-pink); color: var(--highlight-ink); }
+.content :global(.ProseMirror ul[data-type="taskList"]) { list-style: none; padding-left: 0; }
+.content :global(.ProseMirror ul[data-type="taskList"] > li) { display: flex; gap: 8px; align-items: flex-start; }
+.content :global(.ProseMirror ul[data-type="taskList"] > li > label) { display: block; flex: 0 0 auto; margin-top: 0.3rem; }
+.content :global(.ProseMirror ul[data-type="taskList"] > li > div) { flex: 1; min-width: 0; }
+.content :global(.ProseMirror ul[data-type="taskList"] input) { display: block; width: 1.1rem; height: 1.1rem; min-height: 0; margin: 0; padding: 0; }
+.content :global(.ProseMirror li[data-checked="true"] > div) { text-decoration: line-through; color: var(--muted); }
+
+@media (min-width: 768px) {
+  .toolbar { flex-wrap: wrap; overflow-x: visible; }
+}
+@media (max-width: 1023px) {
+  .toolbarWrap { top: calc(56px + env(safe-area-inset-top)); }
+}
+@media (max-width: 767px) {
+  .tool, .select, .textButton, .swatch { min-height: 44px; }
+  .tool { min-width: 44px; }
+  .swatch { width: 44px; height: 44px; }
+  .select { font-size: 1rem; }
+  .content :global(.ProseMirror) { min-height: 360px; font-size: 1rem; }
+}

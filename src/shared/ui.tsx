@@ -1,3 +1,4 @@
+import { notePreview } from "../services/noteText";
 import { Dialog } from "@base-ui/react/dialog";
 import {
   X,
@@ -181,7 +182,7 @@ export function NoteCard({
         ) : <FileText size={16} aria-hidden="true" />}
       </div>
       <h3>{note.title}</h3>
-      <p className={s.excerpt}>{note.body}</p>
+      <p className={s.excerpt}>{notePreview(note)}</p>
       <div className={s.cardFooter}>
         <span>
           {note.visibility === "shared" ? (

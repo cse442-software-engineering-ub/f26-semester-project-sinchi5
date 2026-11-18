@@ -161,6 +161,7 @@ export function Notes() {
       await repo.notes.create({
         title: title || "Untitled note",
         body,
+        format: "text",
         ...(draftCategory ? { category: draftCategory } : {}),
       });
       await refresh();
