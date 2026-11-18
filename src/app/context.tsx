@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { createAppRepositories } from "../services/app-repositories";
+import { onUnauthorized } from "../services/session-ended";
 import { createReminderScheduler, showNoteNotification } from "../services/note-reminders";
 import { buildPalette, PALETTE_VARIABLES } from "../services/palette";
 import type { User, Course, Note, CourseEvent, Repositories, Preferences, ThemeInput } from "../domain";
@@ -107,10 +108,11 @@ export function Provider({ children }: { children: ReactNode }) {
       if (document.visibilityState !== "visible") return;
       if (holds.current > 0) missed.current = true; else void refresh();
     };
+    const stopUnauthorized = onUnauthorized(() => void refresh());
     window.addEventListener("focus", recheck);
     // Card 142: changes made on another device show up within 30 seconds while this tab is visible.
     const timer = setInterval(recheck, 30000);
-    return () => { window.removeEventListener("focus", recheck); clearInterval(timer); };
+    return () => { stopUnauthorized(); window.removeEventListener("focus", recheck); clearInterval(timer); };
   }, []);
   useEffect(() => {
     reminders.update(state.user ? state.notes : []);

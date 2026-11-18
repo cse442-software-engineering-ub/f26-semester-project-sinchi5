@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowRight, BookOpen } from "lucide-react";
 import { useApp } from "../app/context";
 import { FieldError, PasswordRequirements, RecoveryCode } from "./account";
@@ -12,6 +12,8 @@ const both = { eyebrow: `${s.eyebrow} ${o.eyebrow}`, form: `${s.form} ${o.form}`
 export function Onboarding() {
   const { state, repo, refresh } = useApp();
   const navigate = useNavigate();
+  // Card 258: App sends visitors here with this flag when a session ended or an app page was opened signed out.
+  const loginRequired = useLocation().state?.loginRequired === true;
   const [mode, setMode] = useState("signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -139,6 +141,7 @@ export function Onboarding() {
                   ? "A fresh start."
                   : mode === "recover" ? "Recover your account." : "Good to see you again."}
               </h2>
+              {loginRequired && mode === "signin" && <p role="status">Log in to continue.</p>}
               <p className={both.muted}>
                 A small step toward a more organized semester.
               </p>

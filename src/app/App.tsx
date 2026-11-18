@@ -78,6 +78,9 @@ export default function App() {
   const [addingCourse, setAddingCourse] = useState(false);
   // Bug 3: after Log out the signed-out redirect always lands on the log-in form, from any page.
   const [loggedOut, setLoggedOut] = useState(false);
+  // Card 258: a signed-out screen after a session that had a user, or on an app page, says "Log in to continue."
+  const hadUser = useRef(false);
+  useEffect(() => { hadUser.current = !!state.user; if (state.user) setLoggedOut(false); }, [state.user]);
   // An account left mid-setup goes straight in; one background request, retried at the next load.
   const setupTried = useRef(false);
   const newAccount = Boolean(location.state?.newAccount);
@@ -181,7 +184,8 @@ export default function App() {
           path="*"
           element={
             <Navigate
-              to={location.pathname === "/" && !loggedOut ? "/welcome" : "/welcome?mode=signin"}
+              to={location.pathname === "/" && !loggedOut && !hadUser.current ? "/welcome" : "/welcome?mode=signin"}
+              state={{ loginRequired: !state.user ? !loggedOut && (hadUser.current || location.pathname !== "/") : false }}
               replace
             />
           }

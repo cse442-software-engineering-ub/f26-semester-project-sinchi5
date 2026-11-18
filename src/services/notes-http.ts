@@ -1,6 +1,7 @@
 import type { Collaborator, Comment, Course, Note, NoteRepository, NoteVersion } from "../domain";
 import { filterNotes } from "./repositories";
 import { dateKey } from "./fixtures";
+import { reportUnauthorized } from "./session-ended";
 
 export class NoteServiceError extends Error {
   constructor(message: string, public status: number) { super(message); }
@@ -35,6 +36,7 @@ export function createApiClient(endpoint: string, fetcher: typeof fetch, offline
       return send(route, data, timeout, false);
     }
     // A reply that isn't a JSON object (such as a PHP warning page sent with 200) is a failure too.
+    if (response.status === 401) reportUnauthorized();
     if (!response.ok || !body || typeof body !== "object") throw new NoteServiceError(body?.error || unavailable, response.status);
     return body as T;
   };

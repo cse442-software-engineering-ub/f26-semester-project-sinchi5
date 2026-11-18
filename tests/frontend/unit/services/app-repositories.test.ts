@@ -43,9 +43,9 @@ it("needs a signed-in account for every workspace call, and ignores the old brow
   storage.setItem("notely-data-v1", JSON.stringify({ user: alice, completed: true, notes: [], courses: [] }));
   const { repo } = app({ session: vi.fn().mockResolvedValue(null) }, fakeServer(), storage);
   expect(await repo.auth.session()).toBeNull();
-  await expect(repo.notes.list()).rejects.toThrow("Sign in");
-  await expect(repo.courses.list()).rejects.toThrow("Sign in");
-  await expect(repo.schedule.list()).rejects.toThrow("Sign in");
+  await expect(repo.notes.list()).rejects.toThrow("Log in to continue.");
+  await expect(repo.courses.list()).rejects.toThrow("Log in to continue.");
+  await expect(repo.schedule.list()).rejects.toThrow("Log in to continue.");
 });
 it("isolates accounts and keeps courses, events and notes on the server, never in browser storage", async () => {
   let current: User | null = alice;
@@ -64,14 +64,14 @@ it("isolates accounts and keeps courses, events and notes on the server, never i
   expect((await repo.notes.get(note.id)).title).toBe("Alice only");
   expect((await repo.courses.list()).map((c) => c.code)).toEqual(["CSE 442"]);
   await repo.auth.deleteAccount("current password");
-  await expect(repo.notes.list()).rejects.toThrow("Sign in");
+  await expect(repo.notes.list()).rejects.toThrow("Log in to continue.");
 });
 it("clears selected workspace on server failure", async () => {
   const session = vi.fn().mockResolvedValueOnce(alice).mockRejectedValueOnce(new Error("unavailable"));
   const { repo } = app({ session });
   await repo.auth.session();
   await expect(repo.auth.session()).rejects.toThrow("unavailable");
-  await expect(repo.notes.list()).rejects.toThrow("Sign in");
+  await expect(repo.notes.list()).rejects.toThrow("Log in to continue.");
 });
 it("ignores an older server refresh after signing out", async () => {
   let finish!: (user: User | null) => void;
@@ -81,7 +81,7 @@ it("ignores an older server refresh after signing out", async () => {
   await repo.auth.signOut();
   finish(alice);
   expect(await earlier).toBeNull();
-  await expect(repo.notes.list()).rejects.toThrow("Sign in");
+  await expect(repo.notes.list()).rejects.toThrow("Log in to continue.");
 });
 it("Clear workspace sends one workspace-clear request and the server empties notes, courses and events (card 218)", async () => {
   const { repo, server } = app({ session: async () => alice });
