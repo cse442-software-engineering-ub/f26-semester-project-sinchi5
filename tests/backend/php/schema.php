@@ -38,6 +38,8 @@ $tables = [
         'remind_at' => ['datetime(3)', 'YES'],
         'created_at' => ['datetime', 'NO'], 'updated_at' => ['datetime', 'NO'],
         'checklist' => ['text', 'YES'],
+        // Card 243: the event a note is linked to, and the occurrence's date.
+        'event_id' => ['bigint unsigned', 'YES'], 'event_date' => ['date', 'YES'],
     ],
     'notely_note_editors' => [
         'note_id' => ['bigint unsigned', 'NO'], 'user_id' => ['bigint unsigned', 'NO'],
@@ -108,4 +110,8 @@ foreach (['notely_notes_owner_fk', 'notely_note_editors_note_fk', 'notely_note_e
 $rule = query($db, "SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS
     WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'notely_events_job_fk'")->fetchColumn();
 if ($rule !== 'SET NULL') { throw new RuntimeException('Missing event job SET NULL rule'); }
+// Card 243: deleting an event only clears the notes' link.
+$rule = query($db, "SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'notely_notes_event_fk'")->fetchColumn();
+if ($rule !== 'SET NULL') { throw new RuntimeException('Missing note event SET NULL rule'); }
 echo "PASS: schema, unique email, and account/note cascades\n";
