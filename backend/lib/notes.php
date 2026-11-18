@@ -10,12 +10,35 @@ const NOTE_READ_ROUTES = ['note', 'notes', 'note-versions', 'note-comments', 'no
 const NOTE_ROUTES = [...NOTE_READ_ROUTES, 'note-create', 'note-title', 'note-content', 'note-save', 'note-pin',
     'note-reminder', 'note-restore', 'note-delete', 'note-comment', 'note-invite', 'note-permission'];
 const NOTE_CATEGORIES = ['School', 'Work', 'Meetings', 'Personal'];
-const NOTE_COLUMNS = 'n.id, n.owner_user_id, n.title, n.body, n.highlights, n.course_id, n.lecture_date, n.category,
-    n.visibility, n.tags, n.pinned, n.remind_at, n.created_at, n.updated_at, n.checklist';
+const NOTE_COLUMNS = 'n.id, n.owner_user_id, n.title, n.body, n.body_format, n.body_text, n.highlights, n.course_id,
+    n.lecture_date, n.category, n.visibility, n.tags, n.pinned, n.remind_at, n.created_at, n.updated_at, n.checklist';
+
+// Card 240: a note body is cleaned HTML. The incoming string is measured; backend/index.php lets these routes read twice
+// this much so JSON escaping of quotes still fits.
+const NOTE_MAX_BYTES = 524288;
+const NOTE_TOO_LONG = 'Notes can be at most 512 KB. Split this note into two.';
+// Card 240: each note keeps its newest versions only, so repeated large saves can't fill the database.
+const NOTE_MAX_VERSIONS = 50;
+const NOTE_BODY_ROUTES = ['note-content', 'note-save'];
+const NOTE_EXCERPT_LENGTH = 300;
+// The XSS wall: only these tags survive cleanNoteHtml. Other tags are unwrapped to their text,
+// and NOTE_HTML_DROP tags are removed together with their content.
+const NOTE_HTML_TAGS = ['p', 'br', 'h1', 'h2', 'h3', 'strong', 'em', 'u', 's', 'mark', 'span', 'ul', 'ol', 'li',
+    'blockquote', 'code', 'pre', 'a', 'hr'];
+const NOTE_HTML_DROP = ['script', 'style', 'iframe', 'object', 'embed', 'applet', 'svg', 'math', 'template', 'noscript',
+    'noembed', 'noframes', 'frameset', 'frame', 'textarea', 'title', 'head', 'select', 'xmp', 'plaintext', 'canvas',
+    'audio', 'video', 'picture', 'map'];
+// The editor's font list and size steps (card 241 offers exactly these). A style value outside them is dropped.
+const NOTE_FONTS = ['Arial, Helvetica, sans-serif', 'Georgia, serif', '"Times New Roman", Times, serif',
+    'Verdana, Geneva, sans-serif', '"Trebuchet MS", Helvetica, sans-serif', '"Courier New", Courier, monospace'];
+const NOTE_FONT_SIZES = ['12px', '14px', '16px', '18px', '20px', '24px', '30px', '36px'];
+const NOTE_COLOR = '/^(?:#[0-9a-f]{3}|#[0-9a-f]{6}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(?:,\s*(?:0|1|0?\.\d{1,3})\s*)?\))$/iD';
+// Old highlight names stay names so card 241 can show them in the theme's own highlight colors.
+const NOTE_MARK_NAMES = ['yellow', 'green', 'pink'];
 
 // Task #79 / Story #19: retain ordered tasks and exact boolean completion states.
 // HTTP JSON objects arrive as stdClass; PHP callers may supply associative items.
-// The existing 8 KB request cap bounds item count/text size without new arbitrary limits.
+// Card 240 raised note-save's request cap, so the stored JSON is bounded by its TEXT column (64 KB) instead.
 function noteChecklist(mixed $value): string
 {
     if (!is_array($value) || array_values($value) !== $value) {
@@ -31,7 +54,9 @@ function noteChecklist(mixed $value): string
         // Task Test 2: discard blank tasks, preserving meaningful text and relative order.
         if (trimEdges($item['text']) !== '') $items[] = ['text' => $item['text'], 'done' => $item['done']];
     }
-    return json_encode($items, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    $json = json_encode($items, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    if (strlen($json) > 65535) throw new HttpError(422, 'Keep the checklist under 64 KB.');
+    return $json;
 }
 
 function recordId(mixed $value, string $message): string
@@ -65,10 +90,178 @@ function noteTitle(array $input): string
 function noteBody(array $input): string
 {
     $body = field($input, 'body');
+    if (strlen($body) > NOTE_MAX_BYTES) {
+        throw new HttpError(413, NOTE_TOO_LONG);
+    }
     if (!preg_match('//u', $body)) {
         throw new HttpError(422, 'The note body contains characters we could not read.');
     }
     return $body;
+}
+
+// Card 240: 'html' from the formatting editor (card 241); 'text' (the default) is today's plain-text editor,
+// whose body is escaped into paragraphs, never parsed as HTML.
+function noteFormat(array $input): string
+{
+    $format = $input['format'] ?? 'text';
+    if (!in_array($format, ['text', 'html'], true)) {
+        throw new HttpError(422, 'Choose text or html for the note format.');
+    }
+    return $format;
+}
+
+function noteEscape(string $text): string
+{
+    return htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8');
+}
+
+// Card 240: parse untrusted HTML and rebuild it from the allow-list. The output is written here, never by
+// libxml, so every text and attribute value is escaped and only allowed tags and attributes can appear.
+function cleanNoteHtml(string $html): string
+{
+    if ($html === '') return '';
+    $unreadable = "This note has formatting we can't read. Paste it as plain text and try again.";
+    // libxml is quadratic in attributes per tag, so a huge tag is refused before parsing (CPU DoS).
+    if (preg_match('/<[^>]{4096}/', $html)) throw new HttpError(422, $unreadable);
+    // A literal </body> or </html> would make libxml drop everything after it while the save succeeds.
+    $html = preg_replace('~</(?:body|html)\b[^>]*>~i', '', str_replace("\0", '', $html));
+    $doc = new DOMDocument();
+    $errors = libxml_use_internal_errors(true);
+    $doc->loadHTML('<!DOCTYPE html><html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head><body>'
+        . $html . '</body></html>', LIBXML_NONET);
+    // A fatal error (nesting past libxml's depth limit) stops the parse and loses the rest, so refuse instead.
+    // It is always the last error; libxml_get_errors() would copy every warning and can exhaust memory.
+    $fatal = libxml_get_last_error();
+    $fatal = $fatal && $fatal->level === LIBXML_ERR_FATAL;
+    libxml_clear_errors();
+    libxml_use_internal_errors($errors);
+    if ($fatal) throw new HttpError(422, $unreadable);
+    $body = $doc->getElementsByTagName('body')->item(0);
+    $clean = $body ? cleanNoteNodes($body, 0) : '';
+    // Escaping can grow the text (512 KB of & becomes 2.5 MB), so the cap applies to the stored HTML too.
+    if (strlen($clean) > NOTE_MAX_BYTES) throw new HttpError(413, NOTE_TOO_LONG);
+    return $clean;
+}
+
+function cleanNoteNodes(DOMNode $parent, int $depth): string
+{
+    $html = '';
+    foreach ($parent->childNodes as $node) {
+        if ($node instanceof DOMText) {
+            $html .= htmlspecialchars($node->data, ENT_NOQUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8');
+            continue;
+        }
+        // Comments, processing instructions, and dangerous elements go with everything inside them.
+        $tag = strtolower($node->nodeName);
+        if (!$node instanceof DOMElement || in_array($tag, NOTE_HTML_DROP, true)) continue;
+        // Past 64 levels keep only the escaped text, so hostile nesting can't exhaust the stack.
+        $inner = $depth < 64 ? cleanNoteNodes($node, $depth + 1)
+            : htmlspecialchars($node->textContent, ENT_NOQUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8');
+        $attributes = in_array($tag, NOTE_HTML_TAGS, true) ? cleanNoteAttributes($tag, $node) : null;
+        if ($attributes === null || ($tag === 'span' && $attributes === '')) {
+            $html .= $inner;
+        } else {
+            $html .= in_array($tag, ['br', 'hr'], true) ? "<$tag$attributes>" : "<$tag$attributes>$inner</$tag>";
+        }
+    }
+    return $html;
+}
+
+// Returns the kept attributes as ' name="value"' text, in their original order.
+function cleanNoteAttributes(string $tag, DOMElement $node): string
+{
+    $kept = '';
+    foreach ($node->attributes as $attribute) {
+        $name = strtolower($attribute->name);
+        $value = $attribute->value;
+        $ok = match ($name) {
+            // A fixed scheme prefix and no whitespace or control characters anywhere: case, entity, and
+            // whitespace tricks (java&#x09;script:, " javascript:", JaVaScRiPt:) can never pass.
+            'href' => $tag === 'a' && strlen($value = trim($value)) <= 2048
+                && preg_match('~^(?:https?://|mailto:)[^\s\x00-\x1f\x7f"<>\\\\`]*$~iuD', $value),
+            'data-type' => ($tag === 'ul' && $value === 'taskList') || ($tag === 'li' && $value === 'taskItem'),
+            'data-checked' => $tag === 'li' && in_array($value, ['true', 'false'], true),
+            'data-color' => $tag === 'mark' && (in_array($value, NOTE_MARK_NAMES, true) || preg_match(NOTE_COLOR, $value)),
+            'style' => ($value = cleanNoteStyle($value)) !== '',
+            default => false,
+        };
+        if ($ok) $kept .= ' ' . $name . '="' . noteEscape($value) . '"';
+    }
+    return $kept;
+}
+
+function cleanNoteStyle(string $style): string
+{
+    $kept = [];
+    foreach (explode(';', $style) as $declaration) {
+        [$property, $value] = array_map('trim', explode(':', $declaration, 2)) + ['', ''];
+        $property = strtolower($property);
+        if ($property === 'font-family') {
+            $value = preg_replace('/\s*,\s*/', ', ', str_replace("'", '"', $value));
+        }
+        $ok = match ($property) {
+            'color', 'background-color' => (bool) preg_match(NOTE_COLOR, $value),
+            'font-family' => in_array($value, NOTE_FONTS, true),
+            'font-size' => in_array($value, NOTE_FONT_SIZES, true),
+            'text-align' => in_array($value, ['left', 'center', 'right', 'justify'], true),
+            default => false,
+        };
+        if ($ok) $kept[] = "$property: $value";
+    }
+    return implode('; ', $kept);
+}
+
+// Card 240: plain text of clean HTML for search, excerpts, and counts. Blocks and line breaks become spaces.
+function notePlain(string $html): string
+{
+    $text = strip_tags(preg_replace('/<(?=\/?(?:p|h[1-3]|li|ul|ol|blockquote|pre|br|hr)\b)/', ' <', $html));
+    return trim(preg_replace('/\s+/u', ' ', html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+}
+
+// Card 240: an old plain-text note as HTML. Each line is a paragraph, saved highlights (UTF-16 ranges, where an
+// emoji counts 2) become <mark data-color>, and checklist items become the editor's task list.
+function legacyNoteHtml(string $text, array $highlights, array $checklist): string
+{
+    $units = mb_convert_encoding($text, 'UTF-16LE', 'UTF-8');
+    $length = intdiv(strlen($units), 2);
+    $cuts = [0, $length];
+    foreach ($highlights as $h) array_push($cuts, max(0, min($length, $h['start'])), max(0, min($length, $h['end'])));
+    $cuts = array_values(array_unique($cuts));
+    sort($cuts);
+    $paragraphs = [''];
+    for ($i = 1; $i < count($cuts); $i++) {
+        [$from, $to] = [$cuts[$i - 1], $cuts[$i]];
+        $color = null;
+        foreach ($highlights as $h) if ($h['start'] <= $from && $h['end'] >= $to) $color = $h['color'];
+        $piece = mb_convert_encoding(substr($units, 2 * $from, 2 * ($to - $from)), 'UTF-8', 'UTF-16LE');
+        foreach (explode("\n", str_replace("\r", '', $piece)) as $n => $line) {
+            if ($n > 0) $paragraphs[] = '';
+            if ($line === '') continue;
+            $line = htmlspecialchars($line, ENT_NOQUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8');
+            $paragraphs[count($paragraphs) - 1] .= $color === null ? $line : '<mark data-color="' . noteEscape($color) . "\">$line</mark>";
+        }
+    }
+    $html = $text === '' ? '' : '<p>' . implode('</p><p>', $paragraphs) . '</p>';
+    if ($checklist) {
+        $html .= '<ul data-type="taskList">';
+        foreach ($checklist as $item) {
+            $html .= '<li data-type="taskItem" data-checked="' . ($item['done'] ? 'true' : 'false') . '"><p>'
+                . htmlspecialchars($item['text'], ENT_NOQUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8') . '</p></li>';
+        }
+        $html .= '</ul>';
+    }
+    return $html;
+}
+
+// Card 240: what a save stores as [body, body_text]. HTML is cleaned on every save; text stays text (its
+// highlights and checklist stay in their own columns) and is converted when read.
+function noteStorage(string $format, string $body, string $checklist): array
+{
+    if ($format === 'html') {
+        $body = cleanNoteHtml($body);
+        return [$body, notePlain($body)];
+    }
+    return [$body, notePlain(legacyNoteHtml($body, [], json_decode($checklist, true) ?? []))];
 }
 
 // The browser measures highlight positions in UTF-16 units (selectionStart/selectionEnd), where an emoji counts 2.
@@ -130,10 +323,10 @@ function noteHighlights(mixed $value, string $body): string
         ];
     }
 
-    return json_encode(
-        $highlights,
-        JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-    );
+    $json = json_encode($highlights, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    // Card 240: the larger note-save request could otherwise overflow the TEXT column.
+    if (strlen($json) > 65535) throw new HttpError(422, 'Use fewer highlights.');
+    return $json;
 }
 
 // Returns [course_id, lecture_date, category, visibility, tags JSON] in column order.
@@ -211,7 +404,8 @@ function noteListFilter(array $query): array
         }
         // Use an explicit escape character so wildcard searches work with any SQL mode.
         $like = '%' . strtr($keyword, ['!' => '!!', '%' => '!%', '_' => '!_']) . '%';
-        $sql .= " AND (n.title LIKE ? ESCAPE '!' OR n.body LIKE ? ESCAPE '!'
+        // Card 240: search the plain text, so tag names and attributes never match; old rows may have none yet.
+        $sql .= " AND (n.title LIKE ? ESCAPE '!' OR COALESCE(n.body_text, n.body) LIKE ? ESCAPE '!'
             OR n.tags LIKE ? ESCAPE '!')";
         array_push($values, $like, $like, $like);
     }
@@ -293,17 +487,30 @@ function reminderTime(mixed $value): ?string
     return $time->format('Y-m-d H:i:s.v');
 }
 
+// Card 240: a note or version body is always returned as clean HTML. Old text rows (and old versions, which have
+// no highlight or checklist columns) are converted here and rewritten as HTML only on their next save.
+function noteRowHtml(array $row): string
+{
+    if ($row['body_format'] === 'html') return $row['body'];
+    return legacyNoteHtml($row['body'], json_decode($row['highlights'] ?? '[]', true, 16, JSON_THROW_ON_ERROR),
+        json_decode($row['checklist'] ?? '[]', true, 16, JSON_THROW_ON_ERROR));
+}
+
 function noteJson(array $row): array
 {
+    // Task #86 / Story #31: expose saved highlight ranges as an array.
+    $highlights = json_decode($row['highlights'] ?? '[]', true, 16, JSON_THROW_ON_ERROR);
+    // Task #79: NULL on pre-existing notes means no tasks; expose an array, never JSON text.
+    $checklist = json_decode($row['checklist'] ?? '[]', true, 16, JSON_THROW_ON_ERROR);
+    $body = noteRowHtml($row);
     return [
         'id' => (string) $row['id'],
         'ownerId' => (string) $row['owner_user_id'],
         'title' => $row['title'],
-        'body' => $row['body'],
-        // Task #86 / Story #31: expose saved highlight ranges as an array.
-        'highlights' => json_decode($row['highlights'] ?? '[]', true, 16, JSON_THROW_ON_ERROR),
-        // Task #79: NULL on pre-existing notes means no tasks; expose an array, never JSON text.
-        'checklist' => json_decode($row['checklist'] ?? '[]', true, 16, JSON_THROW_ON_ERROR),
+        'body' => $body,
+        'excerpt' => mb_substr($row['body_text'] ?? notePlain($body), 0, NOTE_EXCERPT_LENGTH),
+        'highlights' => $highlights,
+        'checklist' => $checklist,
         'courseId' => $row['course_id'],
         'lectureDate' => $row['lecture_date'] ?? '',
         'category' => $row['category'],
@@ -375,13 +582,21 @@ function requireOwner(PDO $db, string $id, array $user, string $message): void
     if (noteRole($db, $id, $user, true) !== 'owner') throw new HttpError(403, $message);
 }
 
-function keepVersion(PDO $db, string $id, array $user, string $title, string $body): void
+// $next holds the new title, body, and/or body_format. Like the browser repository, changing the title or body keeps
+// the previous text as a version. Card 240 (bug 2): the version is the note as clean HTML with its marks and tasks,
+// so a restore brings back its own formatting.
+function keepVersion(PDO $db, string $id, array $user, array $next): void
 {
-    // Like the browser repository, changing the title or body keeps the previous text as a version.
-    $previous = query($db, 'SELECT title, body, updated_at FROM notely_notes WHERE id = ?', [$id])->fetch();
-    if ($previous['title'] !== $title || $previous['body'] !== $body) {
-        query($db, 'INSERT INTO notely_note_versions (note_id, title, body, author_name, created_at) VALUES (?, ?, ?, ?, ?)',
-            [$id, $previous['title'], $previous['body'], $user['name'], $previous['updated_at']]);
+    $previous = query($db, 'SELECT title, body, body_format, highlights, checklist, updated_at FROM notely_notes WHERE id = ?',
+        [$id])->fetch();
+    if (array_diff_assoc($next, $previous)) {
+        $html = noteRowHtml($previous);
+        query($db, "INSERT INTO notely_note_versions (note_id, title, body, body_format, body_text, author_name, created_at)
+            VALUES (?, ?, ?, 'html', ?, ?, ?)", [$id, $previous['title'], $html, notePlain($html), $user['name'], $previous['updated_at']]);
+        // The derived table lets MySQL read the kept ids from the table it deletes from.
+        query($db, 'DELETE FROM notely_note_versions WHERE note_id = ? AND id NOT IN (SELECT id FROM (SELECT id
+            FROM notely_note_versions WHERE note_id = ? ORDER BY created_at DESC, id DESC LIMIT ' . NOTE_MAX_VERSIONS . ') AS kept)',
+            [$id, $id]);
     }
 }
 
@@ -409,10 +624,14 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
     }
     if ($route === 'note-create') {
         $title = noteTitle($input);
+        $format = noteFormat($input);
         $body = array_key_exists('body', $input) ? noteBody($input) : '';
-        $checklist = noteChecklist(array_key_exists('checklist', $input) ? $input['checklist'] : []);
-        query($db, 'INSERT INTO notely_notes (owner_user_id, title, body, course_id, lecture_date, category, visibility, tags, checklist)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [$user['id'], $title, $body, ...noteFields($input), $checklist]);
+        // HTML carries its own task list, so the old checklist input only applies to text notes.
+        $checklist = $format === 'html' ? '[]' : noteChecklist(array_key_exists('checklist', $input) ? $input['checklist'] : []);
+        [$body, $text] = noteStorage($format, $body, $checklist);
+        query($db, 'INSERT INTO notely_notes (owner_user_id, title, body, body_format, body_text, course_id, lecture_date, category,
+            visibility, tags, checklist) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [$user['id'], $title, $body, $format, $text, ...noteFields($input), $checklist]);
         $id = (string) $db->lastInsertId();
         http_response_code(201);
         return ['note' => loadNote($db, $id)];
@@ -431,10 +650,11 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
         }
         if ($route === 'note') return ['note' => loadNote($db, $id)];
         if ($route === 'note-versions') {
-            $rows = query($db, 'SELECT id, note_id, title, body, author_name, created_at FROM notely_note_versions
+            $rows = query($db, 'SELECT id, note_id, title, body, body_format, author_name, created_at FROM notely_note_versions
                 WHERE note_id = ? ORDER BY created_at DESC, id DESC', [$id])->fetchAll();
             return ['versions' => array_map(fn ($row) => ['id' => (string) $row['id'], 'noteId' => (string) $row['note_id'],
-                'title' => $row['title'], 'body' => $row['body'], 'author' => $row['author_name'],
+                'title' => $row['title'], 'author' => $row['author_name'],
+                'body' => noteRowHtml($row),
                 'createdAt' => isoTime($row['created_at'])], $rows)];
         }
         if ($route === 'note-comments') {
@@ -447,55 +667,47 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
         return ['collaborators' => array_map(fn ($row) => loadCollaborator($db, $id, (string) $row['user_id']), $rows)];
     }
 
-    if ($route === 'note-title' || $route === 'note-content') {
-        $value = $route === 'note-content'
-            ? noteBody($input)
-            : noteTitle($input);
-
+    if ($route === 'note-title') {
+        $title = noteTitle($input);
         requireEditor($db, $id, $user);
-
-        $current = loadNote($db, $id);
-
-        $title = $route === 'note-title'
-            ? $value
-            : $current['title'];
-
-        $body = $route === 'note-content'
-            ? $value
-            : $current['body'];
-
-        keepVersion($db, $id, $user, $title, $body);
-
-        query(
-            $db,
-            'UPDATE notely_notes SET '
-            . ($route === 'note-content' ? 'body' : 'title')
-            . ' = ? WHERE id = ?',
-            [$value, $id]
-        );
-
-        return [
-            'note' => [
-                'id' => $id,
-                $route === 'note-content' ? 'body' : 'title' => $value,
-            ],
-        ];
+        keepVersion($db, $id, $user, ['title' => $title]);
+        query($db, 'UPDATE notely_notes SET title = ? WHERE id = ?', [$title, $id]);
+        return ['note' => ['id' => $id, 'title' => $title]];
+    }
+    if ($route === 'note-content') {
+        $format = noteFormat($input);
+        $body = noteBody($input);
+        requireEditor($db, $id, $user);
+        // An HTML body replaces the old highlight and checklist columns; a text body keeps them.
+        $checklist = $format === 'html' ? '[]'
+            : (query($db, 'SELECT checklist FROM notely_notes WHERE id = ?', [$id])->fetchColumn() ?? '[]');
+        [$body, $text] = noteStorage($format, $body, $checklist);
+        keepVersion($db, $id, $user, ['body' => $body, 'body_format' => $format]);
+        query($db, "UPDATE notely_notes SET body = ?, body_format = ?, body_text = ?, highlights = IF(? = 'html', '[]', highlights),
+            checklist = ? WHERE id = ?", [$body, $format, $text, $format, $checklist, $id]);
+        return ['note' => ['id' => $id, 'body' => loadNote($db, $id)['body']]];
     }
     if ($route === 'note-save') {
         requireEditor($db, $id, $user);
         // Task #79 / Story #19: merge after locking so checklist-only saves and legacy
         // title/body saves preserve every omitted field, including existing tasks.
         $merged = $input + loadNote($db, $id);
+        // Card 240: a save without a body keeps the stored body in its own format (loadNote's body is converted HTML).
+        $format = array_key_exists('body', $input) ? noteFormat($input)
+            : query($db, 'SELECT body_format FROM notely_notes WHERE id = ?', [$id])->fetchColumn();
+        $body = array_key_exists('body', $input) ? noteBody($input)
+            : query($db, 'SELECT body FROM notely_notes WHERE id = ?', [$id])->fetchColumn();
         $title = noteTitle($merged);
-        $body = noteBody($merged);
         $fields = noteFields($merged);
-        $highlights = noteHighlights($merged['highlights'], $body);
-        $checklist = noteChecklist($merged['checklist']);
+        // HTML carries its own marks and tasks, so the old highlight and checklist inputs only apply to text notes.
+        $highlights = $format === 'html' ? '[]' : noteHighlights($merged['highlights'], $body);
+        $checklist = $format === 'html' ? '[]' : noteChecklist($merged['checklist']);
+        [$body, $text] = noteStorage($format, $body, $checklist);
         // History remains title/body-only; checklist saves update the edit date like metadata.
-        // Restoring text therefore leaves the current Story #19 task states untouched.
-        keepVersion($db, $id, $user, $title, $body);
-        query($db, 'UPDATE notely_notes SET title = ?, body = ?, highlights = ?, course_id = ?, lecture_date = ?, category = ?,
-            visibility = ?, tags = ?, checklist = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [$title, $body, $highlights, ...$fields, $checklist, $id]);
+        keepVersion($db, $id, $user, ['title' => $title, 'body' => $body, 'body_format' => $format]);
+        query($db, 'UPDATE notely_notes SET title = ?, body = ?, body_format = ?, body_text = ?, highlights = ?, course_id = ?,
+            lecture_date = ?, category = ?, visibility = ?, tags = ?, checklist = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            [$title, $body, $format, $text, $highlights, ...$fields, $checklist, $id]);
         return ['note' => loadNote($db, $id)];
     }
     if ($route === 'note-pin') {
@@ -515,13 +727,16 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
     if ($route === 'note-restore') {
         $versionId = recordId($input['versionId'] ?? null, 'Choose a valid version.');
         requireEditor($db, $id, $user);
-        $version = query($db, 'SELECT title, body FROM notely_note_versions WHERE id = ? AND note_id = ?', [$versionId, $id])->fetch();
+        $version = query($db, 'SELECT title, body, body_format FROM notely_note_versions WHERE id = ? AND note_id = ?', [$versionId, $id])->fetch();
         if (!$version) throw new HttpError(404, 'Version not found.');
-        keepVersion($db, $id, $user, $version['title'], $version['body']);
-        // Versions keep no highlights, so drop the ones that no longer fit the restored text.
-        $fit = array_values(array_filter(loadNote($db, $id)['highlights'], fn ($h) => $h['end'] <= utf16Length($version['body'])));
-        query($db, 'UPDATE notely_notes SET title = ?, body = ?, highlights = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-            [$version['title'], $version['body'], json_encode($fit, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), $id]);
+        keepVersion($db, $id, $user, $version);
+        // Card 240 (bug 2): the version comes back with its own marks and tasks and none of the current marks.
+        // A version kept before migration 019 is plain text with no marks; it keeps the current tasks (Story #19).
+        $checklist = $version['body_format'] === 'html' ? '[]'
+            : (query($db, 'SELECT checklist FROM notely_notes WHERE id = ?', [$id])->fetchColumn() ?? '[]');
+        [$body, $text] = noteStorage($version['body_format'], $version['body'], $checklist);
+        query($db, "UPDATE notely_notes SET title = ?, body = ?, body_format = ?, body_text = ?, highlights = '[]', checklist = ?,
+            updated_at = CURRENT_TIMESTAMP WHERE id = ?", [$version['title'], $body, $version['body_format'], $text, $checklist, $id]);
         return ['note' => loadNote($db, $id)];
     }
     if ($route === 'note-delete') {

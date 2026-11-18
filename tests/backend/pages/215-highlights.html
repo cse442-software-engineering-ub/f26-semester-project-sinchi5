@@ -37,16 +37,18 @@ await test("2. A highlight past the end of the note is accepted", SAVE, async ()
     expect(await api("note-save", { id: emoji, title: NOTES[0], body, highlights: [{ ...bad, color: "green" }] })).toEqual(422, outside);
   expect((await api("note", undefined, { id: emoji })).body.note.highlights).toEqual([{ start, end, color: "yellow" }]);
 });
-await test("3. Restoring a shorter version keeps a highlight past its end, or drops one that fits", RESTORE, async () => {
+// Card 240 (bug 2): a restored version comes back with its own formatting. "Alpha" was saved with no highlight,
+// so the newer highlights must not land on it. Bodies are HTML since card 240.
+await test("3. Restoring a shorter version brings newer highlights onto it", RESTORE, async () => {
   const id = (await api("note-create", { title: NOTES[1], body: "Alpha" })).body.note.id;
   const longer = "Alpha beta gamma delta";
   const highlights = [{ start: 0, end: 5, color: "pink" }, { start: 17, end: 22, color: "green" }];
   expect((await api("note-save", { id, title: NOTES[1], body: longer, highlights })).status).toBe(200);
-  const alpha = (await api("note-versions", undefined, { id })).body.versions.find((v) => v.body === "Alpha");
+  const alpha = (await api("note-versions", undefined, { id })).body.versions.find((v) => v.body === "<p>Alpha</p>");
   const r = await api("note-restore", { id, versionId: alpha.id });
   expect(r.status).toBe(200);
-  expect([r.body.note.body, r.body.note.highlights]).toEqual(["Alpha", [{ start: 0, end: 5, color: "pink" }]]);
-  expect((await api("note", undefined, { id })).body.note.highlights).toEqual([{ start: 0, end: 5, color: "pink" }]);
+  expect([r.body.note.body, r.body.note.highlights]).toEqual(["<p>Alpha</p>", []]);
+  expect((await api("note", undefined, { id })).body.note.body).toBe("<p>Alpha</p>");
 });
 
 await clean();

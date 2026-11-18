@@ -46,6 +46,9 @@ try {
   const created = await owner.call("note-create", { title: "CSE 442 Notes" });
   assert.equal(created.status, 201);
   const id = created.data.note.id;
+  // Card 240: a plain-text body comes back as escaped paragraphs, one per line, with its exact text.
+  const asHtml = (text) => text === "" ? "" : text.replace(/\r/g, "").split("\n")
+    .map((line) => `<p>${line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`).join("");
   const read = async () => {
     const result = await owner.call(`note&id=${id}`);
     assert.equal(result.status, 200);
@@ -55,17 +58,17 @@ try {
   };
   assert.deepEqual(await read(), { id, title: "CSE 442 Notes", body: "" });
   assert.equal((await owner.call("note-content", { id, body: "Original body" })).status, 200);
-  assert.equal((await read()).body, "Original body");
+  assert.equal((await read()).body, asHtml("Original body"));
   assert.equal((await other.call("note-content", {
     id, body: "Intruder", owner_user_id: created.data.note.id, permission: "edit",
   })).status, 403);
   assert.equal((await other.call(`note&id=${id}`)).status, 404);
-  assert.equal((await read()).body, "Original body");
+  assert.equal((await read()).body, asHtml("Original body"));
   const body = " \tUpdated content\r\n\u{1F600}\u{00E9} \n";
   const updated = await owner.call("note-content", { id, body, title: "Ignored title" });
   assert.equal(updated.status, 200);
-  assert.deepEqual(updated.data, { note: { id, body } });
-  assert.deepEqual(await read(), { id, title: "CSE 442 Notes", body });
+  assert.deepEqual(updated.data, { note: { id, body: asHtml(body) } });
+  assert.deepEqual(await read(), { id, title: "CSE 442 Notes", body: asHtml(body) });
   assert.equal((await anonymous.call("note-content", { id, body: "Anonymous" })).status, 401);
   assert.equal((await owner.call("note-content", { id, body: "CSRF" }, { "X-CSRF-Token": "forged" })).status, 403);
   assert.equal((await owner.call("note-content", { id, body: "Origin" }, { Origin: "https://attacker.invalid" })).status, 403);
@@ -77,11 +80,11 @@ try {
   const missing = "9999999999999999999";
   assert.equal((await owner.call("note-content", { id: missing, body: "Ghost" })).status, 404);
   assert.equal((await owner.call(`note&id=${missing}`)).status, 404);
-  assert.equal((await owner.call("note-content", { id, body: "x".repeat(8200) })).status, 413);
-  assert.deepEqual(await read(), { id, title: "CSE 442 Notes", body });
+  assert.equal((await owner.call("note-content", { id, body: "x".repeat(512 * 1024 + 1) })).status, 413);
+  assert.deepEqual(await read(), { id, title: "CSE 442 Notes", body: asHtml(body) });
   const largeBody = "x".repeat(8000);
   assert.equal((await owner.call("note-content", { id, body: largeBody })).status, 200);
-  assert.equal((await read()).body, largeBody);
+  assert.equal((await read()).body, asHtml(largeBody));
   assert.equal((await owner.call("note-content", { id, body: "" })).status, 200);
   assert.deepEqual(await read(), { id, title: "CSE 442 Notes", body: "" });
   console.log("PASS: card 110 HTTP persistence, title preservation, ownership, validation, CSRF/origin, request limits");

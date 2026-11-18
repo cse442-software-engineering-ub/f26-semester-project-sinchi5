@@ -84,7 +84,7 @@ try {
   assert.equal(list[0].permission, "view");
   const read = await friend.call(`note&id=${week9.id}`);
   assert.equal(read.status, 200);
-  assert.equal(read.data.note.body, "Sprint review notes");
+  assert.equal(read.data.note.body, "<p>Sprint review notes</p>");
   assert.equal(read.data.note.sharedBy.name, owner.name);
   // Shared notes stay out of the friend's own list, and other courses aren't shared.
   assert.deepEqual(await ownTitles(friend), []);
@@ -118,7 +118,7 @@ try {
     expectError(await friend.call(`${route}&id=${week9.id}`), 404, "This note could not be found.");
   }
   const unchanged = (await owner.call(`note&id=${week9.id}`)).data.note;
-  assert.deepEqual([unchanged.title, unchanged.body, unchanged.pinned], ["Week 9 summary", "Sprint review notes", false]);
+  assert.deepEqual([unchanged.title, unchanged.body, unchanged.pinned], ["Week 9 summary", "<p>Sprint review notes</p>", false]);
   console.log("PASS 3: the friend can't change, comment on, delete, or see the history of a shared note");
 
   // Task test 4: notes added later are shared too; unsharing or removing the friend ends access.

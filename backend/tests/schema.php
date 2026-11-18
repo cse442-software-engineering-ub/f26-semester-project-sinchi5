@@ -30,7 +30,9 @@ $tables = [
     ],
     'notely_notes' => [
         'id' => ['bigint unsigned', 'NO'], 'owner_user_id' => ['bigint unsigned', 'NO'],
-        'title' => ['varchar(255)', 'NO'], 'body' => ['text', 'NO'], 'highlights' => ['text', 'YES'],
+        // Card 240: old rows stay 'text' until their next save.
+        'title' => ['varchar(255)', 'NO'], 'body' => ['mediumtext', 'NO'], 'body_format' => ["enum('text','html')", 'NO'],
+        'body_text' => ['mediumtext', 'YES'], 'highlights' => ['text', 'YES'],
         'course_id' => ['varchar(64)', 'NO'], 'lecture_date' => ['date', 'YES'], 'category' => ['varchar(20)', 'NO'],
         'visibility' => ["enum('private','shared')", 'NO'], 'tags' => ['varchar(4000)', 'NO'], 'pinned' => ['tinyint', 'NO'],
         'remind_at' => ['datetime(3)', 'YES'],
@@ -43,7 +45,8 @@ $tables = [
     ],
     'notely_note_versions' => [
         'id' => ['bigint unsigned', 'NO'], 'note_id' => ['bigint unsigned', 'NO'], 'title' => ['varchar(255)', 'NO'],
-        'body' => ['text', 'NO'], 'author_name' => ['varchar(100)', 'NO'], 'created_at' => ['datetime', 'NO'],
+        'body' => ['mediumtext', 'NO'], 'body_format' => ["enum('text','html')", 'NO'], 'body_text' => ['mediumtext', 'YES'],
+        'author_name' => ['varchar(100)', 'NO'], 'created_at' => ['datetime', 'NO'],
     ],
     'notely_note_comments' => [
         'id' => ['bigint unsigned', 'NO'], 'note_id' => ['bigint unsigned', 'NO'], 'author_user_id' => ['bigint unsigned', 'NO'],

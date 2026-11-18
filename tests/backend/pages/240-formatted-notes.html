@@ -1,0 +1,235 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>240 Backend: Store notes as cleaned formatted text</title>
+<link rel="stylesheet" href="../../shared/runner.css">
+<script type="module">
+// Backend test: real API, no screen code. Imports nothing from src/.
+import { page, test, expect, api, signIn, signOut } from "../../shared/runner.js";
+
+page({ card: "240", title: "Backend: Store notes as cleaned formatted text", kind: "backend" });
+const A = "notely-task240-442@example.edu";
+const B = "notely-task240b-442@example.edu";
+const T = (s) => `t-240 ${s}`;
+const NOTES = ["xss", "format", "plain", "old", "restore html", "restore text", "size", "search", "shared", "private", "limits", "versions"].map(T);
+const CLEAN = "backend/lib/notes.php → cleanNoteHtml (the allow-list)";
+const READ = "backend/lib/notes.php → noteJson, legacyNoteHtml (read-time conversion)";
+const denied = { error: "You do not have permission to edit this note." };
+
+// Start and end clean: delete the notes this page made. Accounts are never deleted.
+async function clean() {
+  await signIn(A);
+  for (const n of (await api("notes")).body.notes ?? []) if (NOTES.includes(n.title)) await api("note-delete", { id: n.id });
+}
+await clean();
+
+// No third argument: an HTML note. `{}`: no format at all, like the plain-text editor sends today.
+const create = async (title, body, extra = { format: "html" }) => (await api("note-create", { title: T(title), body, ...extra })).body.note;
+const read = async (id) => (await api("note", undefined, { id })).body.note;
+
+// The browser's own parser reads the returned HTML (DOMParser never runs scripts) and anything outside the allow-list is named.
+const TAGS = new Set("p br h1 h2 h3 strong em u s mark span ul ol li blockquote code pre a hr".split(" "));
+const PROPS = new Set(["color", "background-color", "font-family", "font-size", "text-align"]);
+function unsafe(html) {
+  const doc = new DOMParser().parseFromString(`<!doctype html><body>${html}`, "text/html");
+  if (doc.head.childNodes.length) return "something moved into <head>";
+  for (const el of doc.body.querySelectorAll("*")) {
+    if (!TAGS.has(el.localName) || el.namespaceURI !== "http://www.w3.org/1999/xhtml") return `tag <${el.localName}>`;
+    for (const { name, value } of el.attributes) {
+      if (name === "href") {
+        if (el.localName !== "a" || !/^(https?:\/\/|mailto:)/i.test(value) || /\s/.test(value)) return `href ${value}`;
+      } else if (name === "style") {
+        for (const decl of value.split(";").filter((d) => d.trim())) {
+          const [prop, ...rest] = decl.split(":");
+          if (!PROPS.has(prop.trim()) || /url|expression|javascript|\\|@|[<>{}]/i.test(rest.join(":"))) return `style ${decl}`;
+        }
+      } else if (!["data-type", "data-checked", "data-color"].includes(name)) return `attribute ${name}`;
+    }
+  }
+  return "";
+}
+
+const PAYLOADS = [
+  `<script>alert(1)<\/script><p>Hi</p>`,
+  `<img src=x onerror=alert(1)>`,
+  `<p onclick="alert(1)" onmouseover=alert(1)>Hi</p>`,
+  `<a href="javascript:alert(1)">x</a>`,
+  `<a href="JaVaScRiPt:alert(1)">x</a>`,
+  `<a href="  javascript:alert(1)">x</a>`,
+  `<a href="java&#x09;script:alert(1)">x</a>`,
+  `<a href="&#106;&#97;vascript:alert(1)">x</a>`,
+  `<a href="java\nscript:alert(1)">x</a>`,
+  `<a href="data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==">x</a>`,
+  `<a href="vbscript:msgbox(1)">x</a>`,
+  `<a href="//evil.example/">x</a>`,
+  `<span style="background-image:url(javascript:alert(1))">x</span>`,
+  `<span style="color: expression(alert(1))">x</span>`,
+  `<span style="color: #fff;}</style><script>alert(1)<\/script>">x</span>`,
+  `<span style="color: red; position: fixed; top: 0; font-family: x;background:url(//evil.example)">x</span>`,
+  `<span style="font-size: 18px/**/; color: rgb(0,0,0) url(x); text-align: center; color: #12345">x</span>`,
+  `<svg onload=alert(1)><circle/></svg>after`,
+  `<math><mtext><table><mglyph><style><img src=x onerror=alert(1)>`,
+  `<iframe src="javascript:alert(1)"></iframe>`,
+  `<object data="javascript:alert(1)"></object><embed src="x">`,
+  `<noscript><p title="</noscript><img src=x onerror=alert(1)>"></noscript>`,
+  `<form action="javascript:alert(1)"><button formaction="javascript:alert(1)">x</button></form>`,
+  `<p class="x" id="y" title="t" data-foo="1" contenteditable="true">x</p>`,
+  `<mark data-color="red;background:url(x)" data-checked="javascript:alert(1)" data-type="evil">x</mark>`,
+  `<style>body{display:none}</style><!-- <script>alert(1)<\/script> -->x`,
+  `<a href="https://ok.example/" onclick="alert(1)" target="_blank">ok</a>`,
+  `<base href="javascript:alert(1)//"><link rel=stylesheet href=x><meta http-equiv=refresh content="0;url=javascript:alert(1)">`,
+];
+
+let xss;
+await test("1. A script, event handler, javascript:/data:/vbscript: link, or CSS injection is stored and returned live", CLEAN, async () => {
+  xss = (await create("xss", "<p>start</p>")).id;
+  for (const payload of PAYLOADS) {
+    for (const route of ["note-content", "note-save"]) {
+      const r = await api(route, { id: xss, body: payload, format: "html" });
+      expect([route, payload, r.status, unsafe(r.body.note.body)]).toEqual([route, payload, 200, ""]);
+    }
+    const n = await read(xss);
+    expect([payload, unsafe(n.body), /[<>]/.test(n.excerpt)]).toEqual([payload, "", false]);
+  }
+  for (const n of (await api("notes")).body.notes) expect(unsafe(n.body)).toBe("");
+  // Exact results for a few: handlers and bad links go, the text and the safe parts stay.
+  const exact = [
+    [`<p onclick="alert(1)">Hi</p>`, `<p>Hi</p>`],
+    [`<script>alert(1)<\/script><p>Hi</p>`, `<p>Hi</p>`],
+    [`<p><a href="javascript:alert(1)">x</a></p>`, `<p><a>x</a></p>`],
+    [`<p><a href="https://ok.example/" onclick="alert(1)" target="_blank">ok</a></p>`, `<p><a href="https://ok.example/">ok</a></p>`],
+    [`<p><span style="color: #123456; position: fixed; background-image: url(x)">x</span></p>`, `<p><span style="color: #123456">x</span></p>`],
+    [`<p><b>bold</b> <font color=red>and</font> <abbr>font</abbr></p>`, `<p>bold and font</p>`],
+  ];
+  for (const [input, want] of exact) expect([input, (await api("note-content", { id: xss, body: input, format: "html" })).body.note.body]).toEqual([input, want]);
+});
+
+const RICH = `<h1>Title</h1><h2 style="text-align: center">Sub</h2><h3>Small</h3>`
+  + `<p style="text-align: justify"><strong>bold</strong> <em>it</em> <u>under</u> <s>strike</s> <code>code</code> `
+  + `<mark data-color="#f6d85e" style="background-color: #f6d85e">hl</mark> <mark data-color="green">old hl</mark> `
+  + `<span style="color: rgb(255, 0, 0); font-family: Georgia, serif; font-size: 18px">styled</span> `
+  + `<span style="font-family: &quot;Times New Roman&quot;, Times, serif; background-color: rgba(0, 0, 0, 0.5)">times</span> `
+  + `<a href="https://example.com/a?b=1&amp;c=2">link</a> <a href="mailto:a@example.edu">mail</a><br>line</p>`
+  + `<ul><li><p>one</p></li></ul><ol><li><p>two</p></li></ol>`
+  + `<ul data-type="taskList"><li data-type="taskItem" data-checked="true"><p>done</p></li><li data-type="taskItem" data-checked="false"><p>todo</p></li></ul>`
+  + `<blockquote><p>quote</p></blockquote><pre><code>let x = 1 &lt; 2 &amp;&amp; y;</code></pre><hr><p>It's "quoted" — café 🎉</p>`;
+await test("2. Allowed formatting (headings, marks, colors, fonts, sizes, lists, checkboxes, links, code) is changed or lost", CLEAN, async () => {
+  const n = await create("format", RICH);
+  expect(n.body).toBe(RICH);
+  expect((await read(n.id)).body).toBe(RICH);
+  // Saving the same HTML again is a no-op: no new version.
+  expect((await api("note-save", { id: n.id, body: RICH, format: "html" })).body.note.body).toBe(RICH);
+  expect((await api("note-versions", undefined, { id: n.id })).body.versions.length).toBe(0);
+});
+
+await test("3. The excerpt shows tags or entities, or runs blocks together", "backend/lib/notes.php → notePlain, noteJson (excerpt)", async () => {
+  const n = await create("format", `<h1>Exam</h1><p>Bring <strong>pen</strong>cil &amp; <em>eraser</em></p><ul><li><p>one</p></li><li><p>two</p></li></ul>`);
+  expect(n.excerpt).toBe("Exam Bring pencil & eraser one two");
+  expect((await api("notes")).body.notes.find((x) => x.id === n.id).excerpt).toBe("Exam Bring pencil & eraser one two");
+  await api("note-delete", { id: n.id });
+});
+
+await test("4. Plain text from today's editor (no format) is read as HTML instead of escaped paragraphs", "backend/lib/notes.php → noteFormat, legacyNoteHtml", async () => {
+  const body = "a < b & c\n<script>alert(1)<\/script>\n\nend";
+  const n = await create("plain", body, {});
+  const want = "<p>a &lt; b &amp; c</p><p>&lt;script&gt;alert(1)&lt;/script&gt;</p><p></p><p>end</p>";
+  expect([n.body, n.excerpt]).toEqual([want, "a < b & c <script>alert(1)<\/script> end"]);
+  expect((await api("note-content", { id: n.id, body: "x<y" })).body.note.body).toBe("<p>x&lt;y</p>");
+  expect(await api("note-content", { id: n.id, body: "x", format: "markdown" })).toEqual(422, { error: "Choose text or html for the note format." });
+});
+
+await test("5. An old text note with an emoji before a highlight, or a checklist, converts to the wrong marks (bug 1)", READ, async () => {
+  const body = "Exam day \u{1F389} bring a calculator\nand a ruler";
+  const n = await create("old", body, {});
+  const start = body.indexOf("calculator"), end = body.indexOf("ruler") + 5; // UTF-16 units, across the line break
+  const checklist = [{ text: "Buy ink", done: true }, { text: "<b>Return</b> book", done: false }];
+  const r = await api("note-save", { id: n.id, title: T("old"), body, highlights: [{ start: 0, end: 4, color: "pink" }, { start, end, color: "yellow" }], checklist });
+  expect(r.status).toBe(200);
+  const want = `<p><mark data-color="pink">Exam</mark> day \u{1F389} bring a <mark data-color="yellow">calculator</mark></p>`
+    + `<p><mark data-color="yellow">and a ruler</mark></p>`
+    + `<ul data-type="taskList"><li data-type="taskItem" data-checked="true"><p>Buy ink</p></li>`
+    + `<li data-type="taskItem" data-checked="false"><p>&lt;b&gt;Return&lt;/b&gt; book</p></li></ul>`;
+  expect(r.body.note.body).toBe(want);
+  expect((await read(n.id)).body).toBe(want);
+  expect((await read(n.id)).excerpt).toBe("Exam day \u{1F389} bring a calculator and a ruler Buy ink <b>Return</b> book");
+  // Saving it from the new editor makes it an HTML note; the old marks and tasks now live in the HTML.
+  const saved = (await api("note-save", { id: n.id, body: want, format: "html" })).body.note;
+  expect([saved.body, saved.highlights, saved.checklist]).toEqual([want, [], []]);
+});
+
+await test("6. Restoring an older version brings the current marks onto it, or loses its own formatting (bug 2)", "backend/lib/notes.php → keepVersion, noteRoute (note-restore)", async () => {
+  const v1 = `<p><mark data-color="green">old</mark> text</p><ul data-type="taskList"><li data-type="taskItem" data-checked="true"><p>a</p></li></ul>`;
+  const n = await create("restore html", v1);
+  expect((await api("note-save", { id: n.id, body: `<p>new <strong>text</strong> <mark data-color="pink">here</mark></p>`, format: "html" })).status).toBe(200);
+  const versions = (await api("note-versions", undefined, { id: n.id })).body.versions;
+  expect(versions.map((v) => v.body)).toEqual([v1]);
+  const r = await api("note-restore", { id: n.id, versionId: versions[0].id });
+  expect([r.status, r.body.note.body, r.body.note.highlights]).toEqual([200, v1, []]);
+  expect((await read(n.id)).body).toBe(v1);
+  // An old text note: the restored text comes back without the newer highlight.
+  const t = await create("restore text", "Alpha", {});
+  await api("note-save", { id: t.id, body: "Alpha beta", highlights: [{ start: 0, end: 5, color: "pink" }] });
+  const alpha = (await api("note-versions", undefined, { id: t.id })).body.versions.find((v) => v.body === "<p>Alpha</p>");
+  expect((await api("note-restore", { id: t.id, versionId: alpha.id })).body.note.body).toBe("<p>Alpha</p>");
+});
+
+await test("7. A note just under 512 KB is refused, or one over 512 KB is saved", "backend/lib/notes.php → noteBody (NOTE_MAX_BYTES); backend/index.php (the note size cap)", async () => {
+  const id = (await create("size", "<p>x</p>")).id;
+  const fill = (bytes) => "<p>" + "x".repeat(bytes - 7) + "</p>";
+  const just = fill(512 * 1024);
+  expect((await api("note-save", { id, body: just, format: "html" })).status).toBe(200);
+  expect((await read(id)).body.length).toBe(just.length);
+  const tooBig = { error: "Notes can be at most 512 KB. Split this note into two." };
+  for (const route of ["note-save", "note-content"]) expect(await api(route, { id, body: fill(512 * 1024 + 1), format: "html" })).toEqual(413, tooBig);
+  // note-create keeps the usual 8 KB request limit: the editor creates a note first, then saves its text.
+  expect(await api("note-create", { title: T("size"), body: "x".repeat(9000) })).toEqual(413, { error: "This request is too large." });
+  expect((await read(id)).body.length).toBe(just.length);
+});
+
+await test("8. Search misses words inside formatting, or finds tag names, attributes, and links", "backend/lib/notes.php → noteListFilter (body_text)", async () => {
+  const n = await create("search", `<p><strong>zebra</strong>fish <a href="https://quokka.example/">link</a> <span style="color: #abcdef">ok</span> <mark data-color="green">wombat</mark></p>`);
+  const found = async (q) => (await api("notes", undefined, { q })).body.notes.some((x) => x.id === n.id);
+  for (const q of ["zebrafish", "wombat", "fish link"]) expect([q, await found(q)]).toEqual([q, true]);
+  for (const q of ["quokka", "strong", "abcdef", "data-color", "href", "<p>"]) expect([q, await found(q)]).toEqual([q, false]);
+});
+
+await test("9. A viewer, another student, or a signed-out visitor can change a note, or a wrong method or format is accepted", "backend/lib/notes.php → requireEditor; backend/index.php", async () => {
+  const shared = await create("shared", "<p>mine</p>");
+  const mine = await create("private", "<p>secret</p>");
+  await signIn(B);
+  await signIn(A);
+  expect((await api("note-invite", { id: shared.id, email: B })).status).toBe(200);
+  expect(await api.raw("GET", "note-save")).toEqual(405, { error: "This request method is not supported." });
+  expect(await api("note-save", { id: shared.id, body: "<p>x</p>", format: "rich" })).toEqual(422, { error: "Choose text or html for the note format." });
+  await signIn(B);
+  for (const route of ["note-save", "note-content"]) expect(await api(route, { id: shared.id, body: "<p>hacked</p>", format: "html" })).toEqual(403, denied);
+  expect((await read(shared.id)).body).toBe("<p>mine</p>");
+  for (const route of ["note-save", "note-content"]) expect(await api(route, { id: mine.id, body: "<p>hacked</p>", format: "html" })).toEqual(403, denied);
+  await signOut();
+  expect(await api("note-content", { id: shared.id, body: "<p>x</p>", format: "html" })).toEqual(401, { error: "Sign in to continue." });
+  await signIn(A);
+  expect((await read(mine.id)).body).toBe("<p>secret</p>");
+});
+
+await test("10. A huge tag or deep nesting is parsed (slow) or cut short, or text after a stray </body> is lost", "backend/lib/notes.php → cleanNoteHtml (the tag, depth, and </body> checks)", async () => {
+  const id = (await create("limits", "<p>kept</p>")).id;
+  const unreadable = { error: "This note has formatting we can't read. Paste it as plain text and try again." };
+  for (const body of [`<p title="${"a".repeat(4100)}">x</p>`, "<b>".repeat(300) + "deep"])
+    for (const route of ["note-save", "note-content"]) expect(await api(route, { id, body, format: "html" })).toEqual(422, unreadable);
+  expect((await read(id)).body).toBe("<p>kept</p>");
+  expect((await api("note-content", { id, body: `<p title="${"a".repeat(4000)}">x</p>`, format: "html" })).body.note.body).toBe("<p>x</p>");
+  expect((await api("note-save", { id, body: "<p>a</p></BODY ></html><p>after</p>", format: "html" })).body.note.body).toBe("<p>a</p><p>after</p>");
+});
+
+await test("11. Escaping grows a note past 512 KB, or versions pile up past 50", "backend/lib/notes.php → cleanNoteHtml (the size check), keepVersion (NOTE_MAX_VERSIONS)", async () => {
+  const id = (await create("versions", "<p>v0</p>")).id;
+  // 200,000 "&" is 200 KB in, but 1 MB once escaped as &amp;.
+  expect(await api("note-save", { id, body: "&".repeat(200000), format: "html" })).toEqual(413, { error: "Notes can be at most 512 KB. Split this note into two." });
+  for (let i = 1; i <= 52; i++) await api("note-content", { id, body: `<p>v${i}</p>`, format: "html" });
+  const versions = (await api("note-versions", undefined, { id })).body.versions;
+  expect([versions.length, versions[0].body, versions.at(-1).body]).toEqual([50, "<p>v51</p>", "<p>v2</p>"]);
+});
+
+await clean();
+await signOut();
+</script>

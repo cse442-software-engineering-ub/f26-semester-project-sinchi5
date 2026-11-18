@@ -41,6 +41,11 @@ function read(PDO $db, array $session, string $route, string $id): array
     $_GET['id'] = $id;
     return noteAction($db, $session, $route, []);
 }
+// Card 240: bodies are HTML and a text note's tasks are part of it; these checks compare the paragraph words.
+function words(string $html): string
+{
+    return notePlain(preg_replace('~<ul data-type="taskList">.*</ul>~s', '', $html));
+}
 function countRows(PDO $db, string $table, string $id): int
 {
     return (int) query($db, "SELECT COUNT(*) FROM $table WHERE note_id = ?", [$id])->fetchColumn();
@@ -62,9 +67,10 @@ try {
     $taskSaved = noteAction($db, $a, 'note-save', ['id' => $id, 'checklist' => $tasks])['note'];
     check($taskSaved['checklist'] === $tasks && $taskSaved['updatedAt'] > '2000-01-01T00:00:00Z', 'Checklist save did not update edit date.');
     check(read($db, $a, 'note-versions', $id)['versions'] === [], 'Checklist edit created a text version.');
-    foreach (['title', 'body', 'courseId', 'lectureDate', 'category', 'visibility', 'tags', 'pinned', 'createdAt', 'ownerId'] as $key) {
+    foreach (['title', 'courseId', 'lectureDate', 'category', 'visibility', 'tags', 'pinned', 'createdAt', 'ownerId'] as $key) {
         check($taskSaved[$key] === $note[$key], "Checklist edit changed $key.");
     }
+    check($taskSaved['body'] === legacyNoteHtml('Chapter 1', [], $tasks), 'Checklist edit changed the text or lost the tasks.');
     echo "PASS: Task #79 legacy NULL compatibility, checklist-only timestamp and metadata preservation\n";
     check($note['ownerId'] === (string) $users[0] && $note['courseId'] === 'cse442' && $note['lectureDate'] === '2026-10-05'
         && $note['tags'] === ['exam'] && $note['pinned'] === false, 'Create did not store metadata.');
@@ -109,22 +115,22 @@ try {
     // Save keeps the previous text as a version; pin keeps the edit date.
     $saved = noteAction($db, $a, 'note-save', ['id' => $id, 'title' => 'Shared study guide', 'body' => 'Chapter 2',
         'courseId' => 'cse442', 'lectureDate' => '2026-10-05', 'category' => 'Work', 'visibility' => 'shared', 'tags' => []])['note'];
-    check($saved['body'] === 'Chapter 2' && $saved['visibility'] === 'shared' && $saved['category'] === 'Work', 'Save failed.');
+    check(words($saved['body']) === 'Chapter 2' && $saved['visibility'] === 'shared' && $saved['category'] === 'Work', 'Save failed.');
     $versions = read($db, $a, 'note-versions', $id)['versions'];
-    check(count($versions) === 1 && $versions[0]['body'] === 'Chapter 1' && $versions[0]['author'] === 'Student A', 'Save kept no version.');
+    check(count($versions) === 1 && words($versions[0]['body']) === 'Chapter 1' && $versions[0]['author'] === 'Student A', 'Save kept no version.');
     $pinned = noteAction($db, $a, 'note-pin', ['id' => $id, 'pinned' => true])['note'];
     check($pinned['pinned'] === true && $pinned['updatedAt'] === $saved['updatedAt'], 'Pinning changed the edit date.');
     $restored = noteAction($db, $a, 'note-restore', ['id' => $id, 'versionId' => $versions[0]['id']])['note'];
-    check($restored['body'] === 'Chapter 1' && count(read($db, $a, 'note-versions', $id)['versions']) === 2, 'Restore lost history.');
+    check(words($restored['body']) === 'Chapter 1' && count(read($db, $a, 'note-versions', $id)['versions']) === 2, 'Restore lost history.');
 
     // Card 56: the title-only and body-only saves keep the previous text too; an unchanged title keeps nothing.
     noteAction($db, $a, 'note-title', ['id' => $id, 'title' => 'Renamed guide']);
     $versions = read($db, $a, 'note-versions', $id)['versions'];
-    check(count($versions) === 3 && $versions[0]['title'] === 'Shared study guide' && $versions[0]['body'] === 'Chapter 1',
+    check(count($versions) === 3 && $versions[0]['title'] === 'Shared study guide' && words($versions[0]['body']) === 'Chapter 1',
         'A title change kept no version.');
     noteAction($db, $a, 'note-content', ['id' => $id, 'body' => 'Chapter 3']);
     $versions = read($db, $a, 'note-versions', $id)['versions'];
-    check(count($versions) === 4 && $versions[0]['title'] === 'Renamed guide' && $versions[0]['body'] === 'Chapter 1',
+    check(count($versions) === 4 && $versions[0]['title'] === 'Renamed guide' && words($versions[0]['body']) === 'Chapter 1',
         'A body change kept no version.');
     noteAction($db, $a, 'note-title', ['id' => $id, 'title' => 'Renamed guide']);
     check(count(read($db, $a, 'note-versions', $id)['versions']) === 4, 'An unchanged title kept a version.');
@@ -138,12 +144,12 @@ try {
     $invited = noteAction($db, $a, 'note-invite', ['id' => $id, 'email' => strtoupper($emails[1])])['collaborator'];
     check($invited === ['id' => (string) $users[1], 'name' => 'Student B', 'email' => $emails[1], 'permission' => 'view'], 'Invite failed.');
     expectStatus($db, fn () => noteAction($db, $b, 'note-invite', ['id' => $id, 'email' => $emails[2]]), 403);
-    check($titles($b) === ['Shared study guide'] && read($db, $b, 'note', $id)['note']['body'] === 'Chapter 1', 'Collaborator cannot open the note.');
+    check($titles($b) === ['Shared study guide'] && words(read($db, $b, 'note', $id)['note']['body']) === 'Chapter 1', 'Collaborator cannot open the note.');
     expectStatus($db, fn () => noteAction($db, $b, 'note-pin', ['id' => $id, 'pinned' => false]), 403);
     expectStatus($db, fn () => noteAction($db, $b, 'note-permission', ['id' => $id, 'userId' => (string) $users[1], 'permission' => 'edit']), 403);
     noteAction($db, $a, 'note-permission', ['id' => $id, 'userId' => (string) $users[1], 'permission' => 'edit']);
     $edited = noteAction($db, $b, 'note-save', ['id' => $id, 'title' => 'Shared study guide', 'body' => 'Edited by B'])['note'];
-    check($edited['body'] === 'Edited by B' && $edited['visibility'] === 'shared' && $edited['category'] === 'Work',
+    check(words($edited['body']) === 'Edited by B' && $edited['visibility'] === 'shared' && $edited['category'] === 'Work',
         'Edit collaborator could not save, or omitted fields were reset.');
     check(read($db, $a, 'note-collaborators', $id)['collaborators'][0]['permission'] === 'edit', 'Permission did not change.');
     expectStatus($db, fn () => read($db, $c, 'note', $id), 404);
