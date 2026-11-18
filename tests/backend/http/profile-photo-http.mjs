@@ -51,7 +51,7 @@ function error(result, status, message) {
 }
 function photoCount(user, expected) {
   const result = execFileSync(process.env.NOTELY_TEST_PHP || "php", [
-    fileURLToPath(new URL("profile-photo-storage.php", import.meta.url)), user.id, user.email,
+    fileURLToPath(new URL("../php/profile-photo-storage.php", import.meta.url)), user.id, user.email,
   ], { encoding: "utf8", env: process.env });
   assert.equal(result.trim(), String(expected), "database row count for this test account");
 }
