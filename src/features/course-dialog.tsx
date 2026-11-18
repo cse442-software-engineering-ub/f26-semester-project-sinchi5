@@ -1,5 +1,5 @@
 ﻿import { useState } from "react";
-import { useApp } from "../app/context";
+import { useApp, useHoldRefresh } from "../app/context";
 import { Modal } from "../shared/ui";
 import { ImportDialog } from "./imports";
 import s from "../shared/ui.module.css";
@@ -11,6 +11,7 @@ export function AddCourseDialog({
   onClose: () => void;
 }) {
   const { repo, refresh } = useApp();
+  useHoldRefresh(true); // open form: the background re-read waits until it closes
   const [error, setError] = useState("");
   const [syllabus, setSyllabus] = useState<File>();
   const [syllabusError, setSyllabusError] = useState("");

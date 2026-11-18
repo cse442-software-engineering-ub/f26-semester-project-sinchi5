@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useCallback,
   useReducer,
   useMemo,
   useRef,
@@ -42,6 +43,7 @@ const Context = createContext<{
   saveTheme: (theme: ThemeInput) => Promise<Preferences>;
   deleteTheme: (id: string) => Promise<Preferences>;
   setError: (error: string) => void;
+  holdRefresh: () => () => void;
 }>(null!);
 export function Provider({ children }: { children: ReactNode }) {
   const repo = useMemo(() => createAppRepositories(), []);
@@ -53,6 +55,16 @@ export function Provider({ children }: { children: ReactNode }) {
   const refreshVersion = useRef(0);
   const photoVersion = useRef(0);
   const saving = useRef(0);
+  // Card 257: forms with unsaved changes hold the background re-read; one runs when the last hold lets go.
+  const holds = useRef(0);
+  const missed = useRef(false);
+  const refreshRef = useRef<() => Promise<void>>();
+  const holdRefresh = useCallback(() => {
+    holds.current++;
+    return () => {
+      if (--holds.current === 0 && missed.current) { missed.current = false; void refreshRef.current?.(); }
+    };
+  }, []);
   async function refresh({ photoChanged = false }: { photoChanged?: boolean } = {}) {
     // Keep invalidation even if a newer focus/session refresh supersedes this request.
     if (photoChanged) photoVersion.current++;
@@ -89,9 +101,13 @@ export function Provider({ children }: { children: ReactNode }) {
       dispatch({ user: null, completed: false, courses: [], notes: [], events: [], ready: true, error: (e as Error).message });
     }
   }
+  refreshRef.current = refresh;
   useEffect(() => {
     void refresh();
-    const recheck = () => { if (document.visibilityState === "visible") void refresh(); };
+    const recheck = () => {
+      if (document.visibilityState !== "visible") return;
+      if (holds.current > 0) missed.current = true; else void refresh();
+    };
     const stopUnauthorized = onUnauthorized(() => void refresh());
     window.addEventListener("focus", recheck);
     // Card 142: changes made on another device show up within 30 seconds while this tab is visible.
@@ -141,6 +157,7 @@ export function Provider({ children }: { children: ReactNode }) {
         state,
         repo,
         refresh,
+        holdRefresh,
         setPreferences,
         saveTheme: (theme) => themeRequest(() => repo.auth.saveTheme(theme)),
         deleteTheme: (id) => themeRequest(() => repo.auth.deleteTheme(id)),
@@ -152,3 +169,8 @@ export function Provider({ children }: { children: ReactNode }) {
   );
 }
 export const useApp = () => useContext(Context);
+// While `held` is true (unsaved changes, or a form that is open) the 30-second and tab-focus re-reads wait.
+export function useHoldRefresh(held: boolean) {
+  const { holdRefresh } = useApp();
+  useEffect(() => (held ? holdRefresh() : undefined), [held, holdRefresh]);
+}
