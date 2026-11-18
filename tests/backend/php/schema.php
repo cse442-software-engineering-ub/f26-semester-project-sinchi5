@@ -1,0 +1,111 @@
+<?php
+declare(strict_types=1);
+// Read-only test against DEV/TEST using the same private configuration as the app.
+require_once __DIR__ . '/../../../backend/lib/bootstrap.php';
+$db = database(configuration());
+$tables = [
+    'notely_profile_photos' => [
+        'user_id' => ['bigint unsigned', 'NO'],
+        'mime' => ["enum('image/png','image/jpeg','image/webp')", 'NO'],
+        'data' => ['mediumblob', 'NO'], 'updated_at' => ['timestamp', 'NO'],
+    ],
+    // Card 156: one row per course a student shares with one friend.
+    'notely_course_note_shares' => [
+        'owner_user_id' => ['bigint unsigned', 'NO'], 'course_id' => ['varchar(64)', 'NO'],
+        'course_code' => ['varchar(64)', 'NO'], 'friend_user_id' => ['bigint unsigned', 'NO'],
+        'created_at' => ['datetime', 'NO'],
+    ],
+    'notely_users' => [
+        'id' => ['bigint unsigned', 'NO'], 'name' => ['varchar(100)', 'NO'],
+        'email' => ['varchar(254)', 'NO'], 'password_hash' => ['varchar(255)', 'NO'],
+        'recovery_code_hash' => ['char(64)', 'NO'], 'onboarding_completed' => ['tinyint', 'NO'],
+        'created_at' => ['datetime', 'NO'], 'updated_at' => ['datetime', 'NO'],
+    ],
+    'notely_sessions' => [
+        'token_hash' => ['char(64)', 'NO'], 'user_id' => ['bigint unsigned', 'YES'],
+        'created_at' => ['datetime', 'NO'], 'last_seen_at' => ['datetime', 'NO'], 'expires_at' => ['datetime', 'NO'],
+    ],
+    'notely_rate_limits' => [
+        'bucket_hash' => ['char(64)', 'NO'], 'window_start' => ['bigint unsigned', 'NO'], 'attempts' => ['int unsigned', 'NO'],
+    ],
+    'notely_notes' => [
+        'id' => ['bigint unsigned', 'NO'], 'owner_user_id' => ['bigint unsigned', 'NO'],
+        // Card 240: old rows stay 'text' until their next save.
+        'title' => ['varchar(255)', 'NO'], 'body' => ['mediumtext', 'NO'], 'body_format' => ["enum('text','html')", 'NO'],
+        'body_text' => ['mediumtext', 'YES'], 'highlights' => ['text', 'YES'],
+        'course_id' => ['varchar(64)', 'NO'], 'lecture_date' => ['date', 'YES'], 'category' => ['varchar(20)', 'NO'],
+        'visibility' => ["enum('private','shared')", 'NO'], 'tags' => ['varchar(4000)', 'NO'], 'pinned' => ['tinyint', 'NO'],
+        'remind_at' => ['datetime(3)', 'YES'],
+        'created_at' => ['datetime', 'NO'], 'updated_at' => ['datetime', 'NO'],
+        'checklist' => ['text', 'YES'],
+    ],
+    'notely_note_editors' => [
+        'note_id' => ['bigint unsigned', 'NO'], 'user_id' => ['bigint unsigned', 'NO'],
+        'permission' => ["enum('view','edit')", 'NO'],
+    ],
+    'notely_note_versions' => [
+        'id' => ['bigint unsigned', 'NO'], 'note_id' => ['bigint unsigned', 'NO'], 'title' => ['varchar(255)', 'NO'],
+        'body' => ['mediumtext', 'NO'], 'body_format' => ["enum('text','html')", 'NO'], 'body_text' => ['mediumtext', 'YES'],
+        'author_name' => ['varchar(100)', 'NO'], 'created_at' => ['datetime', 'NO'],
+    ],
+    'notely_note_comments' => [
+        'id' => ['bigint unsigned', 'NO'], 'note_id' => ['bigint unsigned', 'NO'], 'author_user_id' => ['bigint unsigned', 'NO'],
+        'body' => ['text', 'NO'], 'created_at' => ['datetime', 'NO'],
+    ],
+    'notely_import_jobs' => [
+        'id' => ['bigint unsigned', 'NO'], 'owner_user_id' => ['bigint unsigned', 'NO'], 'kind' => ["enum('syllabus')", 'NO'],
+        'course_id' => ['varchar(64)', 'NO'], 'file_name' => ['varchar(255)', 'NO'], 'file_type' => ['varchar(4)', 'NO'],
+        'file_size' => ['int unsigned', 'NO'], 'file_sha256' => ['char(64)', 'NO'], 'content' => ['longblob', 'YES'],
+        'state' => ["enum('queued','processing','review','failed','completed')", 'NO'], 'events' => ['mediumtext', 'YES'],
+        'reader_key' => ['varchar(32)', 'YES'],
+        'created_at' => ['datetime', 'NO'], 'updated_at' => ['datetime', 'NO'],
+    ],
+    'notely_events' => [
+        'id' => ['bigint unsigned', 'NO'], 'owner_user_id' => ['bigint unsigned', 'NO'], 'course_id' => ['varchar(64)', 'NO'],
+        'title' => ['varchar(255)', 'NO'],
+        'kind' => ["enum('lecture','assignment','quiz','exam','deadline','other','recitation','lab')", 'NO'],
+        'event_date' => ['date', 'NO'], 'event_time' => ['time', 'YES'], 'location' => ['varchar(120)', 'NO'],
+        'description' => ['varchar(2000)', 'NO'], 'repeat_rule' => ['json', 'YES'],
+        'series_id' => ['varchar(40)', 'YES'], 'source' => ["enum('manual','imported')", 'NO'],
+        'import_job_id' => ['bigint unsigned', 'YES'], 'created_at' => ['datetime', 'NO'], 'updated_at' => ['datetime', 'NO'],
+    ],
+    'notely_courses' => [
+        'id' => ['varchar(64)', 'NO'], 'owner_user_id' => ['bigint unsigned', 'NO'], 'code' => ['varchar(64)', 'NO'],
+        'name' => ['varchar(255)', 'NO'], 'color' => ['char(7)', 'NO'], 'term' => ['varchar(64)', 'NO'],
+        'classes_start' => ['date', 'YES'], 'classes_end' => ['date', 'YES'], 'created_at' => ['datetime', 'NO'], 'updated_at' => ['datetime', 'NO'],
+    ],
+    'notely_preferences' => [
+        'user_id' => ['bigint unsigned', 'NO'], 'mode' => ["enum('system','light','dark')", 'NO'],
+        'scheme' => ['varchar(40)', 'NO'], 'custom_themes' => ['json', 'YES'], 'updated_at' => ['datetime', 'NO'],
+    ],
+];
+foreach ($tables as $table => $columns) {
+    $rows = query($db, 'SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION', [$table])->fetchAll();
+    if (array_column($rows, 'COLUMN_NAME') !== array_keys($columns)) { throw new RuntimeException('Unexpected columns: ' . $table); }
+    echo $table . "\n";
+    foreach ($rows as $row) {
+        // MySQL 8 omits integer display widths; MariaDB commonly includes them.
+        $type = preg_replace('/\b(bigint|tinyint|int)\(\d+\)/', '$1', strtolower($row['COLUMN_TYPE']));
+        if ([$type, $row['IS_NULLABLE']] !== $columns[$row['COLUMN_NAME']]) {
+            throw new RuntimeException('Unexpected type/nullability: ' . $table . '.' . $row['COLUMN_NAME']);
+        }
+        echo '  ' . implode(' ', $row) . "\n";
+    }
+}
+$index = query($db, "SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notely_users' AND INDEX_NAME = 'notely_users_email' AND NON_UNIQUE = 0")->fetchColumn();
+if ((int) $index !== 1) { throw new RuntimeException('Missing unique email index'); }
+$fk = query($db, "SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'notely_sessions_user_fk'")->fetchColumn();
+if ($fk !== 'CASCADE') { throw new RuntimeException('Missing session cascade'); }
+foreach (['notely_notes_owner_fk', 'notely_note_editors_note_fk', 'notely_note_editors_user_fk',
+    'notely_note_versions_note_fk', 'notely_note_comments_note_fk', 'notely_note_comments_author_fk',
+    'notely_import_jobs_owner_fk', 'notely_events_owner_fk', 'notely_profile_photos_user_fk',
+    'notely_course_note_shares_owner_fk', 'notely_course_note_shares_friend_fk'] as $constraint) {
+    $rule = query($db, 'SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS
+        WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = ?', [$constraint])->fetchColumn();
+    if ($rule !== 'CASCADE') { throw new RuntimeException('Missing note cascade: ' . $constraint); }
+}
+// Saved events outlive the upload they came from.
+$rule = query($db, "SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'notely_events_job_fk'")->fetchColumn();
+if ($rule !== 'SET NULL') { throw new RuntimeException('Missing event job SET NULL rule'); }
+echo "PASS: schema, unique email, and account/note cascades\n";

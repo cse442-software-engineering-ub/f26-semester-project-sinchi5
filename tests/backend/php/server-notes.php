@@ -1,0 +1,180 @@
+<?php
+declare(strict_types=1);
+// Server-side notes, including cards 55 and 79. Apply migrations 001 through 007 locally.
+require_once __DIR__ . '/../../../backend/lib/bootstrap.php';
+require_once __DIR__ . '/../../../backend/lib/accounts.php';
+require_once __DIR__ . '/../../../backend/lib/notes.php';
+
+function check(bool $condition, string $message): void
+{
+    if (!$condition) throw new RuntimeException($message);
+}
+function expectStatus(PDO $db, callable $action, int $status): void
+{
+    try {
+        $action();
+    } catch (HttpError $error) {
+        if ($db->inTransaction()) $db->rollBack();
+        check($error->status === $status, "Expected $status, got {$error->status}.");
+        return;
+    }
+    throw new RuntimeException("Expected a $status error.");
+}
+
+$config = configuration();
+check(in_array(parse_url($config['origin'], PHP_URL_HOST), ['localhost', '127.0.0.1'], true)
+    && getenv('NOTELY_TEST_ISOLATED') === '1', 'Run only on an isolated local database with NOTELY_TEST_ISOLATED=1.');
+$db = database($config);
+$users = [];
+$emails = [];
+function testUser(PDO $db, array $config, array &$users, array &$emails, string $name): array
+{
+    $email = 'notely-server-' . bin2hex(random_bytes(8)) . '@example.edu';
+    query($db, 'INSERT INTO notely_users (name, email, password_hash, recovery_code_hash) VALUES (?, ?, ?, ?)',
+        [$name, $email, password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT), str_repeat('0', 64)]);
+    $users[] = $db->lastInsertId();
+    $emails[] = $email;
+    return newSession($db, $config, end($users));
+}
+function read(PDO $db, array $session, string $route, string $id): array
+{
+    $_GET['id'] = $id;
+    return noteAction($db, $session, $route, []);
+}
+// Card 240: bodies are HTML and a text note's tasks are part of it; these checks compare the paragraph words.
+function words(string $html): string
+{
+    return notePlain(preg_replace('~<ul data-type="taskList">.*</ul>~s', '', $html));
+}
+function countRows(PDO $db, string $table, string $id): int
+{
+    return (int) query($db, "SELECT COUNT(*) FROM $table WHERE note_id = ?", [$id])->fetchColumn();
+}
+try {
+    $a = testUser($db, $config, $users, $emails, 'Student A');
+    $b = testUser($db, $config, $users, $emails, 'Student B');
+    $c = testUser($db, $config, $users, $emails, 'Student C');
+
+    // Create with metadata, then list only what each person can open.
+    $note = noteAction($db, $a, 'note-create', ['title' => 'Shared study guide', 'body' => 'Chapter 1',
+        'courseId' => 'cse442', 'lectureDate' => '2026-10-05', 'category' => 'School', 'visibility' => 'private', 'tags' => ['exam']])['note'];
+    $id = $note['id'];
+    // Task #79 / Story #19: migrated NULL rows read as empty tasks. Checklist-only
+    // edits advance updatedAt without creating text history or losing note metadata.
+    query($db, "UPDATE notely_notes SET checklist = NULL, updated_at = '2000-01-01 00:00:00' WHERE id = ?", [$id]);
+    check(read($db, $a, 'note', $id)['note']['checklist'] === [], 'Legacy NULL checklist was not empty.');
+    $tasks = [['text' => 'Review chapter', 'done' => true]];
+    $taskSaved = noteAction($db, $a, 'note-save', ['id' => $id, 'checklist' => $tasks])['note'];
+    check($taskSaved['checklist'] === $tasks && $taskSaved['updatedAt'] > '2000-01-01T00:00:00Z', 'Checklist save did not update edit date.');
+    check(read($db, $a, 'note-versions', $id)['versions'] === [], 'Checklist edit created a text version.');
+    foreach (['title', 'courseId', 'lectureDate', 'category', 'visibility', 'tags', 'pinned', 'createdAt', 'ownerId'] as $key) {
+        check($taskSaved[$key] === $note[$key], "Checklist edit changed $key.");
+    }
+    check($taskSaved['body'] === legacyNoteHtml('Chapter 1', [], $tasks), 'Checklist edit changed the text or lost the tasks.');
+    echo "PASS: Task #79 legacy NULL compatibility, checklist-only timestamp and metadata preservation\n";
+    check($note['ownerId'] === (string) $users[0] && $note['courseId'] === 'cse442' && $note['lectureDate'] === '2026-10-05'
+        && $note['tags'] === ['exam'] && $note['pinned'] === false, 'Create did not store metadata.');
+    $titles = fn (array $session) => array_column(noteAction($db, $session, 'notes', [])['notes'], 'title');
+    check($titles($a) === ['Shared study guide'] && $titles($b) === [], 'List leaked or lost a note.');
+
+    // Card 55: keyword search covers title, body, and tags without treating wildcards as patterns.
+    $searchTitles = static function (array $session, string $keyword) use ($db): array {
+        $_GET['q'] = $keyword;
+        try {
+            return array_column(noteAction($db, $session, 'notes', [])['notes'], 'title');
+        } finally {
+            unset($_GET['q']);
+        }
+    };
+    $searchIds = [];
+    foreach ([
+        ['title' => 'Math Homework'],
+        ['title' => 'History Notes', 'tags' => ['mid!term']],
+        ['title' => 'Class Notes', 'body' => 'Binary search algorithm'],
+        ['title' => 'Score 50% done'],
+    ] as $input) {
+        $searchIds[] = noteAction($db, $a, 'note-create', $input)['note']['id'];
+    }
+    check($searchTitles($a, 'Math') === ['Math Homework'], 'Title search included unrelated notes.');
+    check($searchTitles($a, 'BINARY') === ['Class Notes'], 'Body search was not case-insensitive.');
+    check($searchTitles($a, 'mid!term') === ['History Notes'], 'Tag search or escape-character search failed.');
+    check($searchTitles($a, '50%') === ['Score 50% done'], 'Percent sign was treated as a wildcard.');
+    check($searchTitles($a, '_') === [], 'Underscore was treated as a wildcard.');
+    check($searchTitles($b, 'Math') === [], 'Search leaked another student’s note.');
+    check($searchTitles($a, str_repeat('a', 100)) === [], 'A 100-character search was rejected.');
+    try {
+        $searchTitles($a, str_repeat('a', 101));
+        throw new RuntimeException('A 101-character search was accepted.');
+    } catch (HttpError $error) {
+        check($error->status === 422 && $error->getMessage() === 'Keep the search to 100 characters of plain text.',
+            'A 101-character search did not return the expected error.');
+    }
+    foreach ($searchIds as $searchId) noteAction($db, $a, 'note-delete', ['id' => $searchId]);
+    echo "PASS: card 55 title, body, and tag search, literal wildcards, length limit, and access scope\n";
+
+    // Save keeps the previous text as a version; pin keeps the edit date.
+    $saved = noteAction($db, $a, 'note-save', ['id' => $id, 'title' => 'Shared study guide', 'body' => 'Chapter 2',
+        'courseId' => 'cse442', 'lectureDate' => '2026-10-05', 'category' => 'Work', 'visibility' => 'shared', 'tags' => []])['note'];
+    check(words($saved['body']) === 'Chapter 2' && $saved['visibility'] === 'shared' && $saved['category'] === 'Work', 'Save failed.');
+    $versions = read($db, $a, 'note-versions', $id)['versions'];
+    check(count($versions) === 1 && words($versions[0]['body']) === 'Chapter 1' && $versions[0]['author'] === 'Student A', 'Save kept no version.');
+    $pinned = noteAction($db, $a, 'note-pin', ['id' => $id, 'pinned' => true])['note'];
+    check($pinned['pinned'] === true && $pinned['updatedAt'] === $saved['updatedAt'], 'Pinning changed the edit date.');
+    $restored = noteAction($db, $a, 'note-restore', ['id' => $id, 'versionId' => $versions[0]['id']])['note'];
+    check(words($restored['body']) === 'Chapter 1' && count(read($db, $a, 'note-versions', $id)['versions']) === 2, 'Restore lost history.');
+
+    // Card 56: the title-only and body-only saves keep the previous text too; an unchanged title keeps nothing.
+    noteAction($db, $a, 'note-title', ['id' => $id, 'title' => 'Renamed guide']);
+    $versions = read($db, $a, 'note-versions', $id)['versions'];
+    check(count($versions) === 3 && $versions[0]['title'] === 'Shared study guide' && words($versions[0]['body']) === 'Chapter 1',
+        'A title change kept no version.');
+    noteAction($db, $a, 'note-content', ['id' => $id, 'body' => 'Chapter 3']);
+    $versions = read($db, $a, 'note-versions', $id)['versions'];
+    check(count($versions) === 4 && $versions[0]['title'] === 'Renamed guide' && words($versions[0]['body']) === 'Chapter 1',
+        'A body change kept no version.');
+    noteAction($db, $a, 'note-title', ['id' => $id, 'title' => 'Renamed guide']);
+    check(count(read($db, $a, 'note-versions', $id)['versions']) === 4, 'An unchanged title kept a version.');
+    noteAction($db, $a, 'note-title', ['id' => $id, 'title' => 'Shared study guide']);
+    noteAction($db, $a, 'note-content', ['id' => $id, 'body' => 'Chapter 1']);
+    echo "PASS: card 56 title and body saves keep the previous version\n";
+
+    // Sharing: only the owner invites and sets permissions; collaborators see the note.
+    expectStatus($db, fn () => noteAction($db, $a, 'note-invite', ['id' => $id, 'email' => 'nobody-' . bin2hex(random_bytes(4)) . '@example.edu']), 404);
+    expectStatus($db, fn () => noteAction($db, $a, 'note-invite', ['id' => $id, 'email' => $emails[0]]), 422);
+    $invited = noteAction($db, $a, 'note-invite', ['id' => $id, 'email' => strtoupper($emails[1])])['collaborator'];
+    check($invited === ['id' => (string) $users[1], 'name' => 'Student B', 'email' => $emails[1], 'permission' => 'view'], 'Invite failed.');
+    expectStatus($db, fn () => noteAction($db, $b, 'note-invite', ['id' => $id, 'email' => $emails[2]]), 403);
+    check($titles($b) === ['Shared study guide'] && words(read($db, $b, 'note', $id)['note']['body']) === 'Chapter 1', 'Collaborator cannot open the note.');
+    expectStatus($db, fn () => noteAction($db, $b, 'note-pin', ['id' => $id, 'pinned' => false]), 403);
+    expectStatus($db, fn () => noteAction($db, $b, 'note-permission', ['id' => $id, 'userId' => (string) $users[1], 'permission' => 'edit']), 403);
+    noteAction($db, $a, 'note-permission', ['id' => $id, 'userId' => (string) $users[1], 'permission' => 'edit']);
+    $edited = noteAction($db, $b, 'note-save', ['id' => $id, 'title' => 'Shared study guide', 'body' => 'Edited by B'])['note'];
+    check(words($edited['body']) === 'Edited by B' && $edited['visibility'] === 'shared' && $edited['category'] === 'Work',
+        'Edit collaborator could not save, or omitted fields were reset.');
+    check(read($db, $a, 'note-collaborators', $id)['collaborators'][0]['permission'] === 'edit', 'Permission did not change.');
+    expectStatus($db, fn () => read($db, $c, 'note', $id), 404);
+    expectStatus($db, fn () => read($db, $c, 'note-comments', $id), 404);
+
+    // Comments: shared notes only, trimmed, limited, and attributed to the session's user.
+    $comment = noteAction($db, $b, 'note-comment', ['id' => $id, 'body' => "  Great guide.  ", 'authorId' => (string) $users[0]])['comment'];
+    check($comment['author'] === 'Student B' && $comment['authorId'] === (string) $users[1] && $comment['body'] === 'Great guide.', 'Comment author was forged.');
+    foreach ([['body' => '   '], ['body' => str_repeat('x', 2001)], ['body' => 5]] as $input) {
+        expectStatus($db, fn () => noteAction($db, $a, 'note-comment', ['id' => $id] + $input), 422);
+    }
+    expectStatus($db, fn () => noteAction($db, $c, 'note-comment', ['id' => $id, 'body' => 'Intruder']), 404);
+    check(count(read($db, $a, 'note-comments', $id)['comments']) === 1, 'Comment count is wrong.');
+
+    // Deleting removes the note with its collaborators, history, and comments; the collaborator loses access.
+    expectStatus($db, fn () => noteAction($db, $b, 'note-delete', ['id' => $id]), 403);
+    noteAction($db, $a, 'note-delete', ['id' => $id]);
+    foreach (['notely_note_editors', 'notely_note_versions', 'notely_note_comments'] as $table) {
+        check(countRows($db, $table, $id) === 0, "Deleting left rows in $table.");
+    }
+    check($titles($a) === [] && $titles($b) === [], 'Deleted note is still listed.');
+    expectStatus($db, fn () => read($db, $b, 'note', $id), 404);
+    expectStatus($db, fn () => read($db, $b, 'note-comments', $id), 404);
+    echo "PASS: metadata, listing, versions, pinning, restore, sharing, permissions, comments, delete cascade and lost access\n";
+} finally {
+    if ($db->inTransaction()) $db->rollBack();
+    foreach ($users as $userId) query($db, 'DELETE FROM notely_users WHERE id = ?', [$userId]);
+}
