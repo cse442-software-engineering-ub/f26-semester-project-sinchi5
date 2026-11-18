@@ -138,9 +138,12 @@ try {
     noteAction($db, $a, 'note-content', ['id' => $id, 'body' => 'Chapter 1']);
     echo "PASS: card 56 title and body saves keep the previous version\n";
 
-    // Sharing: only the owner invites and sets permissions; collaborators see the note.
-    expectStatus($db, fn () => noteAction($db, $a, 'note-invite', ['id' => $id, 'email' => 'nobody-' . bin2hex(random_bytes(4)) . '@example.edu']), 404);
+    // Sharing: only the owner invites, only accepted friends (card 246), and sets permissions; collaborators see the note.
+    expectStatus($db, fn () => noteAction($db, $a, 'note-invite', ['id' => $id, 'email' => 'nobody-' . bin2hex(random_bytes(4)) . '@example.edu']), 422);
     expectStatus($db, fn () => noteAction($db, $a, 'note-invite', ['id' => $id, 'email' => $emails[0]]), 422);
+    expectStatus($db, fn () => noteAction($db, $a, 'note-invite', ['id' => $id, 'email' => $emails[1]]), 422);
+    query($db, "INSERT INTO notely_friendships (requester_id, addressee_id, user_low, user_high, status) VALUES (?, ?, ?, ?, 'accepted')",
+        [$users[0], $users[1], min((int) $users[0], (int) $users[1]), max((int) $users[0], (int) $users[1])]);
     $invited = noteAction($db, $a, 'note-invite', ['id' => $id, 'email' => strtoupper($emails[1])])['collaborator'];
     check($invited === ['id' => (string) $users[1], 'name' => 'Student B', 'email' => $emails[1], 'permission' => 'view'], 'Invite failed.');
     expectStatus($db, fn () => noteAction($db, $b, 'note-invite', ['id' => $id, 'email' => $emails[2]]), 403);

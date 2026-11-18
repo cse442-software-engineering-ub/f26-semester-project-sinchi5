@@ -28,7 +28,7 @@ it("lists server notes with the browser's search and sort", async () => {
   const api = fakeApi(() => ({ json: { notes: [{ ...first, courseId: "other", pinned: false }, { ...second, courseId: "c1", pinned: false }] } }));
   const notes = createHttpNotes(courses, "/api/index.php", api.fetcher);
   expect((await notes.list({ q: "recursion" })).map((n) => n.id)).toEqual([second.id]);
-  expect(api.calls).toEqual([{ route: "notes", method: "GET", csrf: undefined, body: undefined }]);
+  expect(api.calls).toEqual([{ route: "notes&q=recursion", method: "GET", csrf: undefined, body: undefined }]);
 });
 
 it("asks the server for one category and still applies the other filters in the browser", async () => {
@@ -46,7 +46,16 @@ it("asks the server for one category and still applies the other filters in the 
   const repo = createHttpNotes(courses, "/api/index.php", api.fetcher);
   expect((await repo.list({ category: "Work" })).map((n) => n.title).sort()).toEqual(["Sprint plan", "Sprint retro"]);
   expect((await repo.list({ category: "Work", q: "retro" })).map((n) => n.title)).toEqual(["Sprint retro"]);
-  expect(api.calls.map((call) => call.route)).toEqual(["notes&category=Work", "notes&category=Work"]);
+  expect(api.calls.map((call) => call.route)).toEqual(["notes&category=Work", "notes&category=Work&q=retro"]);
+});
+
+it("lets the server search list notes, which carry an excerpt and no body (card 246)", async () => {
+  const [first] = seedNotes();
+  const { body: _body, ...listed } = { ...first, title: "Graphs", tags: [], excerpt: "Intro", pinned: false };
+  const api = fakeApi(() => ({ json: { notes: [listed] } }));
+  const repo = createHttpNotes(courses, "/api/index.php", api.fetcher);
+  expect((await repo.list({ q: "dijkstra" })).map((n) => n.title)).toEqual(["Graphs"]);
+  expect(api.calls[0].route).toBe("notes&q=dijkstra");
 });
 
 it("sends an encoded exact tag and combines it with the category", async () => {

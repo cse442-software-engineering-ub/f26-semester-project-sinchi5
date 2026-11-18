@@ -96,6 +96,9 @@ try {
     assert.equal((await person.call("note-save", { id: taskId, checklist: [] })).status, status);
   }
   assert.equal((await studentA.call("note-save", { id: taskId, checklist: [] }, { "X-CSRF-Token": "forged" })).status, 403);
+  // Card 246: only an accepted friend can be invited.
+  await studentA.call("friend-request", { email: studentB.email });
+  await studentB.call("friend-respond", { id: (await studentB.call("friends")).data.incoming[0].id, accept: true });
   await studentA.call("note-invite", { id: taskId, email: studentB.email });
   assert.equal((await studentB.call("note-save", { id: taskId, checklist: [] })).status, 403);
   const bId = (await studentA.call(`note-collaborators&id=${taskId}`)).data.collaborators[0].id;
@@ -131,7 +134,8 @@ try {
   const id = created.data.note.id;
   assert.deepEqual(created.data.note.tags, ["exam"]);
   assert.equal((await studentA.call("note-save", { id, title: "Shared study guide", body: "Chapter 2", visibility: "shared" })).status, 200);
-  assert.equal((await studentA.call("note-invite", { id, email: `missing-${randomUUID()}@example.edu` })).status, 404);
+  // Card 246: an unknown email gets the same answer as a stranger, so it never reveals an account.
+  assert.equal((await studentA.call("note-invite", { id, email: `missing-${randomUUID()}@example.edu` })).status, 422);
   const invited = await studentA.call("note-invite", { id, email: studentB.email });
   assert.equal(invited.status, 200);
   assert.equal(invited.data.collaborator.permission, "view");

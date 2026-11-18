@@ -196,8 +196,12 @@ await test("8. Search misses words inside formatting, or finds tag names, attrib
 await test("9. A viewer, another student, or a signed-out visitor can change a note, or a wrong method or format is accepted", "backend/lib/notes.php → requireEditor; backend/index.php", async () => {
   const shared = await create("shared", "<p>mine</p>");
   const mine = await create("private", "<p>secret</p>");
+  // Card 246: only a friend can be invited, so B asks and A accepts. A second run finds them already friends.
   await signIn(B);
+  await api("friend-request", { email: A });
   await signIn(A);
+  const request = (await api("friends")).body.incoming.find((f) => f.email === B);
+  if (request) await api("friend-respond", { id: request.id, accept: true });
   expect((await api("note-invite", { id: shared.id, email: B })).status).toBe(200);
   expect(await api.raw("GET", "note-save")).toEqual(405, { error: "This request method is not supported." });
   expect(await api("note-save", { id: shared.id, body: "<p>x</p>", format: "rich" })).toEqual(422, { error: "Choose text or html for the note format." });

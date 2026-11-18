@@ -76,6 +76,9 @@ try {
     assert.equal((await owner.call("note-reminder", { id, remindAt: bad })).status, 422);
   }
 
+  // Card 246: only an accepted friend can be invited.
+  await owner.call("friend-request", { email: reader.email });
+  await reader.call("friend-respond", { id: (await reader.call("friends")).data.incoming[0].id, accept: true });
   assert.equal((await owner.call("note-invite", { id, email: reader.email })).status, 200);
   assert.equal((await reader.call("note-reminder", { id, remindAt: first })).status, 403,
     "a view-only collaborator cannot change the reminder");

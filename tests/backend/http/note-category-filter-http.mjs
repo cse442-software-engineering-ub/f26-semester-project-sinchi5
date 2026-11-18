@@ -93,6 +93,9 @@ try {
   await seed("Private meeting notes", "Meetings", { visibility: "private" });
   // Before the invitation the friend is just another signed-in student with no access.
   assert.deepEqual((await list(friend, "&category=Meetings")).titles, [], "someone with no access sees nothing");
+  // Card 246: only an accepted friend can be invited.
+  await owner.call("friend-request", { email: friend.email });
+  await friend.call("friend-respond", { id: (await friend.call("friends")).data.incoming[0].id, accept: true });
   assert.equal((await owner.call("note-invite", { id: shared, email: friend.email })).status, 200);
   assert.deepEqual((await list(friend, "&category=Meetings")).titles, ["Shared meeting notes"], "a collaborator sees only the shared Meetings note");
   const signedOut = client();

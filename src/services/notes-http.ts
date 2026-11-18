@@ -60,7 +60,9 @@ export function createHttpNotes(
       // the demo and signed-in notes share the same list contract.
       const category = NOTE_CATEGORIES.includes(q?.category ?? "") ? `&category=${encodeURIComponent(q!.category!)}` : "";
       const tag = q?.tag ? `&tag=${encodeURIComponent(q.tag)}` : "";
-      const { notes } = await send<{ notes: Note[] }>(`notes${category}${tag}`);
+      // Card 246: list notes carry an excerpt, not the body, so the server does the keyword search.
+      const search = q?.q ? `&q=${encodeURIComponent(q.q)}` : "";
+      const { notes } = await send<{ notes: Note[] }>(`notes${category}${tag}${search}`);
       return filterNotes(notes, q);
     },
     async get(noteId) {

@@ -22,7 +22,8 @@ export function filterNotes(
   return notes
     .filter(
       (n) =>
-        (!q ||
+        // Card 246: the server's notes list has no body; the server already searched it with the same q.
+        (!q || n.body === undefined ||
           [n.title, plainText(n.body, n.format), ...n.tags]
             .join(" ")
             .toLowerCase()

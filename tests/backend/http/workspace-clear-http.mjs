@@ -66,10 +66,11 @@ try {
 
   const noteA = await fill(a, "clear-c");
   const noteB = await fill(b, "clear-d"); // a second student with their own data
-  assert.equal((await a.call("note-invite", { id: noteA, email: b.email })).status, 200);
   assert.equal((await a.call("friend-request", { email: b.email })).status, 201);
   const incoming = (await b.call("friends")).data.incoming[0];
   assert.equal((await b.call("friend-respond", { id: incoming.id, accept: true })).status, 200);
+  // Card 246: only an accepted friend can be invited.
+  assert.equal((await a.call("note-invite", { id: noteA, email: b.email })).status, 200);
   assert.equal((await a.call("course-notes-share", { courseId: "clear-c", courseCode: "CSE 442", friendIds: [(await a.call("friends")).data.friends[0].userId] })).status, 200);
   assert.deepEqual(await counts(a, noteA), [1, 1, 1, 200]);
   assert.equal((await b.call("note", undefined, { query: `&id=${noteA}` })).status, 200); // b is a collaborator on a's note
