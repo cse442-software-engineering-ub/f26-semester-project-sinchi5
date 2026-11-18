@@ -10,12 +10,12 @@ import { buildPalette } from "../services/palette";
 import type { ColorScheme, CustomTheme, Preferences, ThemeMode } from "../domain";
 
 const MODES: [ThemeMode, string][] = [["system", "System"], ["light", "Light"], ["dark", "Dark"]];
-// Preview colors: bg, surface, primary of each scheme in light mode (the same values as tokens.css).
+// Preview colors: ground, sheet, ribbon of each scheme in light mode (the same values as tokens.css, card 251).
 const SCHEMES: [ColorScheme, string, string[]][] = [
-  ["sage", "Sage", ["#f8f9f6", "#fff", "#8b5d33"]],
-  ["fjord", "Fjord", ["#eceff4", "#f8f9fb", "#496a92"]],
-  ["rose", "Rosé", ["#faf4ed", "#fffaf3", "#286983"]],
-  ["mocha", "Mocha", ["#eff1f5", "#fff", "#7a2fd6"]],
+  ["sage", "Sage", ["#f2f4ee", "#ffffff", "#8b5d33"]],
+  ["fjord", "Fjord", ["#ebeef3", "#fbfcfe", "#496a92"]],
+  ["rose", "Rosé", ["#f7f0e8", "#fffaf3", "#286983"]],
+  ["mocha", "Mocha", ["#eceef3", "#ffffff", "#7a2fd6"]],
 ];
 
 // Native radios give the arrow-key and Tab behavior of a radio group.
@@ -33,8 +33,10 @@ function startingColors() {
   return { accent: read("--primary"), background: read("--bg"), text: read("--text") };
 }
 const swatchOf = (t: CustomTheme) => {
-  const p = isHex(t.accent) && isHex(t.background) && isHex(t.text) ? buildPalette(t).light : null;
-  return p ? [p["--bg"], p["--surface"], p["--primary"]] : [];
+  const b = isHex(t.accent) && isHex(t.background) && isHex(t.text) ? buildPalette(t) : null;
+  // Preview the mode the theme was made for: a dark background shows its dark set.
+  const p = b && (b.dark["--bg"] === t.background.toLowerCase() ? b.dark : b.light);
+  return p ? [p["--ground"], p["--sheet"], p["--ribbon"]] : [];
 };
 
 // The three-color form, with both results previewed from buildPalette as the colors change.

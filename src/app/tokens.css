@@ -7,6 +7,42 @@
   --motion-slow: 240ms;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  /* planner scale (card 251): spacing, page gutter, reading measure, type, radii. Not colors, so no scheme repeats them. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-gutter: clamp(16px, 3.4vw, 56px);
+  --measure-read: 68ch;
+  --fs-label: 0.6875rem;
+  --lh-label: 1rem;
+  --ls-label: 0.06em;
+  --fs-small: 0.75rem;
+  --lh-small: 1rem;
+  --ls-small: 0em;
+  --fs-body: 0.875rem;
+  --lh-body: 1.25rem;
+  --ls-body: -0.006em;
+  --fs-lead: 1rem;
+  --lh-lead: 1.5rem;
+  --ls-lead: -0.011em;
+  --fs-title: 1.25rem;
+  --lh-title: 1.75rem;
+  --ls-title: -0.017em;
+  --fs-heading: clamp(1.5rem, 1.3rem + 0.6vw, 1.75rem);
+  --lh-heading: 1.25;
+  --ls-heading: -0.025em;
+  --fs-display: clamp(2rem, 1.6rem + 1.2vw, 2.5rem);
+  --lh-display: 1.15;
+  --ls-display: -0.035em;
+  --radius-control: 10px;
+  --radius-card: 12px;
+  --radius-sheet: 14px;
+  --radius-pill: 999px;
   color-scheme: light;
   --bg: #f8f9f6;
   --surface: #fff;
@@ -62,6 +98,19 @@
   --shadow-card-hover: 0 5px 18px #34432a08;
   --shadow-paper: 0 12px 40px #51654415;
   --swatch-line: #8884;
+  /* planner material (card 251) */
+  --ground: #f2f4ee;
+  --sheet: #ffffff;
+  --sheet-edge: #e4e9e0;
+  --sheet-shadow: 0 1px 2px #304c580f, 0 8px 24px #304c5814;
+  --spine: #e2e7de;
+  --spine-shade: #f4f6f2;
+  --rule: #eef1ea;
+  --ribbon: #8b5d33;
+  --ribbon-text: #ffffff;
+  --ribbon-notch: #694222;
+  --warn: #865700;
+  --warn-soft: #fbefd0;
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -75,7 +124,7 @@
   --primary-text: #192820;
   --sage: #334638;
   --mint: #a7cdbd;
-  --nav: #283a2d;
+  --nav: #1a231f;
   --shadow: 0 16px 64px #0005;
   /* semantic colors (card 222) */
   --danger: #ffb7a9;
@@ -119,6 +168,19 @@
   --shadow-card-hover: 0 5px 18px #dbe9e108;
   --shadow-paper: 0 12px 40px #c1dbcf15;
   --swatch-line: #8884;
+  /* planner material (card 251) */
+  --ground: #151c19;
+  --sheet: #212c27;
+  --sheet-edge: #34433b;
+  --sheet-shadow: 0 1px 2px #0000004d, 0 12px 32px #00000059;
+  --spine: #34433a;
+  --spine-shade: #1b2420;
+  --rule: #2b3832;
+  --ribbon: #a7cdbd;
+  --ribbon-text: #192820;
+  --ribbon-notch: #6f9585;
+  --warn: #f1c97a;
+  --warn-soft: #3b3624;
 }
 :root[data-scheme="fjord"] {
   --bg: #eceff4;
@@ -175,6 +237,19 @@
   --shadow-card-hover: 0 5px 18px #2e344008;
   --shadow-paper: 0 12px 40px #3c4f6915;
   --swatch-line: #8884;
+  /* planner material (card 251) */
+  --ground: #ebeef3;
+  --sheet: #fbfcfe;
+  --sheet-edge: #d6dce6;
+  --sheet-shadow: 0 1px 2px #2e34400f, 0 8px 24px #2e344014;
+  --spine: #d9dfe8;
+  --spine-shade: #f1f3f7;
+  --rule: #e8ecf2;
+  --ribbon: #496a92;
+  --ribbon-text: #ffffff;
+  --ribbon-notch: #324d70;
+  --warn: #7a5200;
+  --warn-soft: #f6ecd6;
 }
 :root[data-scheme="fjord"][data-theme="dark"] {
   --bg: #2e3440;
@@ -187,7 +262,7 @@
   --primary-text: #2e3440;
   --sage: #434c5e;
   --mint: #8fbcbb;
-  --nav: #3b4252;
+  --nav: #2e3440;
   --shadow: 0 16px 64px #0006;
   /* semantic colors (card 222) */
   --danger: #f0a3aa;
@@ -231,6 +306,19 @@
   --shadow-card-hover: 0 5px 18px #eceff408;
   --shadow-paper: 0 12px 40px #bad8e215;
   --swatch-line: #8884;
+  /* planner material (card 251) */
+  --ground: #292e39;
+  --sheet: #3b4252;
+  --sheet-edge: #4c566a;
+  --sheet-shadow: 0 1px 2px #0000004d, 0 12px 32px #00000059;
+  --spine: #4c556a;
+  --spine-shade: #333a48;
+  --rule: #465065;
+  --ribbon: #88c0d0;
+  --ribbon-text: #2e3440;
+  --ribbon-notch: #5d93a3;
+  --warn: #ebcb8b;
+  --warn-soft: #4a4840;
 }
 :root[data-scheme="rose"] {
   --bg: #faf4ed;
@@ -287,6 +375,19 @@
   --shadow-card-hover: 0 5px 18px #57527908;
   --shadow-paper: 0 12px 40px #405e7e15;
   --swatch-line: #8884;
+  /* planner material (card 251) */
+  --ground: #f7f0e8;
+  --sheet: #fffaf3;
+  --sheet-edge: #e9dfd5;
+  --sheet-shadow: 0 1px 2px #5752790f, 0 8px 24px #57527914;
+  --spine: #e9e0d7;
+  --spine-shade: #f9f2ea;
+  --rule: #f2ebe3;
+  --ribbon: #286983;
+  --ribbon-text: #fffaf3;
+  --ribbon-notch: #18495e;
+  --warn: #8a5300;
+  --warn-soft: #fbecd2;
 }
 :root[data-scheme="rose"][data-theme="dark"] {
   --bg: #232136;
@@ -299,7 +400,7 @@
   --primary-text: #232136;
   --sage: #393552;
   --mint: #9ccfd8;
-  --nav: #2a273f;
+  --nav: #232136;
   --shadow: 0 16px 64px #0006;
   /* semantic colors (card 222) */
   --danger: #f4a6b8;
@@ -343,6 +444,19 @@
   --shadow-card-hover: 0 5px 18px #e0def408;
   --shadow-paper: 0 12px 40px #e5bcc615;
   --swatch-line: #8884;
+  /* planner material (card 251) */
+  --ground: #1e1c2f;
+  --sheet: #2a273f;
+  --sheet-edge: #423e5c;
+  --sheet-shadow: 0 1px 2px #0000004d, 0 12px 32px #00000059;
+  --spine: #423e5a;
+  --spine-shade: #242236;
+  --rule: #38354f;
+  --ribbon: #ea9a97;
+  --ribbon-text: #232136;
+  --ribbon-notch: #b56c6a;
+  --warn: #f6c177;
+  --warn-soft: #443a3c;
 }
 :root[data-scheme="mocha"] {
   --bg: #eff1f5;
@@ -399,6 +513,19 @@
   --shadow-card-hover: 0 5px 18px #4c4f6908;
   --shadow-paper: 0 12px 40px #633fa015;
   --swatch-line: #8884;
+  /* planner material (card 251) */
+  --ground: #eceef3;
+  --sheet: #ffffff;
+  --sheet-edge: #d9dce5;
+  --sheet-shadow: 0 1px 2px #4c4f690f, 0 8px 24px #4c4f6914;
+  --spine: #dee1e9;
+  --spine-shade: #f3f4f8;
+  --rule: #eceef3;
+  --ribbon: #7a2fd6;
+  --ribbon-text: #ffffff;
+  --ribbon-notch: #561c9e;
+  --warn: #8a4f00;
+  --warn-soft: #fbebd2;
 }
 :root[data-scheme="mocha"][data-theme="dark"] {
   --bg: #1e1e2e;
@@ -411,7 +538,7 @@
   --primary-text: #1e1e2e;
   --sage: #313244;
   --mint: #94e2d5;
-  --nav: #181825;
+  --nav: #1e1e2e;
   --shadow: 0 16px 64px #0006;
   /* semantic colors (card 222) */
   --danger: #f5a3b8;
@@ -455,4 +582,17 @@
   --shadow-card-hover: 0 5px 18px #cdd6f408;
   --shadow-paper: 0 12px 40px #ccbef615;
   --swatch-line: #8884;
+  /* planner material (card 251) */
+  --ground: #191926;
+  --sheet: #262738;
+  --sheet-edge: #3c3e53;
+  --sheet-shadow: 0 1px 2px #0000004d, 0 12px 32px #00000059;
+  --spine: #3d3f53;
+  --spine-shade: #202130;
+  --rule: #33354a;
+  --ribbon: #cba6f7;
+  --ribbon-text: #1e1e2e;
+  --ribbon-notch: #9677c2;
+  --warn: #f9e2af;
+  --warn-soft: #403a37;
 }

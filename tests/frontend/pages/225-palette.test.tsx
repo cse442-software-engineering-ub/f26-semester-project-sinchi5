@@ -23,7 +23,7 @@ const readable = (t: Parameters<typeof buildPalette>[0]) => worst(buildPalette(t
 
 await test("1. A color variable from tokens.css is missing in the light or the dark set", FILE, () => {
   // Card 234: the palette now builds the semantic variables of card 222 too, so a custom theme inherits nothing.
-  const names = [...new Set([...tokensCss.matchAll(/^\s*(--[a-z0-9-]+):/gm)].map((m) => m[1]).filter((n) => !/^--(motion|ease)-/.test(n)))].sort(); // motion variables (card 248) are not colors
+  const names = [...new Set([...tokensCss.matchAll(/^\s*(--[a-z0-9-]+):/gm)].map((m) => m[1]).filter((n) => !/^--(motion|ease|space|measure|fs|lh|ls|radius)-/.test(n)))].sort(); // motion (card 248) and the planner scale (card 251) are not colors
   const p = buildPalette(comfy);
   expect(Object.keys(p.light).sort()).toEqual(names);
   expect(Object.keys(p.dark).sort()).toEqual(names);
@@ -77,7 +77,7 @@ await test("9. A value that is not a valid color is produced", FILE, () => {
     const p = buildPalette(t);
     for (const mode of [p.light, p.dark])
       for (const [name, value] of Object.entries(mode)) {
-        const ok = name.includes("shadow") ? /^0 \d+px \d+px (\d+px )?#[0-9a-f]{6,8}$/.test(value)
+        const ok = name.includes("shadow") ? /^0 \d+px \d+px (\d+px )?#[0-9a-f]{6,8}(, 0 \d+px \d+px (\d+px )?#[0-9a-f]{6,8})*$/.test(value) // card 251: the sheet shadow has two layers
           : name === "--swatch-line" || name.startsWith("--overlay") ? /^#[0-9a-f]{4,8}$/.test(value) : /^#[0-9a-f]{6}$/.test(value);
         if (!ok) throw new Error(`${name} is ${JSON.stringify(value)}`);
       }

@@ -15,6 +15,9 @@ export const PALETTE_VARIABLES = [
   "--logo-ink", "--logo-star", "--tint-a", "--tint-a-ink", "--tint-b", "--tint-b-ink", "--tint-c", "--tint-c-ink",
   "--glyph-1", "--glyph-2", "--glyph-3", "--hover-line", "--dropzone-line", "--selection-ink",
   "--overlay", "--overlay-strong", "--shadow-button", "--shadow-pop", "--shadow-card-hover", "--shadow-paper", "--swatch-line",
+  // The planner material of card 251: ground, sheet, spine, rules, ribbon and the due chip.
+  "--ground", "--sheet", "--sheet-edge", "--sheet-shadow", "--spine", "--spine-shade", "--rule",
+  "--ribbon", "--ribbon-text", "--ribbon-notch", "--warn", "--warn-soft",
 ] as const;
 
 const MIN_RATIO = 4.5;
@@ -84,17 +87,17 @@ export function contrastRatio(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-const passes = (fg: string, bgs: string[]) => bgs.every((bg) => contrastRatio(fg, bg) >= MIN_RATIO);
+const passes = (fg: string, bgs: string[], min = MIN_RATIO) => bgs.every((bg) => contrastRatio(fg, bg) >= min);
 
-// Moves lightness (away from the backgrounds first) in 0.01 steps until every pair reaches 4.5:1; null if impossible.
-function nudge(fg: string, bgs: string[]): string | null {
-  if (passes(fg, bgs)) return fg;
+// Moves lightness (away from the backgrounds first) in 0.01 steps until every pair reaches the ratio (4.5:1); null if impossible.
+function nudge(fg: string, bgs: string[], min = MIN_RATIO): string | null {
+  if (passes(fg, bgs, min)) return fg;
   const [L, C, h] = toLch(fg);
   const lum = bgs.reduce((sum, bg) => sum + luminance(bg), 0) / bgs.length;
   for (const dir of lum > 0.18 ? [-1, 1] : [1, -1]) {
     for (let i = 1; i <= 100; i++) {
       const next = fromLch(L + dir * 0.01 * i, C, h);
-      if (passes(next, bgs)) return next;
+      if (passes(next, bgs, min)) return next;
     }
   }
   return null;
@@ -106,23 +109,36 @@ function buildMode(dark: boolean, given: boolean, input: PaletteInput): { set: P
   const [, tC, tH] = toLch(input.text);
   const bg = given ? input.background : fromLch(dark ? 0.21 : 0.975, Math.min(bC, dark ? 0.03 : 0.02), bH);
   const bgL = toLch(bg)[0];
-  const tint = (dL: number, c = Math.min(bC, 0.04)) => fromLch(bgL + dL, c, bH);
-  let surface = tint(dark ? 0.035 : 0.025);
-  const soft = tint(dark ? 0.07 : -0.03);
+  // Card 251: the page ground and the sheet stay calm whatever the input (lightness and chroma clamped);
+  // light sheets sit near white above the ground, dark sheets a step lighter than it. Cards (--surface), quiet fills
+  // and the sidebar follow the calm ground, so a saturated background never floods the screens; --bg keeps the input.
+  const groundL = dark ? clamp(bgL - 0.01, 0.17, 0.25) : clamp(bgL - 0.008, 0.9, 0.97);
+  const calm = (L: number, c = Math.min(bC, 0.04)) => fromLch(L, c, bH);
+  const ground = calm(groundL, Math.min(bC, dark ? 0.025 : 0.035));
+  const sheet = calm(dark ? groundL + 0.05 : Math.max(0.985, groundL + 0.02), Math.min(bC, dark ? 0.02 : 0.01));
+  let surface = sheet;
+  const soft = calm(groundL + (dark ? 0.07 : -0.022));
   const textStart = given ? input.text : fromLch(dark ? 0.93 : 0.3, Math.min(tC, 0.05), tH);
-  let text = nudge(textStart, [bg, surface]);
+  let text = nudge(textStart, [bg, surface, ground, sheet]);
   if (!text) {
     surface = bg; // no text color reaches 4.5:1 on both, so the card color becomes the page color
-    text = nudge(textStart, [bg]) ?? (contrastRatio("#ffffff", bg) > contrastRatio("#000000", bg) ? "#ffffff" : "#000000");
+    text = nudge(textStart, [bg, ground, sheet]) ?? (contrastRatio("#ffffff", bg) > contrastRatio("#000000", bg) ? "#ffffff" : "#000000");
   }
   const adjusted = given && text !== input.text;
-  const muted = nudge(mix(text, bg, 0.3), [bg, surface]) ?? nudge(mix(text, bg, 0.3), [bg]) ?? text;
+  const muted = nudge(mix(text, bg, 0.3), [bg, surface, ground, sheet]) ?? nudge(mix(text, bg, 0.3), [bg, ground, sheet]) ?? text;
   const primary = given ? input.accent : fromLch(dark ? Math.max(aL, 0.78) : Math.min(aL, 0.5), aC, aH);
   const ink = fromLch(0.2, Math.min(aC, 0.03), aH);
   const best = (c: string) => (contrastRatio("#ffffff", c) > contrastRatio("#000000", c) ? "#ffffff" : "#000000");
   const primaryText = ["#ffffff", ink, "#000000"].find((c) => contrastRatio(c, primary) >= MIN_RATIO) ?? best(primary);
   const sage = fromLch(bgL + (dark ? 0.09 : -0.045), Math.min(aC * 0.3, 0.04), aH); // takes the accent's hue
   const mint = fromLch(dark ? 0.82 : 0.8, Math.min(aC * 0.5, 0.07), aH);
+  const nav = calm(groundL + (dark ? 0.022 : -0.02), Math.min(bC, dark ? 0.03 : 0.04)); // dark: between the ground and the sheet
+  // The ribbon is the accent, moved only as far as it needs to show (3:1) on every surface it marks.
+  const ribbon = nudge(primary, [sheet, ground, nav, surface], 3) ?? text;
+  const [rL, rC, rH] = toLch(ribbon);
+  const ribbonText = ["#ffffff", ink, "#000000"].find((c) => contrastRatio(c, ribbon) >= MIN_RATIO) ?? best(ribbon);
+  const warnSoft = mix(sheet, fromLch(0.84, 0.12, 85), dark ? 0.2 : 0.3);
+  const warn = nudge(fromLch(dark ? 0.86 : 0.47, 0.11, 70), [warnSoft, sheet]) ?? text;
   // Status colors keep their own hues (red, green, yellow, pink) so a danger message never looks like the accent.
   const dangerSoft = mix(surface, fromLch(0.6, 0.2, 25), dark ? 0.16 : 0.1);
   const danger = nudge(fromLch(dark ? 0.8 : 0.45, 0.14, 25), [dangerSoft, surface, bg]) ?? text;
@@ -141,7 +157,7 @@ function buildMode(dark: boolean, given: boolean, input: PaletteInput): { set: P
     "--primary-text": primaryText,
     "--sage": sage,
     "--mint": mint,
-    "--nav": tint(dark ? 0.05 : -0.02, Math.min(bC, 0.04)),
+    "--nav": nav,
     "--shadow": dark ? "0 16px 64px #00000066" : `0 16px 64px ${text}20`,
     "--danger": danger,
     "--danger-soft": dangerSoft,
@@ -184,6 +200,18 @@ function buildMode(dark: boolean, given: boolean, input: PaletteInput): { set: P
     "--shadow-card-hover": `0 5px 18px ${text}08`,
     "--shadow-paper": `0 12px 40px ${primary}15`,
     "--swatch-line": "#8884",
+    "--ground": ground,
+    "--sheet": sheet,
+    "--sheet-edge": dark ? mix(sheet, text, 0.12) : mix(ground, text, 0.07),
+    "--sheet-shadow": dark ? "0 1px 2px #00000033, 0 10px 28px #00000047" : `0 1px 2px ${text}0f, 0 8px 24px ${text}14`,
+    "--spine": mix(sheet, text, dark ? 0.16 : 0.11),
+    "--spine-shade": dark ? mix(sheet, ground, 0.55) : mix(sheet, text, 0.035),
+    "--rule": mix(sheet, text, dark ? 0.09 : 0.065),
+    "--ribbon": ribbon,
+    "--ribbon-text": ribbonText,
+    "--ribbon-notch": fromLch(rL + (dark ? -0.16 : -0.12), rC, rH),
+    "--warn": warn,
+    "--warn-soft": warnSoft,
   };
   return { set, adjusted };
 }
