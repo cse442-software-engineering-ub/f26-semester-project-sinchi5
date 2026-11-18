@@ -8,7 +8,11 @@ if (PHP_SAPI !== 'cli' && !defined('NOTELY_INTERNAL')) {
 // GET routes only read; every other note route writes inside one transaction.
 const NOTE_READ_ROUTES = ['note', 'notes', 'note-versions', 'note-comments', 'note-collaborators'];
 const NOTE_ROUTES = [...NOTE_READ_ROUTES, 'note-create', 'note-title', 'note-content', 'note-save', 'note-pin',
-    'note-reminder', 'note-restore', 'note-delete', 'note-comment', 'note-invite', 'note-permission', 'note-link'];
+    'note-reminder', 'note-restore', 'note-delete', 'note-comment', 'note-invite', 'note-permission', 'note-link',
+    'note-collaborator-remove', 'note-comment-delete'];
+// Card 246: one answer for a stranger, a pending request, an unknown email, and the owner's own email,
+// so an invitation never reveals whether an account exists.
+const NOTE_FRIENDS_ONLY = 'You can invite only your friends to a note.';
 const NOTE_CATEGORIES = ['School', 'Work', 'Meetings', 'Personal'];
 const NOTE_COLUMNS = 'n.id, n.owner_user_id, n.title, n.body, n.body_format, n.body_text, n.highlights, n.course_id,
     n.lecture_date, n.category, n.visibility, n.tags, n.pinned, n.remind_at, n.created_at, n.updated_at, n.checklist,
@@ -600,11 +604,13 @@ function noteRole(PDO $db, string $id, array $user, bool $lock): string
     return courseShareFor($db, $id, (string) $user['id']) ? 'friend' : 'none';
 }
 
-function requireEditor(PDO $db, string $id, array $user): void
+function requireEditor(PDO $db, string $id, array $user): string
 {
-    if (!in_array(noteRole($db, $id, $user, true), ['owner', 'edit'], true)) {
+    $role = noteRole($db, $id, $user, true);
+    if (!in_array($role, ['owner', 'edit'], true)) {
         throw new HttpError(403, 'You do not have permission to edit this note.');
     }
+    return $role;
 }
 
 function requireOwner(PDO $db, string $id, array $user, string $message): void
@@ -634,7 +640,7 @@ function keepVersion(PDO $db, string $id, array $user, array $next): void
 function noteAction(PDO $db, array $session, string $route, array $input, array $config = []): array
 {
     $write = !in_array($route, NOTE_READ_ROUTES, true);
-    // An invitation reveals whether an email is registered, so invitations are throttled per user.
+    // Invitations are throttled per user, so a note can't be pushed to friends in bulk.
     if ($route === 'note-invite' && $config) rateLimit($db, $config, 'note-invite', (string) $session['user_id'], 30);
     if ($write) $db->beginTransaction();
     $user = requireUser($db, $session, $write);
@@ -647,11 +653,15 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
 {
     if ($route === 'notes') {
         [$filterSql, $filterValues] = noteListFilter($_GET, (string) $user['id']);
-        $rows = query($db, 'SELECT ' . NOTE_COLUMNS . ' FROM notely_notes n
+        // Card 246: a list sends each note's excerpt, never its body, so many large shared notes can't exhaust memory.
+        // Only rows from before migration 019 have no body_text; their bodies fit in the old 64 KB TEXT column.
+        $columns = str_replace('n.body, n.body_format, n.body_text', "IF(n.body_text IS NULL, n.body, '') AS body, n.body_format,
+            LEFT(n.body_text, " . NOTE_EXCERPT_LENGTH . ') AS body_text', NOTE_COLUMNS);
+        $rows = query($db, 'SELECT ' . $columns . ' FROM notely_notes n
             LEFT JOIN notely_note_editors e ON e.note_id = n.id AND e.user_id = ?
             WHERE (n.owner_user_id = ? OR e.user_id IS NOT NULL)' . $filterSql . '
             ORDER BY ' . noteListOrder($_GET), [$user['id'], $user['id'], ...$filterValues])->fetchAll();
-        return ['notes' => array_map('noteJson', $rows)];
+        return ['notes' => array_map(fn ($row) => array_diff_key(noteJson($row), ['body' => true]), $rows)];
     }
     if ($route === 'note-create') {
         $title = noteTitle($input);
@@ -745,10 +755,15 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
         return ['note' => ['id' => $id, 'body' => loadNote($db, $id)['body']]];
     }
     if ($route === 'note-save') {
-        requireEditor($db, $id, $user);
+        $role = requireEditor($db, $id, $user);
         // Task #79 / Story #19: merge after locking so checklist-only saves and legacy
         // title/body saves preserve every omitted field, including existing tasks.
-        $merged = $input + loadNote($db, $id);
+        $current = loadNote($db, $id);
+        $merged = $input + $current;
+        // Card 246: sharing is the owner's choice; an editor's save may not change who can see the note.
+        if ($role !== 'owner' && $merged['visibility'] !== $current['visibility']) {
+            throw new HttpError(403, "Only the note's owner can change who can see it.");
+        }
         // Card 240: a save without a body keeps the stored body in its own format (loadNote's body is converted HTML).
         $format = array_key_exists('body', $input) ? noteFormat($input)
             : query($db, 'SELECT body_format FROM notely_notes WHERE id = ?', [$id])->fetchColumn();
@@ -822,9 +837,12 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
     if ($route === 'note-invite') {
         $email = validEmail(field($input, 'email'));
         requireOwner($db, $id, $user, "Only the note's owner can invite collaborators.");
-        $invitee = query($db, 'SELECT id FROM notely_users WHERE email = ?', [$email])->fetchColumn();
-        if (!$invitee) throw new HttpError(404, 'No registered account was found for this email.');
-        if ((string) $invitee === (string) $user['id']) throw new HttpError(422, 'You already own this note.');
+        // Card 246: only the owner's accepted friends, so a stranger can't push notes into someone's list.
+        $invitee = (string) query($db, 'SELECT id FROM notely_users WHERE email = ?', [$email])->fetchColumn();
+        $me = (int) $user['id'];
+        $friends = $invitee !== '' && query($db, "SELECT 1 FROM notely_friendships WHERE status = 'accepted'
+            AND user_low = ? AND user_high = ?", [min($me, (int) $invitee), max($me, (int) $invitee)])->fetchColumn();
+        if (!$friends) throw new HttpError(422, NOTE_FRIENDS_ONLY);
         query($db, "INSERT INTO notely_note_editors (note_id, user_id, permission) VALUES (?, ?, 'view')
             ON DUPLICATE KEY UPDATE permission = permission", [$id, $invitee]);
         return ['collaborator' => loadCollaborator($db, $id, (string) $invitee)];
@@ -837,6 +855,33 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
         if (!loadCollaborator($db, $id, $userId)) throw new HttpError(404, 'Collaborator not found.');
         query($db, 'UPDATE notely_note_editors SET permission = ? WHERE note_id = ? AND user_id = ?', [$permission, $id, $userId]);
         return ['collaborator' => loadCollaborator($db, $id, $userId)];
+    }
+    if ($route === 'note-collaborator-remove') {
+        $userId = recordId($input['userId'] ?? null, 'Choose a valid collaborator.');
+        $role = noteRole($db, $id, $user, true);
+        if ($role === 'none') throw new HttpError(404, 'This note could not be found.');
+        // Card 246: the owner removes anyone; a collaborator may only remove themselves (leave the note).
+        if ($role !== 'owner' && $userId !== (string) $user['id']) {
+            throw new HttpError(403, "Only the note's owner can remove collaborators.");
+        }
+        if (!loadCollaborator($db, $id, $userId)) throw new HttpError(404, 'Collaborator not found.');
+        query($db, 'DELETE FROM notely_note_editors WHERE note_id = ? AND user_id = ?', [$id, $userId]);
+        return ['collaborator' => ['id' => $userId]];
+    }
+    if ($route === 'note-comment-delete') {
+        $commentId = recordId($input['commentId'] ?? null, 'Choose a valid comment.');
+        $role = noteRole($db, $id, $user, true);
+        // Like note-comments: a reader through a shared course never sees the comments.
+        if ($role === 'none' || $role === 'friend') throw new HttpError(404, 'This note could not be found.');
+        $author = query($db, 'SELECT author_user_id FROM notely_note_comments WHERE id = ? AND note_id = ? FOR UPDATE',
+            [$commentId, $id])->fetchColumn();
+        if ($author === false) throw new HttpError(404, 'This comment could not be found.');
+        // Card 246: authors delete their own comments; the owner may delete any comment on the note.
+        if ($role !== 'owner' && (string) $author !== (string) $user['id']) {
+            throw new HttpError(403, "Only the comment's author or the note's owner can delete it.");
+        }
+        query($db, 'DELETE FROM notely_note_comments WHERE id = ?', [$commentId]);
+        return ['comment' => ['id' => $commentId]];
     }
     throw new HttpError(404, 'This action was not found.');
 }

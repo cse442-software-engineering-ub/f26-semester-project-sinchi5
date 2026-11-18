@@ -137,6 +137,9 @@ try {
     expectError(await person.call("note-pin", { id, pinned: true, ownerId: owner.id }), status, message);
     assert.deepEqual(await read(id), before);
   }
+  // Card 246: only an accepted friend can be invited.
+  await owner.call("friend-request", { email: other.email });
+  await other.call("friend-respond", { id: (await other.call("friends")).data.incoming[0].id, accept: true });
   const invite = await owner.call("note-invite", { id, email: other.email });
   assert.equal(invite.status, 200);
   assert.equal(invite.data.collaborator.id, other.id);

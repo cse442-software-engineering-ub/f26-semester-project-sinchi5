@@ -1,0 +1,197 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>246 Backend: Invite friends to a note and store comments</title>
+<link rel="stylesheet" href="../../shared/runner.css">
+<script type="module">
+// Backend test: real API, no screen code. Imports nothing from src/.
+import { page, test, expect, api, signIn, signOut } from "../../shared/runner.js";
+
+page({ card: "246", title: "Backend: Invite friends to a note and store comments", kind: "backend" });
+const PASSWORD = "TestPassword2026!";
+// A owns the note; B is A's friend; C starts as a stranger, then has a pending request, then becomes a friend.
+// Cases run in order and each starts as the student the last one ended with, so the page logs in about 21 times
+// (the server allows 60 log ins per 15 minutes from one address and 20 per account).
+const A = "notely-task246a-442@example.edu";
+const B = "notely-task246b-442@example.edu";
+const C = "notely-task246c-442@example.edu";
+const ROUTE = "backend/lib/notes.php → noteRoute";
+const INVITE = `${ROUTE} (the note-invite branch)`;
+const REMOVE = `${ROUTE} (the note-collaborator-remove branch); noteRole`;
+const COMMENT = `${ROUTE} (the note-comment branch)`;
+const DELETE_COMMENT = `${ROUTE} (the note-comment-delete branch)`;
+const friendsOnly = { error: "You can invite only your friends to a note." };
+const denied = { error: "You do not have permission to edit this note." };
+const missing = { error: "This note could not be found." };
+const signedOut = { error: "Sign in to continue." };
+const notOwnerRemove = { error: "Only the note's owner can remove collaborators." };
+
+// Every run starts from new accounts: one left by a stopped run is deleted first. The last lines delete all three,
+// which removes their notes, comments, and friendships.
+async function fresh(email, name) {
+  if ((await api("session")).body.user) await signOut();
+  if ((await api("login", { email, password: PASSWORD })).status === 200) await api("delete", { currentPassword: PASSWORD });
+  const r = await api("register", { name, email, password: PASSWORD });
+  if (r.status !== 201) throw new Error(`could not create ${email}: ${r.status} ${JSON.stringify(r.body)}`);
+  return r.body.user;
+}
+async function removeAccount(email) {
+  if ((await api("session")).body.user?.email !== email) {
+    if ((await api("session")).body.user) await signOut();
+    if ((await api("login", { email, password: PASSWORD })).status !== 200) return;
+  }
+  await api("delete", { currentPassword: PASSWORD });
+}
+
+const b = await fresh(B, "Bea Friend");
+const c = await fresh(C, "Cy Viewer");
+const a = await fresh(A, "Ada Owner");
+await api("friend-request", { email: B });
+const note = (await api("note-create", { title: "t-246 shared", body: "<p>Original</p>", format: "html", visibility: "shared" })).body.note;
+await signIn(B);
+await api("friend-respond", { id: (await api("friends")).body.incoming.find((f) => f.email === A).id, accept: true });
+await signIn(A);
+
+const read = (id = note.id) => api("note", undefined, { id });
+const listed = async () => (await api("notes")).body.notes.map((n) => n.id);
+const comments = (id = note.id) => api("note-comments", undefined, { id });
+const collaborators = async () => (await api("note-collaborators", undefined, { id: note.id })).body.collaborators.map((x) => [x.id, x.permission]);
+const remove = (userId, id = note.id) => api("note-collaborator-remove", { id, userId });
+const say = async (body, id = note.id) => (await api("note-comment", { id, body })).body.comment;
+
+await test("1. Inviting an accepted friend is refused, or the friend is not added as a viewer who sees the note", INVITE, async () => {
+  expect(await api("note-invite", { id: note.id, email: B.toUpperCase() })).toEqual(200, { collaborator: { id: b.id, name: "Bea Friend", email: B, permission: "view" } });
+  expect(await collaborators()).toEqual([[b.id, "view"]]);
+  await signIn(B);
+  expect(await listed()).toEqual([note.id]);
+  expect((await read()).body.note.body).toBe("<p>Original</p>");
+});
+
+await test("2. A viewer can save, rename, or rewrite the note, or an editor can't save, or an editor can change who sees it", "backend/lib/notes.php → requireEditor; noteRoute (the note-save visibility check)", async () => {
+  expect(await api("note-save", { id: note.id, title: "t-246 hacked", body: "<p>hacked</p>", format: "html" })).toEqual(403, denied);
+  expect(await api("note-title", { id: note.id, title: "t-246 hacked" })).toEqual(403, denied);
+  expect(await api("note-content", { id: note.id, body: "<p>hacked</p>", format: "html" })).toEqual(403, denied);
+  const kept = (await read()).body.note;
+  expect([kept.title, kept.body]).toEqual(["t-246 shared", "<p>Original</p>"]);
+  await signIn(A);
+  expect((await api("note-permission", { id: note.id, userId: b.id, permission: "edit" })).body.collaborator.permission).toBe("edit");
+  await signIn(B);
+  const saved = await api("note-save", { id: note.id, title: "t-246 shared", body: "<p>Edited by Bea</p>", format: "html" });
+  expect([saved.status, saved.body.note.body, saved.body.note.visibility]).toEqual([200, "<p>Edited by Bea</p>", "shared"]);
+  expect(await api("note-save", { id: note.id, visibility: "private" })).toEqual(403, { error: "Only the note's owner can change who can see it." });
+  expect((await read()).body.note.visibility).toBe("shared");
+});
+
+await test("3. A stranger, a pending request, an unknown email, or your own email is added, or gets an answer that reveals an account", INVITE, async () => {
+  expect(await api("note-invite", { id: note.id, email: C })).toEqual(403, { error: "Only the note's owner can invite collaborators." });
+  await signIn(A);
+  for (const email of [C, "nobody-246-unknown@example.edu", A]) expect([email, await api("note-invite", { id: note.id, email })]).toEqual([email, { status: 422, body: friendsOnly }]);
+  await api("friend-request", { email: C }); // pending until C accepts
+  expect(await api("note-invite", { id: note.id, email: C })).toEqual(422, friendsOnly);
+  expect(await collaborators()).toEqual([[b.id, "edit"]]);
+  await signOut();
+  expect(await api("note-invite", { id: note.id, email: C })).toEqual(401, signedOut);
+  await signIn(C);
+  expect((await api("friend-respond", { id: (await api("friends")).body.incoming.find((f) => f.email === A).id, accept: true })).status).toBe(200);
+  await signIn(A);
+  expect(await api("note-invite", { id: note.id, email: C })).toEqual(200, { collaborator: { id: c.id, name: "Cy Viewer", email: C, permission: "view" } });
+});
+
+await test("4. A viewer can't comment, a comment gets a forged or missing author, or comments come back out of order", COMMENT, async () => {
+  await signIn(C); // a viewer
+  const first = await api("note-comment", { id: note.id, body: "  Looks good  ", authorId: a.id });
+  expect(first).toEqual(200, { comment: { ...first.body.comment, noteId: note.id, body: "Looks good", author: "Cy Viewer", authorId: c.id } });
+  expect(Object.keys(first.body.comment).sort()).toEqual(["author", "authorId", "body", "createdAt", "id", "noteId"]);
+  await signIn(B);
+  const second = await say("Thanks");
+  expect((await comments()).body.comments.map((x) => [x.id, x.author, x.body]))
+    .toEqual([[first.body.comment.id, "Cy Viewer", "Looks good"], [second.id, "Bea Friend", "Thanks"]]);
+});
+
+await test("5. An editor or a viewer can change a permission, remove someone, delete, or link the note", REMOVE, async () => {
+  // B is an editor.
+  expect(await api("note-permission", { id: note.id, userId: c.id, permission: "edit" })).toEqual(403, { error: "Only the note's owner can change permissions." });
+  expect(await remove(c.id)).toEqual(403, notOwnerRemove);
+  expect(await api("note-delete", { id: note.id })).toEqual(403, { error: "Only the note's owner can delete it." });
+  expect(await api("note-link", { noteId: note.id, eventId: null })).toEqual(403, { error: "Only the note's owner can link it to an event." });
+  await signIn(C); // C is a viewer
+  expect(await remove(b.id)).toEqual(403, notOwnerRemove);
+  expect(await api("note-delete", { id: note.id })).toEqual(403, { error: "Only the note's owner can delete it." });
+  expect(await api("note-permission", { id: note.id, userId: c.id, permission: "edit" })).toEqual(403, { error: "Only the note's owner can change permissions." });
+  expect(await collaborators()).toEqual([[b.id, "edit"], [c.id, "view"]]);
+});
+
+await test("6. A collaborator can't leave a note, or still sees it after leaving", REMOVE, async () => {
+  expect(await remove(c.id)).toEqual(200, { collaborator: { id: c.id } });
+  expect(await listed()).toEqual([]);
+  expect(await read()).toEqual(404, missing);
+  expect(await comments()).toEqual(404, missing);
+  expect(await api("note-comment", { id: note.id, body: "Back?" })).toEqual(404, missing);
+  expect(await remove(c.id)).toEqual(404, missing);
+  await signIn(B);
+  expect(await collaborators()).toEqual([[b.id, "edit"]]);
+});
+
+await test("7. A blank or 2001-character comment is saved, a 2000-character one is refused, HTML comes back changed, or a private note takes comments", COMMENT, async () => {
+  expect(await api("note-comment", { id: note.id, body: "   " })).toEqual(422, { error: "Write a comment first." });
+  expect(await api("note-comment", { id: note.id, body: "x".repeat(2001) })).toEqual(422, { error: "Comments can be at most 2000 characters." });
+  expect((await api("note-comment", { id: note.id, body: 5 })).status).toBe(422);
+  expect((await say("y".repeat(2000))).body.length).toBe(2000);
+  const html = `<script>alert(1)<\/script><b onclick="x()">bold</b> & "quotes" ' OR 1=1 --`;
+  const saved = await say(html);
+  expect(saved.body).toBe(html);
+  expect((await comments()).body.comments.find((x) => x.id === saved.id).body).toBe(html);
+  expect(await api.raw("GET", "note-comment")).toEqual(405, { error: "This request method is not supported." });
+  expect((await api("note-comment", { id: note.id, body: "z".repeat(9000) })).status).toBe(413);
+  const mine = (await api("note-create", { title: "t-246 private", body: "<p>x</p>", format: "html" })).body.note;
+  expect(await api("note-comment", { id: mine.id, body: "hi" })).toEqual(422, { error: "Share this note before adding comments." });
+});
+
+await test("8. Someone deletes a comment that isn't theirs, or the author or the owner can't delete one", DELETE_COMMENT, async () => {
+  const cys = (await comments()).body.comments.find((x) => x.author === "Cy Viewer");
+  const one = await say("Bea one");
+  const two = await say("Bea two");
+  expect(await api("note-comment-delete", { id: note.id, commentId: cys.id })).toEqual(403, { error: "Only the comment's author or the note's owner can delete it." });
+  expect(await api("note-comment-delete", { id: note.id, commentId: one.id })).toEqual(200, { comment: { id: one.id } });
+  expect(await api("note-comment-delete", { id: note.id, commentId: one.id })).toEqual(404, { error: "This comment could not be found." });
+  for (const bad of ["1 OR 1=1", "0", -1, null]) expect([bad, await api("note-comment-delete", { id: note.id, commentId: bad })]).toEqual([bad, { status: 422, body: { error: "Choose a valid comment." } }]);
+  const other = (await api("note-create", { title: "t-246 other", body: "", format: "html", visibility: "shared" })).body.note;
+  expect(await api("note-comment-delete", { id: other.id, commentId: two.id })).toEqual(404, { error: "This comment could not be found." });
+  await signOut();
+  expect(await api("note-comment-delete", { id: note.id, commentId: two.id })).toEqual(401, signedOut);
+  await signIn(A); // the owner deletes anyone's comment
+  expect(await api("note-comment-delete", { id: note.id, commentId: two.id })).toEqual(200, { comment: { id: two.id } });
+  expect(await api("note-comment-delete", { id: note.id, commentId: cys.id })).toEqual(200, { comment: { id: cys.id } });
+  const left = (await comments()).body.comments.map((x) => x.id);
+  expect([one.id, two.id, cys.id].some((id) => left.includes(id))).toBe(false);
+});
+
+await test("9. The notes list sends whole bodies, has no excerpt, or misses a word deep in a long body", "backend/lib/notes.php → noteRoute (the notes branch); noteJson", async () => {
+  const long = (await api("note-create", { title: "t-246 long", body: `<p>${"word ".repeat(1200)}needle246</p>`, format: "html" })).body.note;
+  const notes = (await api("notes")).body.notes;
+  expect(notes.length > 1 && notes.every((n) => !("body" in n) && typeof n.excerpt === "string" && n.excerpt.length <= 300)).toBe(true);
+  expect(notes.find((n) => n.id === long.id).excerpt).toBe("word ".repeat(60));
+  expect((await read(long.id)).body.note.body.endsWith("needle246</p>")).toBe(true);
+  expect((await api("notes", undefined, { q: "needle246" })).body.notes.map((n) => n.id)).toEqual([long.id]);
+  await signIn(B);
+  const shared = (await api("notes")).body.notes.find((n) => n.id === note.id);
+  expect(["body" in shared, shared.excerpt]).toEqual([false, "Edited by Bea"]);
+});
+
+await test("10. A removed collaborator still sees, saves, or comments on the note", REMOVE, async () => {
+  await signIn(A);
+  for (const bad of ["1 OR 1=1", "abc", 5]) expect([bad, await remove(bad)]).toEqual([bad, { status: 422, body: { error: "Choose a valid collaborator." } }]);
+  expect(await remove(c.id)).toEqual(404, { error: "Collaborator not found." });
+  expect(await remove(b.id)).toEqual(200, { collaborator: { id: b.id } });
+  expect(await collaborators()).toEqual([]);
+  await signIn(B);
+  expect((await listed()).includes(note.id)).toBe(false);
+  expect(await read()).toEqual(404, missing);
+  expect(await comments()).toEqual(404, missing);
+  expect(await api("note-save", { id: note.id, title: "t-246 after", body: "<p>after</p>", format: "html" })).toEqual(403, denied);
+  expect(await api("note-comment", { id: note.id, body: "Still here?" })).toEqual(404, missing);
+  expect(await remove(b.id)).toEqual(404, missing);
+});
+
+for (const email of [B, A, C]) await removeAccount(email);
+</script>

@@ -71,6 +71,9 @@ try {
   assert.deepEqual(await titles(owner, "&tag="), await titles(owner, ""), "an empty tag means no tag filter");
 
   assert.deepEqual(await titles(reader, "&tag=exam"), [], "another account cannot see private notes");
+  // Card 246: only an accepted friend can be invited.
+  await owner.call("friend-request", { email: reader.email });
+  await reader.call("friend-respond", { id: (await reader.call("friends")).data.incoming[0].id, accept: true });
   assert.equal((await owner.call("note-invite", { id: shared, email: reader.email })).status, 200);
   assert.deepEqual(await titles(reader, "&tag=exam"), ["Exam 331 review"], "only the shared note is visible");
   const signedOut = client();

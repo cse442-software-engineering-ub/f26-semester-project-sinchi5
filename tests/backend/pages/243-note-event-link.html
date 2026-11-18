@@ -30,7 +30,12 @@ async function clean() {
   }
 }
 await clean();
+// Card 246: only a friend can be invited (cases 4 and 7), so B (signed in by clean) asks and A accepts.
+// A second run finds them already friends.
+await api("friend-request", { email: A });
 await signIn(A);
+const request = (await api("friends")).body.incoming.find((f) => f.email === B);
+if (request) await api("friend-respond", { id: request.id, accept: true });
 
 const note = async (name) => (await api("note-create", { title: T(name), body: "<p>x</p>", format: "html", courseId: "other-course", lectureDate: "2026-01-02" })).body.note;
 const event = async (extra = {}) => (await api("event-save", { ...oneOff, ...extra })).body.event;

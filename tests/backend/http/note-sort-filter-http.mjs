@@ -75,6 +75,9 @@ try {
   const shared = await seed("Shared lab notes", "Meetings", { visibility: "shared" });
   await seed("A private lab", "Meetings", { visibility: "private" });
   assert.deepEqual(await titles(friend, "&q=lab&sort=title"), [], "someone with no access sees nothing");
+  // Card 246: only an accepted friend can be invited.
+  await owner.call("friend-request", { email: friend.email });
+  await friend.call("friend-respond", { id: (await friend.call("friends")).data.incoming[0].id, accept: true });
   assert.equal((await owner.call("note-invite", { id: shared, email: friend.email })).status, 200);
   assert.deepEqual(await titles(friend, "&q=lab&sort=title"), ["Shared lab notes"], "a collaborator sees only the shared note");
   assert.deepEqual(await titles(friend, "&category=Meetings&sort=created"), ["Shared lab notes"], "category and sort for a collaborator");
