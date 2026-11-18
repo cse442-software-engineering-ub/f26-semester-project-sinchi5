@@ -11,7 +11,7 @@ import {
   checkRepeat,
   expandRepeats,
 } from "../services/recurrence";
-import { useApp } from "../app/context";
+import { useApp, useHoldRefresh } from "../app/context";
 import {
   Modal,
   PageHeading,
@@ -92,6 +92,7 @@ export function EventDialog({
   onClose: () => void;
 }) {
   const { state, repo, refresh } = useApp();
+  useHoldRefresh(true); // open form: the background re-read waits until it closes
 
   const [value, setValue] = useState<CourseEvent>(
     event || {

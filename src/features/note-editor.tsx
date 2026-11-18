@@ -19,7 +19,7 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import { Menu } from "@base-ui/react/menu";
-import { useApp } from "../app/context";
+import { useApp, useHoldRefresh } from "../app/context";
 import { Empty, Modal, DeleteNoteDialog} from "../shared/ui";
 import { MAX_COMMENT_LENGTH } from "../domain";
 import type {
@@ -121,6 +121,8 @@ function NoteEditor() {
   const [reminderSaving, setReminderSaving] = useState(false);
   const noteRef = useRef<Note>();
   const dirtyRef = useRef(false);
+  // Card 257: unsaved title, body, details, or comment text keeps the background re-read away.
+  useHoldRefresh(dirty || draftBody !== null || (!!note && titleDraft !== note.title) || comment !== "" || reminderOpen);
   const generation = useRef(0);
   // The note as the server last confirmed it, so a failed category save can put the selector back.
   const savedNote = useRef<Note>();

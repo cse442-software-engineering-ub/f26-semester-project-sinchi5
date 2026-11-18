@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent } from "react";
 import { Check, Circle } from "lucide-react";
-import { useApp } from "../app/context";
+import { useApp, useHoldRefresh } from "../app/context";
 import { Avatar, Modal } from "../shared/ui";
 import s from "../shared/ui.module.css";
 import d from "./settings.module.css";
@@ -52,6 +52,7 @@ export function AccountSettings({ danger = false }: { danger?: boolean } = {}) {
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  useHoldRefresh(!!action);
   const photoInput = useRef<HTMLInputElement>(null);
   async function changePhoto(file?: File) {
     // An empty selection is a canceled picker, not a removal or validation error.

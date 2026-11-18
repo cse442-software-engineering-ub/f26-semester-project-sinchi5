@@ -1,7 +1,7 @@
 import { AccountSettings } from "./account";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { useApp } from "../app/context";
+import { useApp, useHoldRefresh } from "../app/context";
 import { Modal, PageHeading } from "../shared/ui";
 import s from "../shared/ui.module.css";
 import a from "./appearance.module.css";
@@ -44,6 +44,7 @@ function ThemeEditor({ theme, onSaved, onCancel }: { theme: CustomTheme | null; 
   const [colors, setColors] = useState(() => (theme ? { accent: theme.accent, background: theme.background, text: theme.text } : startingColors()));
   const [error, setError] = useState<{ field: "name" | "colors" | "form"; message: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  useHoldRefresh(true); // the editor is open
   const built = useMemo(() => (isHex(colors.accent) && isHex(colors.background) && isHex(colors.text) ? buildPalette(colors) : null), [colors]);
   const fieldError = (field: string) => (error?.field === field ? error.message : "");
   async function submit(e: FormEvent) {

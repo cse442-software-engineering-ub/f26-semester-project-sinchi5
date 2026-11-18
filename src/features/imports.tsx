@@ -10,7 +10,7 @@ import {
   ArrowUpRight,
   Plus,
 } from "lucide-react";
-import { useApp } from "../app/context";
+import { useApp, useHoldRefresh } from "../app/context";
 import { fileTypeProblem } from "../services/syllabus-file";
 import { applyPlacement, checkMeeting, needsSectionPick, placementContext, sectionQuestions, type SectionAnswers } from "../services/syllabus";
 import { formatEventTime, Modal } from "../shared/ui";
@@ -170,6 +170,7 @@ export function ImportDialog({
   startingCourseId?: string;
 }) {
   const { repo, state, refresh } = useApp();
+  useHoldRefresh(true); // open dialog (including the review step): the background re-read waits until it closes
   const [file, setFile] = useState<File | undefined>(startingFile);
   const [job, setJob] = useState<UploadJob>();
   const [phase, setPhase] = useState(startingFile ? "queued" : "pick");

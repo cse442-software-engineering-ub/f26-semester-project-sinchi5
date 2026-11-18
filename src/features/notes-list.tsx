@@ -14,7 +14,7 @@ import {
   Pin,
   X,
 } from "lucide-react";
-import { useApp } from "../app/context";
+import { useApp, useHoldRefresh } from "../app/context";
 import { PageHeading, NoteCard, Empty, Modal, DeleteNoteDialog, countOf} from "../shared/ui";
 import { groupNotesByCategory, isNoteCategory, NOTE_CATEGORIES, type NoteCategory } from "../services/categories";
 import type {
@@ -36,6 +36,7 @@ export function Notes() {
   const [creating, setCreating] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftBody, setDraftBody] = useState("");
+  useHoldRefresh(!!(draftTitle || draftBody));
   const [createStatus, setCreateStatus] = useState("All changes saved");
   // Set when "New note" is chosen from an empty category, so the new note lands in that category.
   const [draftCategory, setDraftCategory] = useState<NoteCategory>();
