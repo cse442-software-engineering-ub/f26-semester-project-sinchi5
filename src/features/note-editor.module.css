@@ -26,8 +26,48 @@
   background: var(--sage);
   border-color: var(--primary);
 }
-.sheetClose {
+.sheetHead,
+.scrim {
   display: none;
+}
+.sheetTitle {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.menu {
+  min-width: 200px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  z-index: 30;
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+}
+.menuItem[data-highlighted] {
+  background: var(--nav);
+  outline: none;
+}
+.menuItem[data-disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+.menuItem:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+.menuDanger {
+  color: var(--danger);
 }
 .details {
   display: grid;
@@ -215,7 +255,7 @@
       z-index: 20;
       width: auto;
       margin: 0;
-      max-height: 70dvh;
+      max-height: 75dvh;
       overflow-y: auto;
       border-radius: 14px 14px 0 0;
       padding-bottom: calc(20px + env(safe-area-inset-bottom));
@@ -228,9 +268,19 @@
       visibility: visible;
       transition: transform var(--motion-base) var(--ease-drawer);
     }
-  .sheetClose {
-      display: inline-flex;
+  .sheetHead {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
       margin-bottom: 14px;
+    }
+  .scrim {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 19;
+      background: var(--overlay);
     }
   .screen {
       min-height: calc(100dvh - 56px - var(--tabbar) - 2 * clamp(20px, 3vw, 48px));
@@ -255,6 +305,18 @@ so iPhone Safari doesn't zoom in when one is tapped. */
     }
   .editorTop .muted {
       font-size: 0.6rem;
+      max-width: 5.5rem;
+      line-height: 1.2;
+    }
+  /* Card 242: Save, Details, People and More share one row under the title at 320 px. */
+  .editorTop .noteTitle {
+      flex-basis: 5rem;
+    }
+  .editorTop button {
+      padding-inline: 10px;
+    }
+  .toggle svg {
+      display: none;
     }
   .editorTop .iconButton {
       min-width: 35px;

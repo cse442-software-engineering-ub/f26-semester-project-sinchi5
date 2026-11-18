@@ -142,3 +142,63 @@ await test("11. At 320 the bar, panels or text make the page scroll sideways", C
   await wait(400);
   expect(pageScrollWidth() <= 320).toBe(true);
 });
+
+// Phone menu (card 242 follow-up): its popup may sit in either window, so look in both.
+const menuItems = () => [document, ...[...document.querySelectorAll("iframe")].map((f) => f.contentDocument!)]
+  .flatMap((d) => [...d.querySelectorAll<HTMLElement>('[role="menuitem"]')]);
+const menuItem = (name: string) => menuItems().find((i) => i.textContent?.trim() === name) ?? null;
+await test("12. At 375 the More actions menu does not hold History, Reminder, Pin and Delete note, or one of them stops working", PAGE, async () => {
+  const root = await open(375, { "note-pin": () => ({ note: note({ pinned: true }) }) });
+  expect(["History", "Reminder", "Pin", "Delete note", "Cancel"].map((n) => [...bar().children].some((c) => c.textContent?.trim() === n))).toEqual([false, false, false, false, false]);
+  const more = byRole("button", "More actions")!;
+  await click(more);
+  await waitFor(() => menuItem("History"));
+  expect([more.getAttribute("aria-haspopup"), more.getAttribute("aria-expanded")]).toEqual(["menu", "true"]);
+  expect(["History", "Reminder", "Pin", "Cancel", "Delete note"].map((n) => !!menuItem(n))).toEqual([true, true, true, true, true]);
+  await click(menuItem("History"));
+  await wait(400);
+  expect(toggle("People").getAttribute("aria-expanded")).toBe("true");
+  await click(byRole("button", "Close panel"));
+  await click(more);
+  await waitFor(() => menuItem("Reminder"));
+  await click(menuItem("Reminder"));
+  await waitFor(() => [...document.querySelectorAll("*"), ...root.querySelectorAll("*")].find((e) => e.textContent === "Set reminder"));
+  await click([...document.querySelectorAll("button"), ...root.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Close") as HTMLElement);
+  await wait(300);
+  await click(more);
+  await waitFor(() => menuItem("Pin"));
+  await click(menuItem("Pin"));
+  await waitFor(() => api.sent.find((r) => r.route === "note-pin"));
+  await click(more);
+  await waitFor(() => menuItem("Delete note"));
+  await click(menuItem("Delete note"));
+  await waitFor(() => [...document.querySelectorAll("button"), ...root.querySelectorAll("button")].find((b) => b.textContent === "Delete note" && b.closest("[role=dialog]")));
+});
+await test("13. At 375 the More actions menu does not close with Escape and return focus, or the sheet has no heading or scrim that closes it", CSS, async () => {
+  const root = await open(375);
+  const more = byRole("button", "More actions")!;
+  await click(more);
+  await waitFor(() => menuItem("History"));
+  root.ownerDocument.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await wait(400);
+  expect([menuItems().length, more.getAttribute("aria-expanded")]).toEqual([0, "false"]);
+  await click(toggle("People"));
+  await wait(400);
+  expect([...root.querySelectorAll("h2")].some((h) => h.textContent === "People" && visible(root, h))).toBe(true);
+  const scrim = root.querySelector<HTMLElement>('[data-testid="people-scrim"]')!;
+  expect(style(root, scrim).position).toBe("fixed");
+  await click(scrim);
+  await wait(400);
+  expect([toggle("People").getAttribute("aria-expanded"), visible(root, root.querySelector("#note-people"))]).toEqual(["false", false]);
+});
+await test("14. At 320 the top bar needs more than two rows of buttons, or the open sheet covers the bar", PAGE, async () => {
+  const root = await open(320);
+  const tops = [...bar().children].map((c) => Math.round(c.getBoundingClientRect().top)).sort((a, b) => a - b);
+  let rows = 0, start = -100;
+  for (const top of tops) if (top - start > 20) { rows++; start = top; }
+  expect(rows <= 2).toBe(true);
+  await click(toggle("People"));
+  await wait(400);
+  expect(root.querySelector("#note-people")!.getBoundingClientRect().top >= bar().getBoundingClientRect().bottom - 1).toBe(true);
+});

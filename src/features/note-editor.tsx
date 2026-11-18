@@ -16,7 +16,9 @@ import {
   Trash2,
   SlidersHorizontal,
   Users,
+  MoreHorizontal,
 } from "lucide-react";
+import { Menu } from "@base-ui/react/menu";
 import { useApp } from "../app/context";
 import { Empty, Modal, DeleteNoteDialog} from "../shared/ui";
 import { MAX_COMMENT_LENGTH } from "../domain";
@@ -77,6 +79,18 @@ function NoteEditor() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(false);
   const peopleToggle = useRef<HTMLButtonElement>(null);
+  const screenRef = useRef<HTMLDivElement>(null);
+  // Phones keep the bar short: History, Reminder, Pin, Cancel and Delete go into a menu. Read the width from the window that holds the screen.
+  const [phone, setPhone] = useState(false);
+  const loaded = !!note;
+  useEffect(() => {
+    const query = screenRef.current?.ownerDocument.defaultView?.matchMedia("(max-width: 767px)");
+    if (!query) return;
+    const update = () => setPhone(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, [loaded]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(true);
   const [commentsError, setCommentsError] = useState("");
@@ -393,9 +407,8 @@ function NoteEditor() {
   titleDraft !== note.title || draftBody !== null;
   return (
     <>
-      <div className={css.screen} onKeyDown={(e) => {
-        // The sheet only exists on phones; the window of the page that holds the screen knows its width.
-        if (e.key === "Escape" && peopleOpen && e.currentTarget.ownerDocument.defaultView?.matchMedia("(max-width: 767px)").matches) {
+      <div className={css.screen} ref={screenRef} onKeyDown={(e) => {
+        if (e.key === "Escape" && peopleOpen && phone) {
           setPeopleOpen(false);
           peopleToggle.current?.focus();
         }
@@ -425,6 +438,8 @@ function NoteEditor() {
         >
           {saving ? "Saving…" : "Save"}
         </button>
+        {!phone && (
+          <>
         <button
           type="button"
           className={s.secondary}
@@ -467,6 +482,8 @@ function NoteEditor() {
             <Trash2 size={18} aria-hidden="true" /> Delete note
           </button>
         )}
+          </>
+        )}
         <button type="button" className={`${s.secondary} ${css.toggle}`} aria-expanded={detailsOpen} aria-controls="note-details"
           onClick={() => setDetailsOpen((o) => !o)}>
           <SlidersHorizontal size={18} aria-hidden="true" /> Details
@@ -475,6 +492,38 @@ function NoteEditor() {
           onClick={() => setPeopleOpen((o) => !o)}>
           <Users size={18} aria-hidden="true" /> People
         </button>
+        {phone && (
+          <Menu.Root>
+            <Menu.Trigger className={s.secondary} aria-label="More actions" title="More actions">
+              <MoreHorizontal size={18} aria-hidden="true" />
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Positioner side="bottom" align="end" sideOffset={8}>
+                <Menu.Popup className={css.menu}>
+                  <Menu.Item className={css.menuItem} onClick={() => { setPanel("history"); setPeopleOpen(true); }}>
+                    <History size={18} aria-hidden="true" /> History
+                  </Menu.Item>
+                  {canEdit && (
+                    <Menu.Item className={css.menuItem} disabled={saving || reminderSaving} onClick={openReminder}>
+                      <CalendarClock size={18} aria-hidden="true" /> Reminder
+                    </Menu.Item>
+                  )}
+                  <Menu.Item className={css.menuItem} disabled={pinning || !canEdit || saving} onClick={togglePin}>
+                    <Pin size={18} aria-hidden="true" /> {note.pinned ? "Unpin" : "Pin"}
+                  </Menu.Item>
+                  <Menu.Item className={css.menuItem} disabled={!canEdit || saving || !hasDraftChanges} onClick={cancelEdits}>
+                    Cancel
+                  </Menu.Item>
+                  {isOwner && (
+                    <Menu.Item className={`${css.menuItem} ${css.menuDanger}`} disabled={saving} onClick={() => setConfirmDelete(true)}>
+                      <Trash2 size={18} aria-hidden="true" /> Delete note
+                    </Menu.Item>
+                  )}
+                </Menu.Popup>
+              </Menu.Positioner>
+            </Menu.Portal>
+          </Menu.Root>
+        )}
       </div>
       {note.remindAt && <p className={css.reminderSummary}>Reminder: {reminderLabel(note.remindAt)}</p>}
       {reminderNotice && <p className={s.notice} role="status">{reminderNotice}</p>}
@@ -585,10 +634,14 @@ function NoteEditor() {
               editable={canEdit && !saving} onChange={setDraftBody} />
           </Suspense>
         </section>
+        {phone && peopleOpen && <div className={css.scrim} data-testid="people-scrim" onClick={() => { setPeopleOpen(false); peopleToggle.current?.focus(); }} />}
         <div className={css.people} data-open={peopleOpen}>
         <aside id="note-people" className={css.inspector} aria-label="People and history">
-          <button type="button" className={`${s.secondary} ${css.sheetClose}`}
-            onClick={() => { setPeopleOpen(false); peopleToggle.current?.focus(); }}>Close panel</button>
+          <div className={css.sheetHead}>
+            <h2 className={css.sheetTitle}>People</h2>
+            <button type="button" className={s.secondary}
+              onClick={() => { setPeopleOpen(false); peopleToggle.current?.focus(); }}>Close panel</button>
+          </div>
           <Collaborators
             key={`${note.id}:${state.user?.id || ""}`}
             noteId={note.id}
