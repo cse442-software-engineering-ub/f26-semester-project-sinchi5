@@ -56,7 +56,7 @@ Accounts and signed-in users' notes (with their history, comments, and collabora
 **Imports**
 - Upload documents (PDF, DOCX, TXT, Markdown, images), scan photos, or upload a syllabus. Files are validated (type, empty file, 20 MB limit), then shown on a review screen before anything is saved.
 - Syllabus imports find weekly classes, assignments, and exams and add them to the calendar after review. Each weekly class repeats on its posted days, from the syllabus's first and last class (or the course's optional "Classes start" and "Classes end"), skipping no-class dates the syllabus lists. When several sections are listed, the student picks theirs. A file with nothing to add, or one that isn't a syllabus, gets its own screen. Uploading a syllabus again adds only what's new, and deleting a class asks whether to remove that one meeting or all of them. Gemini reads every syllabus on the server ([backend/lib/syllabus-ai.php](backend/lib/syllabus-ai.php)), and the browser cleans what it finds and turns each weekly class into its dates ([src/services/syllabus.ts](src/services/syllabus.ts)). A renamed or damaged file is caught in the browser before anything uploads ([src/services/syllabus-file.ts](src/services/syllabus-file.ts)).
-- Uploaded notes are sorted into course and lecture folders (card 35): the course code and lecture date are read from TXT/Markdown text or the file name by local rules in [src/services/noteMetadata.ts](src/services/noteMetadata.ts) (`Course:` and `Lecture date:` headers win; deadlines in prose are ignored). Anything not found shows **Not detected** and can be filled in on the review screen, and TXT/Markdown text becomes the note body. Try it with [tests/fixtures/cse442-lecture.txt](tests/fixtures/cse442-lecture.txt).
+- Uploaded notes are sorted into course and lecture folders (card 35): the course code and lecture date are read from TXT/Markdown text or the file name by local rules in [src/services/noteMetadata.ts](src/services/noteMetadata.ts) (`Course:` and `Lecture date:` headers win; deadlines in prose are ignored). Anything not found shows **Not detected** and can be filled in on the review screen, and TXT/Markdown text becomes the note body. Try it with [tests/frontend/browser/fixtures/cse442-lecture.txt](tests/frontend/browser/fixtures/cse442-lecture.txt).
 - Extraction is simulated. A **Prototype preview options** control in the dialog exercises success, partial, and failure outcomes.
 
 **Settings**
@@ -128,15 +128,15 @@ $env:NOTELY_CONFIG = 'C:\private\notely-dev.php'
 $env:NOTELY_TEST_ISOLATED = '1'
 $env:NOTELY_TEST_URL = 'http://127.0.0.1:8081/api/index.php'
 # If PHP is not on PATH, also set NOTELY_TEST_PHP to its executable path.
-php backend/tests/profile-photos.php
-node backend/tests/profile-photo-http.mjs
+php tests/backend/php/profile-photos.php
+node tests/backend/http/profile-photo-http.mjs
 ```
 
 Start the API in another terminal with the same `NOTELY_CONFIG` using
 `php -S 127.0.0.1:8081 backend/dev-router.php`. The HTTP suite only permits local
 hosts, creates unique temporary accounts, and removes them in `finally`. Its
 read-only PHP companion uses the same config to verify a single row after
-replacement and zero rows after account deletion. Fixtures in `backend/tests/data/`
+replacement and zero rows after account deletion. Fixtures in `tests/backend/data/`
 are real 64×64 PNG/JPEG/WebP images, a real 16×16 PNG, and plain text disguised as a
 PNG. No GD or intl extension is required by the application or tests.
 
@@ -278,7 +278,7 @@ POST `note-delete` returns `{ "note": { "id": "…" } }` and permanently removes
 
 Since task 120, signed-in accounts use these routes for every note through [src/services/notes-http.ts](src/services/notes-http.ts). GET `note`, `notes`, `note-create`, `note-save`, `note-pin`, and `note-restore` return whole notes: `id`, `ownerId`, `title`, `body`, `courseId`, `lectureDate`, `category` (`School`, `Work`, `Meetings`, or `Personal`), `visibility` (`private` or `shared`), `tags` (at most 30 strings of up to 100 characters), `pinned`, `createdAt`, and `updatedAt` (ISO 8601, UTC). `note-save` keeps the current value of any field it doesn't receive, and saves the previous title and body as a version when either changes. Pinning doesn't change `updatedAt`. Notes the caller can't open return 404 from every read route, so their existence isn't revealed. Deleting a note also deletes its versions and comments. `note-invite` returns 404 for an unregistered email and is limited to 30 invitations per user every 15 minutes. Apply migration 004 before deploying this backend.
 
-Since card 156, a student can share all of one course's notes, read only, with friends they choose ([backend/lib/note-shares.php](backend/lib/note-shares.php)). POST `course-notes-share` takes `{ "courseId", "courseCode", "friendIds": [...] }`, replaces that course's list, and returns `{ "shares": [{ "userId", "name", "email" }] }`; every id must be an accepted friend, otherwise 422 "You can share notes only with friends.". GET `course-notes-shares&courseId=…` returns the caller's list for that course. GET `shared-notes` returns every note, including ones added later, in a course a friend shared with the caller, each with `permission: "view"` and `sharedBy: { "id", "name", "courseCode" }`; these notes stay out of `notes`. GET `note` serves them too, while their versions, comments, and collaborators look missing (404) and every write is refused (403). Removing a friend ends sharing both ways. Apply migration 013 (after 012) before deploying this backend; tests: `NOTELY_TEST_ISOLATED=1 node backend/tests/note-shares-http.mjs`.
+Since card 156, a student can share all of one course's notes, read only, with friends they choose ([backend/lib/note-shares.php](backend/lib/note-shares.php)). POST `course-notes-share` takes `{ "courseId", "courseCode", "friendIds": [...] }`, replaces that course's list, and returns `{ "shares": [{ "userId", "name", "email" }] }`; every id must be an accepted friend, otherwise 422 "You can share notes only with friends.". GET `course-notes-shares&courseId=…` returns the caller's list for that course. GET `shared-notes` returns every note, including ones added later, in a course a friend shared with the caller, each with `permission: "view"` and `sharedBy: { "id", "name", "courseCode" }`; these notes stay out of `notes`. GET `note` serves them too, while their versions, comments, and collaborators look missing (404) and every write is refused (403). Removing a friend ends sharing both ways. Apply migration 013 (after 012) before deploying this backend; tests: `NOTELY_TEST_ISOLATED=1 node tests/backend/http/note-shares-http.mjs`.
 
 Since card 43, POST `syllabus-upload` takes one syllabus (PDF, DOCX, TXT, Markdown, JPG, PNG, or WebP, at most 20 MB) and returns 201 with `{ "job": { "id", "kind": "syllabus", "courseId", "name", "type", "size", "state": "queued", "events": [], "createdAt" } }`. The file's contents must match its type, so a renamed file is refused: a PDF needs its header and end marker, a DOCX must be a Word document without macros, and an image header must parse as the named format. The file is only stored as data and read as text; it is never run, written to disk, or served back. Wrong types, empty files, and files over 20 MB get 422 with the same messages the upload window shows (413 when the whole request is too large). Each account can upload 20 files every 15 minutes. GET `import-job` returns the same job to its owner and 404 to anyone else. The stored file is cleared by `prune.php` after a day. Apply migration 005 before deploying this backend.
 
@@ -296,9 +296,9 @@ A syllabus can contain text written to trick the model (prompt injection), so th
 
 Each read is logged with its token counts only. A failed read leaves the job `failed`, and it can be retried.
 
-Card 127's tests: `php backend/tests/syllabus-ai.php` (fake API, no database), `npm run test:import-extract` (fake API, against a DEV/TEST database with migrations 001–009; it cleans up after itself), and `NOTELY_TEST_ISOLATED=1 npm run test:import-extract-http` (local API, never calls Gemini). The aptitude steps use `backend/tests/data/cse442-syllabus-scan.png`, an image of the acceptance tests' syllabus. The regression fixture `backend/tests/data/cse442-schedule-table-scan.png` has Homework 2 and Quiz 1 in the same Due cell on September 14, 2026, and Exam 1 on September 21. The reader should propose those three separate events, titled by the Due items rather than the neighboring Topic cells.
+Card 127's tests: `php tests/backend/php/syllabus-ai.php` (fake API, no database), `npm run test:import-extract` (fake API, against a DEV/TEST database with migrations 001–009; it cleans up after itself), and `NOTELY_TEST_ISOLATED=1 npm run test:import-extract-http` (local API, never calls Gemini). The aptitude steps use `tests/backend/data/cse442-syllabus-scan.png`, an image of the acceptance tests' syllabus. The regression fixture `tests/backend/data/cse442-schedule-table-scan.png` has Homework 2 and Quiz 1 in the same Due cell on September 14, 2026, and Exam 1 on September 21. The reader should propose those three separate events, titled by the Due items rather than the neighboring Topic cells.
 
-After adding a key, check it once with `NOTELY_AI_LIVE=1 NOTELY_GEMINI_API_KEY=<key> php backend/tests/gemini-smoke.php`. It sends a single small request (free on the free tier) and prints what Gemini found. Add a file path and course year to see how the reader handles a real syllabus: `php backend/tests/gemini-smoke.php syllabus.pdf 2026`. No other test or script calls the API.
+After adding a key, check it once with `NOTELY_AI_LIVE=1 NOTELY_GEMINI_API_KEY=<key> php tests/backend/php/gemini-smoke.php`. It sends a single small request (free on the free tier) and prints what Gemini found. Add a file path and course year to see how the reader handles a real syllabus: `php tests/backend/php/gemini-smoke.php syllabus.pdf 2026`. No other test or script calls the API.
 
 Errors return `{ "error": "<message>" }` with one of these statuses: 400 (bad JSON or plain HTTP in secure mode), 401 (not signed in, or wrong login), 403 (Origin or CSRF failure), 404 (unknown route), 405 (wrong method), 409 (email conflict), 413 (body too large), 415 (wrong content type), 422 (validation failure), 429 (rate limited, with `Retry-After`), 503 (service or configuration failure).
 
@@ -444,23 +444,23 @@ On the server:
 | --- | --- |
 | `npm test` | Vitest unit tests: repository contracts, filtering, pinning, the auth adapter, validation, and the collaborator mock |
 | `npm run test:e2e` | Playwright browser tests (needs `npx playwright install chromium firefox webkit` once) |
-| `npx playwright test tests/note-metadata.spec.ts --project=chromium --project=mobile` | Card 35: upload a lecture note, check the detected course and date survive a reload, and that missing ones stay **Not detected** |
+| `npx playwright test tests/frontend/browser/note-metadata.spec.ts --project=chromium --project=mobile` | Card 35: upload a lecture note, check the detected course and date survive a reload, and that missing ones stay **Not detected** |
 | `npm run test:static-build` | Hash-routing build under a static server with no rewrites (build first) |
 | `npm run test:php` | PHP validation, hashing, and configuration checks. No database needed. |
 | `npm run test:schema` | Read-only check that a live DEV/TEST database matches the expected schema |
 | `npm run test:accounts` | Full HTTP contract test against a running API. Creates and then deletes uniquely named test accounts. |
 | `npm run test:note-titles` | HTTP tests for the three card 108 scenarios against a running DEV/TEST API with migration 002 applied. |
-| `php backend/tests/note-titles.php` | Owner, editor, viewer, and missing-note title tests against a DEV/TEST database with migration 002 applied. Creates and deletes test accounts. |
-| `php backend/tests/note-content.php` | Body validation plus owner/editor/viewer, persistence, and title-preservation tests against a DEV/TEST database with all three migrations applied. |
-| `node backend/tests/note-content-http.mjs` | Task 110 HTTP persistence, access, CSRF/Origin, validation, and request-limit checks against a running DEV/TEST API. |
-| `php backend/tests/note-delete.php` | Task 116 owner-only deletion: owner delete, edit/view collaborator, signed-out, and forged-owner rejection, and collaborator cascade, against a DEV/TEST database with migrations 002 and 003 applied. |
-| `node backend/tests/note-delete-http.mjs` | Task 116 HTTP deletion, ownership, CSRF/Origin, and validation checks against a running DEV/TEST API. |
-| `php backend/tests/server-notes.php` | Task 120 metadata, listing, versions, pinning, restore, sharing, permissions, comments, delete cascade, and lost collaborator access, against a DEV/TEST database with migrations 002–004 applied. |
-| `node backend/tests/server-notes-http.mjs` | Task 120 HTTP sharing, collaborator access, owner-only delete, and lost access after delete against a running DEV/TEST API. |
+| `php tests/backend/php/note-titles.php` | Owner, editor, viewer, and missing-note title tests against a DEV/TEST database with migration 002 applied. Creates and deletes test accounts. |
+| `php tests/backend/php/note-content.php` | Body validation plus owner/editor/viewer, persistence, and title-preservation tests against a DEV/TEST database with all three migrations applied. |
+| `node tests/backend/http/note-content-http.mjs` | Task 110 HTTP persistence, access, CSRF/Origin, validation, and request-limit checks against a running DEV/TEST API. |
+| `php tests/backend/php/note-delete.php` | Task 116 owner-only deletion: owner delete, edit/view collaborator, signed-out, and forged-owner rejection, and collaborator cascade, against a DEV/TEST database with migrations 002 and 003 applied. |
+| `node tests/backend/http/note-delete-http.mjs` | Task 116 HTTP deletion, ownership, CSRF/Origin, and validation checks against a running DEV/TEST API. |
+| `php tests/backend/php/server-notes.php` | Task 120 metadata, listing, versions, pinning, restore, sharing, permissions, comments, delete cascade, and lost collaborator access, against a DEV/TEST database with migrations 002–004 applied. |
+| `node tests/backend/http/server-notes-http.mjs` | Task 120 HTTP sharing, collaborator access, owner-only delete, and lost access after delete against a running DEV/TEST API. |
 
 The HTTP contract tests refuse any host except `localhost`, `127.0.0.1`, or aptitude. Point them with `NOTELY_TEST_URL` (and `NOTELY_TEST_ORIGIN` if needed). **Never run them against production.**
 
-Browser tests mock the account API ([tests/support/account-fixture.ts](tests/support/account-fixture.ts)). They cover:
+Browser tests mock the account API ([tests/frontend/browser/support/account-fixture.ts](tests/frontend/browser/support/account-fixture.ts)). They cover:
 - onboarding and sign-up validation
 - login: valid and incorrect credentials, empty or invalid fields, duplicate submissions, and resuming unfinished onboarding
 - logout, including Back-button and direct-URL access afterwards
@@ -492,7 +492,6 @@ backend/
   prune.php               CLI cleanup of expired sessions and rate-limit rows
   dev-router.php          Local PHP dev server router (not deployed)
   config*.example.php     Templates only, with no real credentials
-  tests/                  PHP unit/config/schema tests and the HTTP contract test
 src/
   domain.ts               Domain types and async repository interfaces; BRAND sets the product name
   main.tsx                Entry point: picks browser or hash routing from VITE_ROUTER_MODE
@@ -504,10 +503,9 @@ src/
     app-repositories.ts   Combines server auth with per-account local workspaces and demo mode
     repositories.ts       localStorage-backed courses/schedule/imports, and the demo's notes (prototype)
     notes-http.ts         Server-backed notes for signed-in accounts (task 120)
-    collaborators.mock.ts Frontend-only collaborator invitations
     fixtures.ts           Demo courses, notes, and events
     validation.ts         Client-side copy of the server's validation rules
-tests/                    Playwright specs and the mocked account API fixture
+tests/                    Every test: backend/ (pages, php, http, data), frontend/ (pages, unit, browser), shared/ runner
 scripts/                  Build helpers (copy PHP into dist/api, static-host test)
 public/                   favicon and SPA .htaccess
 Notes/                    Team research notes (XAMPP, Figma)
@@ -538,7 +536,7 @@ Every screen talks to data through the interfaces in `domain.ts`. To replace a l
 ## Known limitations and next steps
 
 - Courses and events are stored in the browser only. A collaborator sees a shared note's course as its category, because course IDs belong to the owner's browser.
-- The demo still uses the frontend collaborator mock (`collaborators.mock.ts`). Comments and shared notes are not real-time.
+- The demo still uses the frontend collaborator mock (`tests/frontend/unit/services/collaborators.mock.ts`). Comments and shared notes are not real-time.
 - OCR, document parsing, and file storage are simulated. Uploaded files are never stored.
 - Email addresses are not verified, and no email is ever sent.
 - Accounts cannot be recovered without the recovery code.

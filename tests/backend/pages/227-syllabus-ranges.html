@@ -7,7 +7,7 @@
 // Backend test: real API, no screen code. Imports nothing from src/.
 // What this page covers: the saving half of card 227 (import-confirm and events). The reader itself needs a
 // live Gemini read, which a page must never make, so its prompt, schema and clean-up are checked with canned
-// model replies in backend/tests/syllabus-ai.php (check 12) and backend/tests/import-extract.php (PASS 5).
+// model replies in tests/backend/php/syllabus-ai.php (check 12) and tests/backend/php/import-extract.php (PASS 5).
 import { page, test, expect, api, signIn, signOut } from "../../shared/runner.js";
 
 page({ card: "227", title: "Backend: Read ranges, weeks and meeting types from a syllabus", kind: "backend" });
