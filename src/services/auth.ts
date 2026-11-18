@@ -1,3 +1,4 @@
+import { reportUnauthorized } from "./session-ended";
 import type { AuthRepository, OnboardingState, Preferences, User } from "../domain";
 
 type Session = { user: User | null; onboarding: OnboardingState; csrfToken: string; recoveryCode?: string; preferences?: Preferences };
@@ -33,6 +34,7 @@ export function createAuthRepository(
     }
     const body = await response.json().catch(() => null);
     if (!response.ok) {
+      if (response.status === 401 && snapshot?.user && route !== "login") reportUnauthorized();
       if (response.status === 401 || response.status === 403) snapshot = undefined;
       throw new AccountError(body?.error || "The account service is unavailable. Please try again later.", response.status);
     }

@@ -82,7 +82,7 @@ export function createAppRepositories(
     return new Proxy({} as Repositories[K], {
       get(_target, method) {
         return (...args: unknown[]) => {
-          if (!workspace) return Promise.reject(new Error("Sign in to continue."));
+          if (!workspace) return Promise.reject(new Error("Log in to continue."));
           const target = workspace[key] as unknown as Record<string | symbol, (...values: unknown[]) => unknown>;
           return target[method](...args);
         };
@@ -93,7 +93,7 @@ export function createAppRepositories(
     auth,
     courses: proxy("courses"), notes: proxy("notes"), schedule: proxy("schedule"), imports: proxy("imports"),
     async reset() {
-      if (!user || !workspace || !courses) throw new Error("Sign in to continue.");
+      if (!user || !workspace || !courses) throw new Error("Log in to continue.");
       await courses.clearWorkspace();
     },
   };
