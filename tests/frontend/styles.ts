@@ -10,6 +10,7 @@ import "../../src/features/friends.module.css";
 import "../../src/features/imports.module.css";
 import "../../src/features/note-editor.module.css";
 import "../../src/features/notes-list.module.css";
+import "../../src/features/rich-editor.module.css";
 import "../../src/features/onboarding.module.css";
 import "../../src/features/schedule.module.css";
 import "../../src/features/settings.module.css";

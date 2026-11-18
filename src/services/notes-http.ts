@@ -1,5 +1,4 @@
 import type { Collaborator, Comment, Course, Note, NoteRepository, NoteVersion } from "../domain";
-import { checklistPayload } from "./checklists";
 import { filterNotes } from "./repositories";
 import { dateKey } from "./fixtures";
 
@@ -51,11 +50,9 @@ export function createHttpNotes(
     "Your notes are unavailable. Please try again later.");
   const query = (route: string, noteId: string) => `${route}&id=${encodeURIComponent(noteId)}`;
   const content = (note: Partial<Note>) => ({
-    title: note.title, body: note.body, courseId: note.courseId, lectureDate: note.lectureDate,
+    // Card 241: the server's notes are HTML; only a body written as plain text says so.
+    title: note.title, body: note.body, format: note.format ?? "html", courseId: note.courseId, lectureDate: note.lectureDate,
     category: note.category, visibility: note.visibility, tags: note.tags,
-    // Task #78 / Story #19 AT1-3: omit legacy fields, but send [] to explicitly clear tasks.
-    ...(note.highlights === undefined ? {} : { highlights: note.highlights }),
-    ...(note.checklist === undefined ? {} : { checklist: checklistPayload(note.checklist) }),
   });
   return {
     async list(q) {
@@ -70,7 +67,7 @@ export function createHttpNotes(
       return (await send<{ note: Note }>(query("note", noteId))).note;
     },
     async create(data) {
-      const note = { title: "Untitled note", body: "", highlights: [], courseId: "", lectureDate: dateKey(), category: "School",
+      const note = { title: "Untitled note", body: "", courseId: "", lectureDate: dateKey(), category: "School",
         visibility: "private" as const, tags: [], ...data };
       return (await send<{ note: Note }>("note-create", content(note))).note;
     },

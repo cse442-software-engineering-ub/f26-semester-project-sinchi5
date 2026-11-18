@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
     localStorage.setItem("notely-data-v1", JSON.stringify(data));
   });
   await page.goto("/notes/note-1");
-  await expect(page.getByLabel("Note body")).toHaveValue("Original note content.");
+  await expect(page.getByLabel("Note body")).toHaveText("Original note content.");
 });
 
 test("existing content is editable but typing and metadata saves do not persist the body", async ({ page }) => {
@@ -30,10 +30,10 @@ test("existing content is editable but typing and metadata saves do not persist 
   )
   .toBe("Work");
   await page.getByRole("button", { name: "Pin note", exact: true }).click();
-  await expect(page.getByLabel("Note body")).toHaveValue("Unsaved draft.");
+  await expect(page.getByLabel("Note body")).toHaveText("Unsaved draft.");
   await page.getByRole("link", { name: "All notes", exact: true }).click();
   await page.goto("/notes/note-1");
-  await expect(page.getByLabel("Note body")).toHaveValue("Original note content.");
+  await expect(page.getByLabel("Note body")).toHaveText("Original note content.");
 });
 
 test("Save persists updated body when reopening and reloading", async ({ page }) => {
@@ -42,9 +42,9 @@ test("Save persists updated body when reopening and reloading", async ({ page })
   await expect(page.getByText("All changes saved", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "All notes", exact: true }).click();
   await page.goto("/notes/note-1");
-  await expect(page.getByLabel("Note body")).toHaveValue("Updated note content.");
+  await expect(page.getByLabel("Note body")).toHaveText("Updated note content.");
   await page.reload();
-  await expect(page.getByLabel("Note body")).toHaveValue("Updated note content.");
+  await expect(page.getByLabel("Note body")).toHaveText("Updated note content.");
 });
 
 test("failed repository save keeps the editor and draft for retry", async ({ page }) => {
@@ -63,13 +63,13 @@ test("failed repository save keeps the editor and draft for retry", async ({ pag
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Changes could not be saved");
   await expect(page).toHaveURL(new RegExp("/notes/note-1$"));
-  await expect(page.getByLabel("Note body")).toHaveValue("Updated note content.");
+  await expect(page.getByLabel("Note body")).toHaveText("Updated note content.");
   await expect(page.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("notely-data-v1")!).notes.find((n: { id: string }) => n.id === "note-1").body)).toBe("Original note content.");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("All changes saved", { exact: true })).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel("Note body")).toHaveValue("Updated note content.");
+  await expect(page.getByLabel("Note body")).toHaveText("Updated note content.");
 });
 
 test("Cancel discards only the unsaved body and reopening keeps the saved baseline", async ({ page }) => {
@@ -96,14 +96,14 @@ test("Cancel discards only the unsaved body and reopening keeps the saved baseli
 
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
 
-  await expect(page.getByLabel("Note body")).toHaveValue(
+  await expect(page.getByLabel("Note body")).toHaveText(
     "Updated note content.",
   );
 
   await page.getByRole("link", { name: "All notes", exact: true }).click();
   await page.goto("/notes/note-1");
 
-  await expect(page.getByLabel("Note body")).toHaveValue(
+  await expect(page.getByLabel("Note body")).toHaveText(
     "Updated note content.",
   );
 });

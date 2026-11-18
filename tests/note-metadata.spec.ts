@@ -23,7 +23,7 @@ test("uploaded note displays extracted course and lecture date after reload on d
   await expect(page.getByLabel("Lecture date", { exact: true })).toHaveValue("2026-09-14");
   await saveAndOpen(page, "cse442-lecture");
   await page.reload();
-  await expect(page.getByLabel("Note body")).toHaveValue(/Sprint planning/);
+  await expect(page.getByLabel("Note body")).toHaveText(/Sprint planning/);
   for (const width of [320, 375, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     const course = page.getByRole("combobox", { name: "Course", exact: true });

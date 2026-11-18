@@ -109,13 +109,13 @@ test("pinning preserves pending edits for explicit Save before leaving", async (
   await page.goto("/notes/pin-1");
   await page.getByLabel("Note body").fill("An edit made just before pinning.");
   await page.getByRole("button", { name: "Pin note", exact: true }).click();
-  await expect(page.getByLabel("Note body")).toHaveValue("An edit made just before pinning.");
+  await expect(page.getByLabel("Note body")).toHaveText("An edit made just before pinning.");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("All changes saved", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "All notes", exact: true }).click();
   await page.getByRole("heading", { name: "Note B", exact: true }).click();
   await page.reload();
-  await expect(page.getByLabel("Note body")).toHaveValue("An edit made just before pinning.");
+  await expect(page.getByLabel("Note body")).toHaveText("An edit made just before pinning.");
   await expect(page.getByRole("button", { name: "Unpin note" })).toHaveAttribute("aria-pressed", "true");
 });
 

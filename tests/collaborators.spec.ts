@@ -51,7 +51,7 @@ test("success updates the list once, preserves edits, and prevents pending resub
   await expect(rows).toContainText("Jamie");
   await expect(rows).toContainText("jamie@example.edu");
   await expect(rows).toContainText("Pending");
-  await expect(page.getByLabel("Note body")).toHaveValue("Keep this edit during invitation.");
+  await expect(page.getByLabel("Note body")).toHaveText("Keep this edit during invitation.");
   await open(page);
   await dialog.getByLabel("Classmate's email").fill("Jamie@Example.edu");
   await dialog.getByRole("button", { name: "Send invitation" }).click();

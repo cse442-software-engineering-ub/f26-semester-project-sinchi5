@@ -30,20 +30,7 @@ export interface Category {
   id: string;
   name: string;
 }
-export interface ChecklistItem {
-  text: string;
-  done: boolean;
-}
-export type HighlightColor = "yellow" | "green" | "pink";
-
-export interface NoteHighlight {
-  start: number;
-  end: number;
-  color: HighlightColor;
-}
 export interface Note {
-  checklist?: ChecklistItem[];
-  highlights?: NoteHighlight[];
   id: string;
   ownerId?: string;
   // Recorded at creation time so comment permission checks (task #65) can
@@ -51,7 +38,11 @@ export interface Note {
   // the literal id "student" - ownerId alone can't distinguish people.
   ownerEmail?: string;
   title: string;
+  // Cleaned HTML from the server (card 240); the browser demo may still hold plain text (format "text").
   body: string;
+  format?: "text" | "html";
+  // Plain text start of the body, at most 300 characters (card 240).
+  excerpt?: string;
   courseId: string;
   lectureDate: string;
   category: string;

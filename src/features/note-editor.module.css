@@ -21,6 +21,7 @@
   gap: 24px;
 }
 .editor {
+  min-width: 0;
   padding: 35px;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -55,84 +56,6 @@
   margin-top: 20px;
   font-size: 0.65rem;
   color: var(--muted);
-}
-.editor .noteBody {
-  font-size: 0.9rem;
-  line-height: 1.95;
-  border: 0;
-  resize: vertical;
-  padding: 25px 0;
-  min-height: 480px;
-}
-.highlightToolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 16px;
-  margin-bottom: 8px;
-}
-.highlightChoices {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.highlightChoices button {
-  min-height: 36px;
-  padding: 7px 12px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--surface);
-  font-size: 0.7rem;
-}
-.highlightEditor {
-  position: relative;
-  width: 100%;
-}
-.highlightLayer {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-
-  font: inherit;
-  font-size: 0.9rem;
-  line-height: 1.95;
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
-
-  padding: 25px 0;
-  min-height: 480px;
-  color: var(--text);
-}
-.highlightTextarea {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  caret-color: var(--text);
-  background: transparent;
-}
-.highlightTextarea::placeholder {
-  color: var(--muted);
-  -webkit-text-fill-color: var(--muted);
-}
-.highlightLayer mark {
-  color: var(--highlight-ink);
-  padding: 0;
-  border-radius: 3px;
-}
-.highlightYellow {
-  background: var(--highlight-yellow);
-}
-.highlightGreen {
-  background: var(--highlight-green);
-}
-.highlightPink {
-  background: var(--highlight-pink);
 }
 .inspector {
   padding: 20px;
@@ -205,7 +128,6 @@
   display: block;
 }
 .previewBody {
-  white-space: pre-wrap;
   font-size: 0.85rem;
   padding: 20px 0;
   max-height: 40vh;
@@ -221,7 +143,7 @@
 }
 @media (max-width: 1023px) {
   .editorLayout {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
   .inspector {
       max-width: none;
@@ -246,16 +168,6 @@ so iPhone Safari doesn't zoom in when one is tapped. */
   .noteMetadata select {
       font-size: 1rem;
     }
-  /* The highlight layer sits under the note body,
-so both keep the same size. */
-.editor .noteBody {
-      min-height: 420px;
-      font-size: 1rem;
-    }
-  .highlightLayer {
-      min-height: 420px;
-      font-size: 1rem;
-    }
   .editorTop {
       gap: 5px;
     }
@@ -276,12 +188,6 @@ so both keep the same size. */
   min-width: 44px;
   min-height: 44px;
 }
-.checklist { margin-block: 1rem; }
-.checklistRow { display: flex; gap: .5rem; align-items: center; margin-block: .5rem; }
-.checklistRow input[type="checkbox"] { width: 1.25rem; height: 1.25rem; flex: 0 0 auto; }
-.checklistRow input[type="text"],
-.checklistRow input:not([type]) { flex: 1; min-width: 0; width: 0; }
-.checklistDone { text-decoration: line-through; }
 .sharedReader {
   max-width: 760px;
   overflow-wrap: anywhere;
@@ -291,11 +197,4 @@ so both keep the same size. */
   font-size: 2rem;
   letter-spacing: -0.04em;
 }
-.sharedBody {
-  white-space: pre-wrap;
-  line-height: 1.95;
-}
-.sharedChecklist {
-  margin-top: 20px;
-  padding-left: 20px;
-}
+

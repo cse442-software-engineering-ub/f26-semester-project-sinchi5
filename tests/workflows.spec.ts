@@ -138,11 +138,11 @@ test("note edits, comments, history and reload", async ({ page }) => {
     .click();
   await page.getByRole("button", { name: "Restore version" }).click();
   await page.getByRole("button", { name: "Confirm restore" }).click();
-  await expect(page.getByLabel("Note body")).not.toHaveValue(
+  await expect(page.getByLabel("Note body")).not.toHaveText(
     "A revised explanation of Scrum.",
   );
   await page.reload();
-  await expect(page.getByLabel("Note body")).not.toHaveValue(
+  await expect(page.getByLabel("Note body")).not.toHaveText(
     "A revised explanation of Scrum.",
   );
 });
@@ -225,11 +225,11 @@ test("new note saves explicitly before leaving", async ({ page }) => {
   await expect(page.getByText("All changes saved", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "All notes", exact: true }).click();
   await page.getByRole("heading", { name: "A brand-new idea" }).click();
-  await expect(page.getByLabel("Note body")).toHaveValue(
+  await expect(page.getByLabel("Note body")).toHaveText(
     "Keep this even if I leave right away.",
   );
   await page.reload();
-  await expect(page.getByLabel("Note body")).toHaveValue(
+  await expect(page.getByLabel("Note body")).toHaveText(
     "Keep this even if I leave right away.",
   );
 });
