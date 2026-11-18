@@ -5,6 +5,7 @@ import type { Friend, FriendLists } from "../domain";
 import { createHttpFriends } from "../services/friends-http";
 import { Avatar, Modal, PageHeading } from "../shared/ui";
 import { FieldError } from "./account";
+import { useHoldRefresh } from "../app/context";
 import css from "./friends.module.css";
 import s from "../shared/ui.module.css";
 
@@ -15,6 +16,7 @@ export function Friends() {
   const [lists, setLists] = useState<FriendLists>();
   const [pageError, setPageError] = useState("");
   const [email, setEmail] = useState("");
+  useHoldRefresh(email !== ""); // typed classmate address: the background re-read waits
   const [emailError, setEmailError] = useState("");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
