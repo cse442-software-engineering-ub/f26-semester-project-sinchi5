@@ -10,6 +10,8 @@ import {
   BookOpen,
   CalendarDays,
   Trash2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useRef, useState, type ReactNode } from "react";
@@ -162,16 +164,9 @@ export function NoteCard({
   const { state } = useApp();
   const course = state.courses.find((c) => c.id === note.courseId);
   const card = (
-    <Link to={`/notes/${note.id}`} className={s.noteCard}>
+    <Link to={`/notes/${note.id}`} className={s.noteCard} style={{ "--course-color": course?.color || "var(--hover-line)" } as React.CSSProperties}>
       <div className={s.cardTop}>
-        <span
-          className={s.courseBadge}
-          style={
-            {
-              "--course-color": course?.color || "#869D7A",
-            } as React.CSSProperties
-          }
-        >
+        <span className={s.courseBadge}>
           <i />
           {course?.code || note.category}
         </span>
@@ -248,7 +243,7 @@ export function EventRow({
       <span className={s.eventTime}>{event.time ? formatEventTime(event.time) : "All day"}</span>
       <span
         className={s.eventBar}
-        style={{ background: course?.color || "#869D7A" }}
+        style={{ background: course?.color || "var(--hover-line)" }}
       />
       <span className={s.eventText}>
         <strong>{event.title}</strong>
@@ -275,12 +270,15 @@ export function PageHeading({
 }) {
   return (
     <header className={s.pageHeading}>
-      <div>
-        {eyebrow && <span className={s.eyebrow}>{eyebrow}</span>}
-        <h1>{title}</h1>
-        {description && <p>{description}</p>}
-      </div>
+      <h1>{title}</h1>
       <div className={s.actions}>{actions}</div>
+      {/* Card 251: the old eyebrow reads as the quiet meta line under the title, never as a label above it. */}
+      {(eyebrow || description) && (
+        <div className={s.pageMeta}>
+          {eyebrow && <span className={s.eyebrow}>{eyebrow}</span>}
+          {description && <p>{description}</p>}
+        </div>
+      )}
     </header>
   );
 }
@@ -294,5 +292,89 @@ export function DateLabel({ date }: { date: string }) {
         day: "numeric",
       })}
     </span>
+  );
+}
+
+// Card 251: the planner material every screen builds on.
+export function Sheet({ children, label, className = "" }: { children: ReactNode; label?: string; className?: string }) {
+  return <section className={`${s.sheet} ${className}`} aria-label={label}>{children}</section>;
+}
+
+// Two facing pages split by a spine; the pages stack when the sheet is narrower than 720 px (a container query).
+export function Spread({ left, right, label, className = "" }: { left: ReactNode; right: ReactNode; label?: string; className?: string }) {
+  return (
+    <section className={`${s.sheet} ${s.spread} ${className}`} aria-label={label}>
+      <div className={s.spreadGrid}>
+        <div className={s.leaf} data-page>{left}</div>
+        <div className={s.spine} data-spine aria-hidden="true" />
+        <div className={s.leaf} data-page>{right}</div>
+      </div>
+    </section>
+  );
+}
+
+// "Due tonight 11:59 PM" (tone="due") or "In 12 days" (the quiet default).
+export function Chip({ tone = "later", children }: { tone?: "due" | "later"; children: ReactNode }) {
+  return <span className={`${s.chip} ${tone === "due" ? s.chipDue : ""}`} data-tone={tone}>{children}</span>;
+}
+
+const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+// Sunday to Saturday around `date` (YYYY-MM-DD). Today is the filled accent disc, `marked` days get a dot.
+// Props only: the screen owns the data and decides what prev, next, Today and a day click do.
+export function WeekStrip({
+  date,
+  today = isoDay(new Date()),
+  marked = [],
+  selected,
+  onPrev,
+  onNext,
+  onToday,
+  onSelect,
+}: {
+  date: string;
+  today?: string;
+  marked?: string[];
+  selected?: string;
+  onPrev: () => void;
+  onNext: () => void;
+  onToday: () => void;
+  onSelect?: (day: string) => void;
+}) {
+  const start = new Date(`${date}T12:00:00`);
+  start.setDate(start.getDate() - start.getDay());
+  const days = Array.from({ length: 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i, 12));
+  const month = (d: Date) => d.toLocaleDateString("en-US", { month: "short" });
+  const [first, last] = [days[0], days[6]];
+  const range = `${month(first)} ${first.getDate()} – ${first.getMonth() === last.getMonth() ? "" : `${month(last)} `}${last.getDate()}`;
+  const busy = new Set(marked);
+  return (
+    <div className={s.weekStrip} role="group" aria-label={`Week of ${range}`}>
+      <div className={s.weekDays}>
+        {days.map((d) => {
+          const key = isoDay(d);
+          const name = `${d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}${key === today ? ", today" : ""}${busy.has(key) ? ", has items" : ""}`;
+          const face = (
+            <>
+              <span data-weekday aria-hidden="true">{d.toLocaleDateString("en-US", { weekday: "narrow" })}</span>
+              <span data-date aria-hidden="true" className={s.weekDate}>{d.getDate()}</span>
+              {busy.has(key) ? <i data-dot aria-hidden="true" className={s.weekDot} /> : <i aria-hidden="true" className={s.weekDot} data-empty />}
+            </>
+          );
+          const shared = { "data-day": key, "aria-current": key === today ? ("date" as const) : undefined, "data-selected": key === selected || undefined, className: s.weekDay };
+          return onSelect ? (
+            <button key={key} type="button" {...shared} aria-label={name} onClick={() => onSelect(key)}>{face}</button>
+          ) : (
+            <span key={key} {...shared}>{face}<span className={s.srOnly}>{name}</span></span>
+          );
+        })}
+      </div>
+      <div className={s.weekNav}>
+        <strong className={s.weekRange}>{range}</strong>
+        <button type="button" className={s.iconButton} aria-label="Previous week" onClick={onPrev}><ChevronLeft size={18} /></button>
+        <button type="button" className={s.secondary} onClick={onToday}>Today</button>
+        <button type="button" className={s.iconButton} aria-label="Next week" onClick={onNext}><ChevronRight size={18} /></button>
+      </div>
+    </div>
   );
 }

@@ -1,32 +1,36 @@
-/* Application shell: sidebar (>=1024), icon rail (768-1023), top bar + tab bar + floating New (<768). Tokens only. */
+/* Application shell in the planner world (card 251): a tinted sidebar beside the page ground, the ribbon marking the
+   active page, sheets in the main area. Sidebar (>=1024), icon rail (768-1023), top bar + tab bar + floating New (<768). */
 .app {
-  --rail: clamp(220px, 16vw, 280px);
+  --rail: clamp(232px, 16vw, 272px);
   --tabbar: 64px;
   min-height: 100dvh;
   display: grid;
   grid-template-columns: var(--rail) minmax(0, 1fr);
+  background: var(--ground);
 }
 .sidebar {
+  --side-pad: var(--space-4);
   position: sticky;
   top: 0;
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 24px 16px 16px;
-  background: var(--surface);
-  border-right: 1px solid var(--line);
+  gap: var(--space-1);
+  padding: var(--space-5) var(--side-pad) var(--space-3);
+  background: var(--nav);
+  box-shadow: inset -1px 0 0 var(--rule);
   overflow-y: auto;
+  overflow-x: hidden;
 }
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
   min-height: 44px;
-  padding: 0 8px;
-  font-size: 1.25rem;
-  font-weight: 650;
-  letter-spacing: -0.05em;
+  padding: 0 var(--space-2);
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 .brandMark {
   width: 32px;
@@ -34,22 +38,25 @@
   display: grid;
   place-items: center;
   border-radius: 9px;
-  background: var(--sage);
+  background: var(--sheet);
   color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--sheet-edge), var(--shadow-button);
 }
 .newButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-2);
   min-height: 44px;
-  margin: 20px 0 16px;
-  padding: 0 16px;
-  border-radius: 10px;
-  background: var(--primary);
-  color: var(--primary-text);
-  font-size: 0.85rem;
-  font-weight: 550;
+  margin: var(--space-4) 0 var(--space-5);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--ribbon);
+  color: var(--ribbon-text);
+  box-shadow: 0 1px 2px var(--ribbon-notch);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  transition: background-color var(--motion-fast) var(--ease-out), transform var(--motion-fast) var(--ease-out);
 }
 .nav {
   display: flex;
@@ -57,38 +64,59 @@
   gap: 2px;
 }
 .navItem {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   min-height: 44px;
-  padding: 0 12px;
-  border-radius: 8px;
-  font-size: 0.85rem;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-control);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  color: var(--text);
+  transition: background-color var(--motion-fast) var(--ease-out);
+}
+.navItem > svg {
   color: var(--muted);
 }
+/* The active page is pulled onto a sheet and marked by the ribbon, which runs in from the sidebar's edge. */
 .navItem[aria-current="page"] {
-  background: var(--nav);
-  color: var(--text);
+  background: var(--sheet);
+  box-shadow: inset 0 0 0 1px var(--sheet-edge), var(--shadow-pop);
   font-weight: 600;
+}
+.navItem[aria-current="page"] > svg {
+  color: var(--text);
+}
+.navItem[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--side-pad));
+  top: 50%;
+  width: calc(var(--side-pad) - 2px);
+  height: 20px;
+  translate: 0 -50%;
+  background: var(--ribbon);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 5px) 50%, 100% 100%, 0 100%);
 }
 .courseList {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin: 2px 0 6px 22px;
-  padding-left: 10px;
-  border-left: 1px solid var(--line);
+  margin: 2px 0 var(--space-2);
 }
 .courseItem {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
   min-height: 44px;
-  padding: 0 10px;
-  border-radius: 8px;
-  font-size: 0.8rem;
-  color: var(--muted);
+  padding: 0 var(--space-3) 0 calc(var(--space-3) + 5px);
+  border-radius: var(--radius-control);
+  font-size: var(--fs-body);
+  color: var(--text);
   min-width: 0;
+  transition: background-color var(--motion-fast) var(--ease-out);
 }
 .courseItem > span:last-child {
   overflow: hidden;
@@ -96,29 +124,29 @@
   white-space: nowrap;
 }
 .courseItem[aria-current="page"] {
-  background: var(--nav);
-  color: var(--text);
+  background: var(--sheet);
+  box-shadow: inset 0 0 0 1px var(--sheet-edge), var(--shadow-pop);
   font-weight: 600;
 }
 .dot {
   width: 8px;
   height: 8px;
-  border-radius: 3px;
+  border-radius: 50%;
   flex-shrink: 0;
 }
 .account {
   margin-top: auto;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   width: 100%;
   min-height: 56px;
-  padding: 8px 10px;
-  border-top: 1px solid var(--line);
-  border-radius: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-control);
+  box-shadow: 0 -1px 0 var(--rule);
   text-align: left;
-  font-size: 0.85rem;
-  font-weight: 550;
+  font-size: var(--fs-body);
+  font-weight: 600;
 }
 .account > span:not(:first-child) {
   min-width: 0;
@@ -138,12 +166,11 @@
   white-space: nowrap;
 }
 .menu {
-  min-width: 200px;
+  min-width: 216px;
   padding: 6px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  box-shadow: var(--shadow);
+  background: var(--sheet);
+  border-radius: var(--radius-card);
+  box-shadow: inset 0 0 0 1px var(--sheet-edge), var(--shadow);
   z-index: 30;
   transform-origin: var(--transform-origin);
   transition:
@@ -158,28 +185,33 @@
 .menuItem {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   min-height: 44px;
-  padding: 0 12px;
+  padding: 0 var(--space-3);
   border-radius: 8px;
-  font-size: 0.85rem;
+  font-size: var(--fs-body);
+  font-weight: 500;
   cursor: pointer;
   user-select: none;
 }
+.menuItem > svg {
+  color: var(--muted);
+}
 .menuItem[data-highlighted] {
-  background: var(--nav);
+  background: var(--ground);
   outline: none;
 }
 .menuItem:focus-visible,
 .menuItem[data-highlighted]:focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--ribbon);
   outline-offset: -2px;
 }
 .mainWrap {
   min-width: 0;
 }
+/* Fluid gutters; the page itself has no max width, so sheets use the whole screen and screens cap only their prose. */
 .main {
-  padding: clamp(20px, 3vw, 48px) clamp(16px, 3.5vw, 56px) clamp(24px, 3vw, 48px);
+  padding: clamp(var(--space-5), 3vw, var(--space-7)) var(--space-gutter) clamp(var(--space-5), 3vw, var(--space-7));
 }
 .topbar,
 .tabbar,
@@ -194,12 +226,12 @@
   justify-content: space-between;
   min-height: 56px;
   padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
+  background: var(--nav);
+  box-shadow: 0 1px 0 var(--rule);
 }
 .topbar .brand {
   padding: 0;
-  font-size: 1.1rem;
+  font-size: var(--fs-lead);
 }
 .topbar .account {
   width: auto;
@@ -207,7 +239,7 @@
   min-height: 44px;
   min-width: 44px;
   padding: 0;
-  border: 0;
+  box-shadow: none;
   justify-content: center;
 }
 .tabbar {
@@ -215,8 +247,8 @@
   inset: auto 0 0 0;
   z-index: 15;
   padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-  background: var(--surface);
-  border-top: 1px solid var(--line);
+  background: var(--sheet);
+  box-shadow: 0 -1px 0 var(--sheet-edge), 0 -8px 24px var(--rule);
 }
 .tabbar > a,
 .tabbar > button {
@@ -224,13 +256,16 @@
   min-width: 0;
 }
 .tab {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 2px;
   min-height: var(--tabbar);
-  font-size: 0.68rem;
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+  font-weight: 500;
   color: var(--muted);
 }
 .tab[aria-current="page"],
@@ -238,29 +273,53 @@
   color: var(--text);
   font-weight: 600;
 }
+/* On phones the ribbon hangs from the top edge of the active tab. */
+.tab[aria-current="page"]::before,
+.tab[data-active="true"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 16px;
+  height: 10px;
+  translate: -50% 0;
+  background: var(--ribbon);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 4px), 0 100%);
+}
 .fab {
   position: fixed;
   right: max(16px, env(safe-area-inset-right));
   bottom: calc(var(--tabbar) + env(safe-area-inset-bottom) + 16px);
   z-index: 16;
   min-height: 48px;
-  padding: 0 20px;
+  padding: 0 var(--space-5);
   align-items: center;
-  gap: 8px;
-  border-radius: 24px;
-  background: var(--primary);
-  color: var(--primary-text);
-  box-shadow: var(--shadow);
-  font-size: 0.85rem;
-  font-weight: 550;
+  gap: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--ribbon);
+  color: var(--ribbon-text);
+  box-shadow: 0 2px 4px var(--ribbon-notch), var(--shadow);
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+@media (hover: hover) and (pointer: fine) {
+  .navItem:not([aria-current="page"]):hover,
+  .courseItem:not([aria-current="page"]):hover,
+  .account:hover {
+    background: var(--ground);
+  }
+  .newButton:hover {
+    background: var(--ribbon-notch);
+  }
 }
 @media (max-width: 1023px) {
   .app {
-    --rail: 72px;
+    --rail: 76px;
   }
   .sidebar {
+    --side-pad: var(--space-3);
     align-items: stretch;
-    padding: 20px 12px 12px;
+    padding: var(--space-5) var(--side-pad) var(--space-3);
   }
   .brand,
   .navItem,
@@ -315,8 +374,10 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 12px;
-  font-size: 0.85rem;
+  gap: var(--space-3);
+  font-size: var(--fs-body);
+  color: var(--muted);
+  background: var(--ground);
 }
 .skip {
   position: fixed;
@@ -324,8 +385,10 @@
   left: 10px;
   transform: translateY(-150%);
   z-index: 100;
-  background: var(--surface);
-  padding: 12px;
+  background: var(--sheet);
+  border-radius: var(--radius-control);
+  box-shadow: var(--sheet-shadow);
+  padding: var(--space-3);
 }
 .skip:focus {
   transform: none;

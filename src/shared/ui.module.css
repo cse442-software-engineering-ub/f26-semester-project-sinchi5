@@ -1,14 +1,16 @@
+/* Shared parts in the planner world (card 251): sheets on a tinted ground, a spine, faint rules, one ribbon accent.
+   Sizes come from the scale in tokens.css (--space-*, --fs-*, --radius-*); colors only from variables. */
 .avatar {
   position: relative;
-  height: 33px;
-  width: 33px;
+  height: 32px;
+  width: 32px;
   border-radius: 50%;
   background: var(--tint-a);
   color: var(--tint-a-ink);
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  font-size: 0.8rem;
+  font-size: var(--fs-small);
   font-weight: 600;
   overflow: hidden;
 }
@@ -22,60 +24,104 @@
   border-radius: inherit;
   display: block;
 }
+
+/* Page heading: a big tracked day-style title, actions on its baseline, a quiet meta line under it. */
 .pageHeading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 29px;
-}
-.eyebrow {
-  display: block;
-  color: var(--muted);
-  font-size: 0.65rem;
-  letter-spacing: 0.04em;
-  margin-bottom: 12px;
-  font-weight: 450;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: var(--space-5);
+  row-gap: var(--space-2);
+  margin-bottom: var(--space-6);
 }
 .pageHeading h1 {
-  margin-bottom: 10px;
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
 }
-.pageHeading p {
+.pageHeading > .actions {
+  grid-column: 2;
+  grid-row: 1;
+  justify-content: flex-end;
+}
+.pageMeta {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+.eyebrow {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pageMeta p {
+  line-height: inherit;
+  max-width: var(--measure-read);
 }
 .actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
+
+/* Buttons: primary wears the ribbon; secondary sits on the sheet; quiet is text only; destructive keeps its own red. */
 .primary,
 .secondary,
-.danger {
+.quiet,
+.danger,
+.dangerOutline {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  border-radius: 7px;
+  gap: var(--space-2);
   min-height: 44px;
-  padding: 11px 17px;
-  font-size: 0.76rem;
-  font-weight: 500;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-control);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  letter-spacing: var(--ls-body);
+  font-weight: 600;
   white-space: nowrap;
+  transition:
+    background-color var(--motion-fast) var(--ease-out),
+    border-color var(--motion-fast) var(--ease-out),
+    transform var(--motion-fast) var(--ease-out);
 }
 .primary {
-  background: var(--primary);
-  color: var(--primary-text);
+  background: var(--ribbon);
+  color: var(--ribbon-text);
   box-shadow: var(--shadow-button);
 }
 .secondary {
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--sheet);
+  color: var(--text);
+  border: 1px solid var(--spine);
+}
+.quiet {
+  color: var(--text);
+  padding: 0 var(--space-3);
 }
 .danger {
   background: var(--danger-solid);
   color: var(--danger-solid-text);
+}
+.dangerOutline {
+  border: 1px solid var(--danger-line);
+  background: var(--sheet);
+  color: var(--danger);
+}
+/* A destructive action never sits flush against the safe one. */
+.actions > .danger:not(:first-child),
+.actions > .dangerOutline:not(:first-child) {
+  margin-inline-start: var(--space-2);
 }
 .iconButton {
   min-width: 44px;
@@ -83,162 +129,341 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   color: var(--muted);
 }
 .textLink {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  font-size: 0.71rem;
-  font-weight: 500;
+  gap: var(--space-2);
+  font-size: var(--fs-body);
+  font-weight: 600;
   min-height: 44px;
   color: var(--text);
   padding: 0;
+  text-underline-offset: 3px;
 }
+
+/* Chips: due-tonight in the warm due color, in-N-days quiet. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.chipDue {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+/* The sheet: the one surface content sits on. Elevation is the two-layer shadow; the edge is a hairline drawn inside it. */
+.sheet,
+.panel {
+  background: var(--sheet);
+  border-radius: var(--radius-sheet);
+  box-shadow: inset 0 0 0 1px var(--sheet-edge), var(--sheet-shadow);
+  min-width: 0;
+}
+.sheet {
+  padding: clamp(var(--space-5), 2.6vw, var(--space-7));
+}
+.panel {
+  padding: clamp(var(--space-4), 2vw, var(--space-5));
+}
+.spread {
+  container-type: inline-size;
+  padding: 0;
+  overflow: hidden;
+}
+.spreadGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 11fr) 1px minmax(0, 9fr);
+  min-height: 100%;
+}
+.leaf {
+  min-width: 0;
+  padding: clamp(var(--space-5), 2.6vw, var(--space-7));
+}
+.spine {
+  position: relative;
+  background: var(--spine);
+}
+/* The gutter's inner shading: each page darkens a touch toward the spine. */
+.spine::before,
+.spine::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--space-5);
+  pointer-events: none;
+}
+.spine::before {
+  right: 1px;
+  background: linear-gradient(90deg, transparent, var(--spine-shade));
+}
+.spine::after {
+  left: 1px;
+  background: linear-gradient(270deg, transparent, var(--spine-shade));
+}
+@container (max-width: 720px) {
+  .spreadGrid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1px auto;
+  }
+  .spine::before,
+  .spine::after {
+    display: none;
+  }
+}
+
+/* Week strip: S to S with dates, today a filled ribbon disc, a dot for days with items. */
+.weekStrip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-5);
+  min-width: 0;
+}
+.weekDays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(36px, 48px));
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.weekDay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 60px;
+  min-width: 0;
+  padding: var(--space-1) 0;
+  border-radius: var(--radius-control);
+  color: var(--muted);
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+  font-weight: 600;
+  transition: background-color var(--motion-fast) var(--ease-out);
+}
+.weekDate {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--text);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.weekDay[aria-current="date"] .weekDate {
+  background: var(--ribbon);
+  color: var(--ribbon-text);
+  font-weight: 650;
+  box-shadow: 0 2px 6px var(--sheet-edge);
+}
+.weekDay[data-selected]:not([aria-current="date"]) .weekDate {
+  box-shadow: inset 0 0 0 1.5px var(--ribbon);
+}
+.weekDot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--hover-line);
+}
+.weekDot[data-empty] {
+  background: none;
+}
+.weekNav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline-start: auto;
+}
+.weekRange {
+  margin-inline-end: var(--space-2);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .section {
-  margin-bottom: 31px;
+  margin-bottom: var(--space-6);
 }
 .sectionHeading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 18px;
-}
-.sectionHeading p {
-  font-size: 0.7rem;
-  color: var(--muted);
-  margin-top: 5px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 .sectionHeading h2 {
-  font-size: 1rem;
+  font-size: var(--fs-title);
+  line-height: var(--lh-title);
+  letter-spacing: var(--ls-title);
+}
+.sectionHeading p {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--muted);
+  margin-top: var(--space-1);
 }
 .quickNotes {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 13px;
+  gap: var(--space-4);
 }
+
+/* Note card: a small sheet with its course's 3 px edge, a two-line plain excerpt and a quiet footer. */
 .noteCard {
-  border: 1px solid var(--line);
-  background: var(--surface);
-  padding: 17px 16px 0;
+  --course-color: var(--hover-line);
+  position: relative;
   display: flex;
   flex-direction: column;
-  border-radius: 9px;
-  min-height: 210px;
+  min-height: 200px;
   min-width: 0;
+  padding: var(--space-4) var(--space-4) 0 calc(var(--space-4) + 3px);
+  border-radius: var(--radius-card);
+  background: var(--sheet);
+  box-shadow: inset 0 0 0 1px var(--sheet-edge);
+  transition:
+    box-shadow var(--motion-base) var(--ease-out),
+    transform var(--motion-fast) var(--ease-out);
+}
+/* The course's 3 px edge, a straight tab inside the card's left side. */
+.noteCard::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: var(--space-4);
+  bottom: var(--space-4);
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--course-color);
 }
 .cardTop {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-2);
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 18px;
+  margin-bottom: var(--space-3);
   color: var(--muted);
 }
 .pinnedBadge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 0.65rem;
+  gap: var(--space-1);
+  font-size: var(--fs-small);
+  font-weight: 600;
 }
 .courseBadge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 0.55rem;
-  letter-spacing: 0.01em;
-  font-weight: 500;
+  gap: 6px;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  font-weight: 600;
+  color: var(--muted);
 }
 .courseBadge > i {
-  height: 6px;
-  width: 6px;
-  border-radius: 2px;
+  height: 8px;
+  width: 8px;
+  border-radius: 50%;
   background: var(--course-color);
 }
 .noteCard h3 {
   overflow-wrap: anywhere;
-  font-size: 0.83rem;
-  line-height: 1.5;
-  letter-spacing: -0.025em;
-  margin-bottom: 10px;
-  font-weight: 550;
+  font-size: var(--fs-lead);
+  line-height: var(--lh-lead);
+  letter-spacing: var(--ls-lead);
+  font-weight: 600;
+  margin-bottom: var(--space-2);
 }
 .excerpt {
-  font-size: 0.65rem;
-  line-height: 1.7;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   color: var(--muted);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   white-space: pre-line;
-  margin-bottom: 17px;
+  margin-bottom: var(--space-4);
 }
 .cardFooter {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 4px;
-  border-top: 1px solid var(--line);
-  font-size: 0.53rem;
+  gap: var(--space-1);
+  border-top: 1px solid var(--rule);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
   color: var(--muted);
-  padding: 12px 0;
+  font-variant-numeric: tabular-nums;
+  padding: var(--space-3) 0;
   margin-top: auto;
 }
 .cardFooter > span {
   display: flex;
   align-items: center;
-  gap: 4px;
-}
-.panel {
-  padding: 21px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface);
-  min-width: 0;
+  gap: var(--space-1);
 }
 .dashboardAside .panel {
-  margin-bottom: 18px;
+  margin-bottom: var(--space-4);
 }
 .dashboardAside h2 {
-  font-size: 0.86rem;
+  font-size: var(--fs-lead);
 }
 .dashboardAside .sectionHeading {
-  margin-bottom: 13px;
+  margin-bottom: var(--space-3);
 }
-.dashboardAside .sectionHeading .iconButton {
-  min-width: 24px;
-  min-height: 24px;
-}
+
+/* Event row: tabular time, the course's 3 px edge, a title and a quiet line, on faint rules. */
 .eventRow {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
   width: 100%;
   text-align: left;
-  min-height: 76px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--line);
+  min-height: 60px;
+  padding: var(--space-2) var(--space-2) var(--space-2) 0;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  transition: background-color var(--motion-fast) var(--ease-out);
 }
 .eventRow:last-of-type {
   border-bottom: none;
 }
 .eventTime {
-  font-size: 0.62rem;
-  color: var(--muted);
-  width: 34px;
+  width: 4.75rem;
   flex-shrink: 0;
+  text-align: right;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--muted);
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .eventBar {
   width: 3px;
   min-height: 32px;
-  border-radius: 4px;
+  border-radius: 2px;
   align-self: stretch;
-  margin: 8px 0;
+  margin: var(--space-1) 0;
   flex-shrink: 0;
 }
 .eventText {
@@ -247,80 +472,97 @@
 }
 .eventText strong {
   display: block;
-  font-size: 0.7rem;
-  line-height: 1.6;
-  font-weight: 550;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .eventText small {
-  font-size: 0.55rem;
-  color: var(--muted);
   display: block;
-  text-transform: capitalize;
   margin-top: 2px;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--muted);
+  text-transform: capitalize;
 }
 .eventRow > svg {
   color: var(--muted);
-  width: 12px;
+  width: 14px;
 }
 .dashboardAside .textLink {
-  font-size: 0.64rem;
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
-.segment > button {
-  min-width: 44px;
-  min-height: 44px;
-}
+
 .muted {
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 .error {
   border: 1px solid var(--danger-line);
   color: var(--danger);
   background: var(--danger-soft);
-  padding: 12px;
-  border-radius: 8px;
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.8rem;
-  margin-bottom: 16px;
+  gap: var(--space-3);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  margin-bottom: var(--space-4);
 }
 .notice {
-  padding: 12px 14px;
-  background: var(--surface-soft);
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--ground);
+  border-radius: var(--radius-control);
   color: var(--muted);
-  font-size: 0.76rem;
-  line-height: 1.7;
-  margin-bottom: 14px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  margin-bottom: var(--space-4);
 }
+/* Empty: a dashed page waiting to be written on. */
 .empty {
   text-align: center;
-  padding: 40px 20px;
+  padding: var(--space-7) var(--space-5);
   color: var(--muted);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: var(--space-3);
+  border: 1px dashed var(--spine);
+  border-radius: var(--radius-card);
+}
+.empty > svg {
+  width: 48px;
+  height: 48px;
+  padding: var(--space-3);
+  border-radius: 50%;
+  background: var(--sage);
+  color: var(--glyph-1);
 }
 .empty h3 {
   color: var(--text);
+  font-size: var(--fs-lead);
+  line-height: var(--lh-lead);
 }
 .empty p {
-  font-size: 0.8rem;
-  max-width: 340px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  max-width: 36ch;
 }
 .empty a {
   text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .empty a.primary {
   text-decoration: none;
 }
+
+/* Modal: a sheet over a dimmed ground; a bottom sheet on phones. */
 .backdrop {
   position: fixed;
   inset: 0;
@@ -334,14 +576,13 @@
   top: 50%;
   left: 50%;
   translate: -50% -50%;
-  width: min(540px, calc(100vw - 32px));
+  width: min(560px, calc(100vw - 32px));
   max-height: calc(100dvh - 64px);
   overflow-y: auto;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  padding: 28px;
+  background: var(--sheet);
+  padding: var(--space-6);
   border-radius: 16px;
-  box-shadow: var(--shadow);
+  box-shadow: inset 0 0 0 1px var(--sheet-edge), var(--shadow);
   z-index: 50;
   transition:
     opacity var(--motion-slow) var(--ease-out),
@@ -357,22 +598,24 @@
   opacity: 0;
 }
 .wide {
-  width: min(800px, calc(100vw - 32px));
+  width: min(820px, calc(100vw - 32px));
 }
 .modalHeading {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
 }
 .modalHeading h2 {
-  font-size: 1.4rem;
-  margin: 0 0 8px;
+  font-size: var(--fs-heading);
+  line-height: var(--lh-heading);
+  letter-spacing: var(--ls-heading);
+  margin: 0 0 var(--space-2);
 }
 .modalHeading p {
-  font-size: 0.76rem;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   color: var(--muted);
-  line-height: 1.7;
 }
 .modalHeading .iconButton {
   margin: -10px -12px 0 0;
@@ -381,37 +624,39 @@
 .form {
   display: flex;
   flex-direction: column;
-  gap: 17px;
+  gap: var(--space-4);
 }
 .formRow {
   display: grid;
   /* minmax(0, ...) lets a date box shrink, so 16px phone text can't push it past the edge. */
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: var(--space-3);
 }
 .form > .primary {
   align-self: flex-start;
-  margin-top: 4px;
+  margin-top: var(--space-1);
 }
 .demoDetails {
-  font-size: 0.7rem;
+  font-size: var(--fs-small);
   color: var(--muted);
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
 }
 .demoDetails summary {
   cursor: pointer;
   min-height: 32px;
 }
 .demoDetails p {
-  margin-bottom: 10px;
+  margin-bottom: var(--space-3);
 }
+
+/* Segment control: a sunken track with the chosen option raised onto the sheet. */
 .segment {
   display: flex;
   align-items: center;
-  border: 1px solid var(--line);
-  background: var(--surface-soft);
+  background: var(--ground);
+  box-shadow: inset 0 0 0 1px var(--spine);
   padding: 3px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   gap: 2px;
 }
 .segment > button {
@@ -419,39 +664,29 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-width: 38px;
-  min-height: 38px;
-  padding: 8px;
-  font-size: 0.7rem;
-  border-radius: 5px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  border-radius: 8px;
   color: var(--muted);
 }
 .activeButton {
-  background: var(--surface) !important;
+  background: var(--sheet) !important;
   color: var(--text) !important;
-  box-shadow: var(--shadow-pop);
+  font-weight: 600 !important;
+  box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--sheet-edge);
 }
+
 .noteGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  gap: var(--space-4);
 }
 .noteGrid .noteCard {
-  min-height: 230px;
-  padding: 22px 22px 0;
-}
-.noteGrid .noteCard h3 {
-  font-size: 1rem;
-}
-.noteGrid .excerpt {
-  font-size: 0.75rem;
-}
-.noteGrid .cardFooter {
-  font-size: 0.63rem;
-  padding: 15px 0;
-}
-.noteGrid .courseBadge {
-  font-size: 0.65rem;
+  min-height: 216px;
+  padding-top: var(--space-5);
 }
 .noteItem {
   position: relative;
@@ -460,7 +695,7 @@
 }
 /* Leave room for the action in grid and list views; narrow cards wrap whole items. */
 .noteItem .noteCard .cardFooter {
-  padding-right: 76px;
+  padding-right: 84px;
   flex-wrap: wrap;
 }
 .noteItem .cardFooter > span {
@@ -468,23 +703,21 @@
 }
 .cardAction {
   position: absolute;
-  right: 8px;
+  right: var(--space-2);
   bottom: 0;
   min-height: 44px;
-  padding: 0 10px;
+  padding: 0 var(--space-3);
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  border-radius: 8px;
-  font-size: 0.63rem;
-  font-weight: 500;
+  gap: 6px;
+  border-radius: var(--radius-control);
+  font-size: var(--fs-small);
+  font-weight: 600;
   color: var(--danger);
-}
-.cardAction:hover {
-  background: var(--danger-soft);
 }
 .noteList {
   grid-template-columns: 1fr;
+  gap: var(--space-2);
 }
 .noteList .cardAction {
   top: 50%;
@@ -494,9 +727,9 @@
 .noteList .noteCard {
   min-height: 0;
   display: grid;
-  grid-template-columns: 120px 1fr 200px;
-  gap: 20px;
-  padding: 18px 22px;
+  grid-template-columns: 140px minmax(0, 1fr) 220px;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-5);
   align-items: center;
 }
 .noteList .cardTop,
@@ -515,16 +748,14 @@
 .agenda {
   align-self: start;
 }
-.agenda .textLink {
-  font-size: 0.65rem;
-}
+
 .settingsHeading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 0 16px;
-  margin-bottom: 18px;
+  gap: 0 var(--space-4);
+  margin-bottom: var(--space-4);
 }
 .settingsHeading > h2,
 .settingsHeading > p {
@@ -534,26 +765,30 @@
   flex: 1 1 240px;
 }
 .settingsHeading h2 {
-  font-size: 1rem;
-  margin-bottom: 4px;
+  font-size: var(--fs-title);
+  line-height: var(--lh-title);
+  letter-spacing: var(--ls-title);
+  margin-bottom: var(--space-1);
 }
 .settingsHeading p {
-  font-size: 0.72rem;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--muted);
 }
 .accountSummary {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 16px;
-  margin-bottom: 8px;
-  border-radius: 10px;
-  background: var(--surface-soft);
+  gap: var(--space-3);
+  padding: var(--space-4);
+  margin-bottom: var(--space-2);
+  border-radius: var(--radius-card);
+  background: var(--ground);
   flex-wrap: wrap;
 }
 .accountSummary > .avatar {
   height: 44px;
   width: 44px;
-  font-size: 0.9rem;
+  font-size: var(--fs-lead);
   flex-shrink: 0;
   overflow: hidden;
 }
@@ -562,19 +797,19 @@
   min-width: 0;
 }
 .accountSummary + p {
-  margin: 12px 0 4px;
-  font-size: 0.72rem;
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: var(--fs-small);
 }
 .accountSummary strong,
 .accountSummary small {
   display: block;
 }
 .accountSummary strong {
-  font-size: 0.85rem;
+  font-size: var(--fs-body);
 }
 .accountSummary small {
-  font-size: 0.7rem;
-  margin-top: 3px;
+  font-size: var(--fs-small);
+  margin-top: 2px;
 }
 .settingRows {
   list-style: none;
@@ -586,9 +821,9 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 10px 16px;
-  padding: 16px 0;
-  border-top: 1px solid var(--line);
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--rule);
 }
 .settingRows > li:first-child {
   border-top: 0;
@@ -602,32 +837,15 @@
 }
 .settingRows strong {
   display: block;
-  font-size: 0.78rem;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
 }
 .settingRows small {
   display: block;
   color: var(--muted);
-  font-size: 0.68rem;
-  margin-top: 4px;
-  line-height: 1.5;
-}
-.dangerOutline {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 11px 17px;
-  border-radius: 7px;
-  border: 1px solid var(--danger-line);
-  background: var(--surface);
-  color: var(--danger);
-  font-size: 0.76rem;
-  font-weight: 500;
-  white-space: nowrap;
-}
-.dangerOutline:hover {
-  background: var(--danger-soft);
+  font-size: var(--fs-small);
+  margin-top: 2px;
+  line-height: var(--lh-small);
 }
 .accountFields input[aria-invalid="true"] {
   border-color: var(--danger-field);
@@ -646,232 +864,173 @@
 .settingRows > .settingCourse {
   justify-content: flex-start;
   flex-wrap: nowrap;
-  padding: 13px 0;
-}
-.noteCard {
-  transition: border-color var(--motion-base) var(--ease-out), box-shadow var(--motion-base) var(--ease-out), transform var(--motion-fast) var(--ease-out);
+  padding: var(--space-3) 0;
 }
 .noteCard:active {
   transform: scale(0.985);
 }
 @media (hover: hover) and (pointer: fine) {
   .noteCard:hover {
-      border-color: var(--hover-line);
-      box-shadow: var(--shadow-card-hover);
-    }
-  .iconButton:hover {
-      background: var(--nav);
-    }
+    box-shadow: inset 0 0 0 1px var(--hover-line), var(--sheet-shadow);
+  }
+  .iconButton:hover,
+  .quiet:hover,
+  .eventRow:hover,
+  .weekDay:hover {
+    background: var(--ground);
+  }
+  .secondary:hover {
+    border-color: var(--hover-line);
+  }
   .textLink:hover {
-      text-decoration: underline;
-    }
+    text-decoration: underline;
+  }
   .primary:hover {
-      filter: brightness(1.05);
-    }
+    background: var(--ribbon-notch);
+  }
+  .cardAction:hover,
+  .dangerOutline:hover {
+    background: var(--danger-soft);
+  }
 }
 @media (max-width: 1250px) {
   .quickNotes {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .quickNotes > .noteCard:nth-child(3) {
-      display: none;
-    }
-  .noteGrid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+    display: none;
+  }
 }
 @media (max-width: 1023px) {
   .dashboardAside {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-5);
+  }
   .quickNotes {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
   .quickNotes > .noteCard:nth-child(3) {
-      display: flex;
-    }
-  .pageHeading {
-      align-items: flex-start;
-    }
-  .pageHeading .primary {
-      font-size: 0.68rem;
-      padding: 10px 12px;
-    }
+    display: flex;
+  }
   .agenda {
-      width: 100%;
-    }
+    width: 100%;
+  }
   .noteList .noteCard {
-      grid-template-columns: 90px 1fr;
-    }
+    grid-template-columns: 110px minmax(0, 1fr);
+  }
   .noteList .cardFooter {
-      grid-column: 2;
-    }
+    grid-column: 2;
+  }
   .noteList .cardAction {
-      top: auto;
-      bottom: 0;
-      translate: none;
-    }
+    top: auto;
+    bottom: 0;
+    translate: none;
+  }
 }
 @media (max-width: 767px) {
   .pageHeading {
-      gap: 14px;
-      align-items: center;
-      margin-bottom: 24px;
-    }
-  .pageHeading h1 {
-      font-size: 1.75rem;
-      letter-spacing: -0.06em;
-    }
-  .pageHeading p {
-      font-size: 0.7rem;
-      max-width: 260px;
-    }
-  .eyebrow {
-      font-size: 0.57rem;
-      margin-bottom: 10px;
-    }
+    column-gap: var(--space-3);
+    margin-bottom: var(--space-5);
+  }
   .pageHeading .actions .primary {
-      font-size: 0;
-      padding: 10px;
-      min-width: 44px;
-    }
+    font-size: 0;
+    padding: 0;
+    min-width: 44px;
+    gap: 0;
+  }
   .pageHeading .actions .primary > svg {
-      width: 20px;
-      height: 20px;
-    }
+    width: 20px;
+    height: 20px;
+  }
   .quickNotes {
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+  }
   .quickNotes > .noteCard:nth-child(3) {
-      display: none;
-    }
+    display: none;
+  }
   .noteCard {
-      padding: 15px 14px 0;
-      min-height: 206px;
-    }
-  .noteCard h3 {
-      font-size: 0.8rem;
-    }
-  .cardTop {
-      margin-bottom: 15px;
-    }
-  .cardFooter {
-      font-size: 0.5rem;
-    }
-  .sectionHeading h2 {
-      font-size: 0.95rem;
-    }
-  .sectionHeading p {
-      font-size: 0.65rem;
-    }
-  .sectionHeading .textLink {
-      font-size: 0.64rem;
-    }
+    min-height: 184px;
+  }
   .dashboardAside {
-      grid-template-columns: 1fr;
-      gap: 0;
-    }
-  .dashboardAside .panel {
-      margin-bottom: 18px;
-    }
-  .dashboardAside .panel h2 {
-      font-size: 1rem;
-    }
-  .dashboardAside .eventText strong {
-      font-size: 0.8rem;
-    }
-  .dashboardAside .eventText small {
-      font-size: 0.65rem;
-    }
-  .dashboardAside .eventTime {
-      font-size: 0.72rem;
-      width: 45px;
-    }
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
   .noteGrid {
-      gap: 14px;
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
-    }
+    gap: var(--space-3);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  }
   .noteGrid .noteCard {
-      padding: 15px 14px 0;
-      min-height: 220px;
-    }
-  .noteGrid .noteCard h3 {
-      font-size: 0.85rem;
-    }
-  .noteGrid .excerpt {
-      font-size: 0.64rem;
-    }
-  .noteGrid .courseBadge {
-      font-size: 0.53rem;
-    }
-  .noteGrid .cardFooter {
-      font-size: 0.5rem;
-    }
+    padding-top: var(--space-4);
+    min-height: 200px;
+  }
   .noteList .noteCard {
-      display: flex;
-      gap: 10px;
-      min-height: 0;
-      padding-bottom: 14px;
-    }
+    display: flex;
+    gap: var(--space-2);
+    min-height: 0;
+    padding-bottom: var(--space-4);
+  }
   .noteList .cardTop,
   .noteList h3,
   .noteList .cardFooter {
-      width: 100%;
-    }
+    width: 100%;
+  }
   .noteList .cardFooter {
-      margin-top: 4px;
-    }
-  .agenda .eventText strong {
-      font-size: 0.8rem;
-    }
-  .agenda .eventText small {
-      font-size: 0.65rem;
-    }
+    margin-top: var(--space-1);
+  }
+  .weekStrip {
+    justify-content: center;
+  }
+  .weekDays {
+    width: 100%;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+  .weekNav {
+    margin-inline: auto;
+  }
   .modal {
-      top: auto;
-      bottom: 0;
-      left: 0;
-      translate: none;
-      width: 100%;
-      max-height: 92dvh;
-      border-radius: 18px 18px 0 0;
-      padding: 25px 22px max(25px, env(safe-area-inset-bottom));
-      transition:
-        transform var(--motion-slow) var(--ease-drawer),
-        opacity var(--motion-base) var(--ease-out);
-    }
+    top: auto;
+    bottom: 0;
+    left: 0;
+    translate: none;
+    width: 100%;
+    max-height: 92dvh;
+    border-radius: 18px 18px 0 0;
+    padding: var(--space-5) var(--space-5) max(var(--space-5), env(safe-area-inset-bottom));
+    transition:
+      transform var(--motion-slow) var(--ease-drawer),
+      opacity var(--motion-base) var(--ease-out);
+  }
   .modal[data-starting-style],
   .modal[data-ending-style] {
-      transform: translateY(100%);
-      opacity: 1;
-    }
-  .modalHeading h2 {
-      font-size: 1.25rem;
-    }
+    transform: translateY(100%);
+    opacity: 1;
+  }
   .formRow {
-      gap: 10px;
-    }
+    gap: var(--space-2);
+  }
 }
 @media (max-width: 360px) {
   .cardFooter {
-      flex-wrap: wrap;
-    }
+    flex-wrap: wrap;
+  }
 }
 @media (prefers-reduced-transparency: reduce) {
   .backdrop {
-      backdrop-filter: none;
-      background: var(--overlay-strong);
-    }
+    backdrop-filter: none;
+    background: var(--overlay-strong);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .modal[data-starting-style],
   .modal[data-ending-style] {
-      transform: none;
-      opacity: 0;
-    }
+    transform: none;
+    opacity: 0;
+  }
+  .noteCard:active {
+    transform: none;
+  }
 }
 .dashboardAside .sectionHeading .iconButton {
   min-width: 44px;
@@ -880,17 +1039,17 @@
 .accountFields {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
   border: 0;
   padding: 0;
   margin: 0;
   min-width: 0;
 }
 .hint {
-  font-size: 0.72rem;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
   font-weight: 400;
   color: var(--muted);
-  line-height: 1.5;
 }
 .dayToggles {
   display: flex;
@@ -901,15 +1060,15 @@
   width: 44px;
   height: 44px;
   padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 1px solid var(--spine);
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text);
   font: inherit;
   cursor: pointer;
 }
 .dayToggles button[aria-pressed="true"] {
-  border: 2px solid var(--primary);
+  border: 2px solid var(--ribbon);
   background: var(--sage);
   font-weight: 600;
 }
@@ -917,7 +1076,7 @@
   display: flex !important;
   align-items: flex-start;
   flex-direction: row !important;
-  gap: 10px;
+  gap: var(--space-3);
 }
 .checkLabel input {
   width: 18px;
@@ -928,4 +1087,5 @@
   min-height: 0;
   padding: 0;
   margin: 2px 0 0;
+  accent-color: var(--ribbon);
 }

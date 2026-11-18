@@ -1,6 +1,7 @@
 # Notely design system
 
-One accent, generous space, hairline borders, soft elevation. Every color comes from a CSS variable in
+The Planner Spread (card 251): content sits on white sheets over a scheme-tinted ground, two-page views are split by
+a spine, lists sit on faint rules, and one accent ribbon marks now, today and the active item. Every color comes from a CSS variable in
 `src/app/tokens.css`; no other stylesheet may contain a hex value (a unit test enforces it).
 
 ## Color variables
@@ -29,21 +30,38 @@ variable, never a value, so a scheme change recolors everything.
 | `--overlay`, `--overlay-strong` | modal backdrop (the strong one under reduced transparency) |
 | `--shadow`, `--shadow-button`, `--shadow-pop`, `--shadow-card-hover`, `--shadow-paper` | elevation, from page-level to a button's resting shadow |
 | `--swatch-line` | border of the theme swatches in Settings |
+| `--ground` | the tinted page ground behind every sheet (body, main area) |
+| `--sheet`, `--sheet-edge`, `--sheet-shadow` | the sheet surface, its hairline edge (the edge light in dark mode), its two-layer soft shadow |
+| `--spine`, `--spine-shade` | the gutter line between two pages and the shading each page takes toward it |
+| `--rule` | faint ruled lines: hour lines, list dividers |
+| `--ribbon`, `--ribbon-text`, `--ribbon-notch` | the accent ribbon (primary buttons, today's disc, the active-item marker, focus rings), text on it, its darker fold (hover) |
+| `--warn`, `--warn-soft` | the due-tonight chip's text and fill |
+
+Every pair passes AA in all eight blocks and in every custom theme (`tests/frontend/unit/services/palette.test.ts`):
+`--text` and `--muted` on `--sheet` and `--ground`, `--ribbon-text` on `--ribbon`, `--warn` on `--warn-soft`, and `--ribbon`
+at 3:1 on `--sheet`, `--ground` and `--nav`. Custom themes get the same variables from `buildPalette`, which clamps the
+ground and sheet to calm lightness and chroma whatever three colors the student picks.
 
 ## Type, spacing, radii
 
-- Family: Inter Variable, with optical sizing on. Headings use negative tracking (about -0.04em to -0.065em)
-  and weight 500 to 650.
-- Type scale in use (rem): 0.63, 0.65, 0.7, 0.72, 0.76, 0.8, 0.85, 1, 1.4, 1.65, then fluid headings
-  with `clamp()`. New work uses `clamp()` for headings and gaps so pages scale from 320 to 2560 px.
-- Spacing in use (px): 4, 6, 8, 10, 12, 14, 18, 20, 24, 28, 35, 48, 58. Prefer 4/8/12/16/24/32/48 and `clamp()`.
-- Radii: 7 (buttons), 8 (inputs, notices), 10 (tiles), 12 (cards, dropzones), 50% (avatars).
+Defined once in the first `:root` block of `tokens.css` (they are not colors, so no scheme repeats them).
+
+- Family: Inter Variable, with optical sizing on; tabular figures (`font-variant-numeric: tabular-nums`) for times,
+  dates and counts. Tracking never goes below -0.04em.
+- Type scale, each with `--fs-*`, `--lh-*` and `--ls-*`: `label` 11/16 (+0.06em, uppercase section labels), `small` 12/16,
+  `body` 14/20 (the body default), `lead` 16/24 (h3), `title` 20/28 (h2), `heading` 24 to 28 fluid, `display` 32 to 40 fluid (h1).
+- Spacing: `--space-1` to `--space-8` = 4, 8, 12, 16, 24, 32, 48, 64 px; `--space-gutter` is the fluid page gutter
+  (16 to 56 px); `--measure-read` (68ch) caps prose, never sheets.
+- Radii: `--radius-control` 10 (buttons, fields), `--radius-card` 12 (cards, empty states), `--radius-sheet` 14 (sheets),
+  `--radius-pill` (chips, the floating New), 50% (avatars, today's disc).
 - Touch targets are at least 44 px; focus rings are always visible.
 
 ## Elevation and motion
 
-- Cards sit flat with a hairline `--line`; hover adds `--hover-line` and `--shadow-card-hover`.
-  Modals use `--shadow` over `--overlay`.
+- Sheets (`Sheet`, `Spread`, `.panel`) declare elevation once: `--sheet-shadow` with the `--sheet-edge` hairline drawn
+  inside it. Cards on a sheet (`NoteCard`) carry only the edge; hover adds the shadow. Modals and menus are sheets with
+  `--shadow` over `--overlay`. Fields are sunken: `--ground` fill, `--spine` edge, lifting to `--sheet` with a ribbon
+  outline on focus.
 - Motion is 120 to 240 ms on `transform` and `opacity` only, with `--ease-out` (or `--ease-drawer` for
   sheets). Everything stops under `prefers-reduced-motion`; the backdrop blur drops under
   `prefers-reduced-transparency`.
@@ -52,7 +70,11 @@ variable, never a value, so a scheme change recolors everything.
 
 | Component | Use it for |
 |---|---|
-| `PageHeading` | every page's eyebrow, title, description and top-right actions |
+| `PageHeading` | every page's title (display size), its actions on the title's baseline, and a quiet meta line under it (`eyebrow` · `description`; nothing sits above the title) |
+| `Sheet` | `{ children, label?, className? }`: a section on the sheet material |
+| `Spread` | `{ left, right, label?, className? }`: two facing pages (about 55/45) with a spine; stacks when the sheet is under 720 px wide (container query) |
+| `WeekStrip` | `{ date, today?, marked?, selected?, onPrev, onNext, onToday, onSelect? }`: Sunday to Saturday around `date` (YYYY-MM-DD), today as the ribbon disc, a dot on `marked` days; days are buttons only when `onSelect` is given |
+| `Chip` | `{ tone?: "due" \| "later", children }`: "Due tonight 11:59 PM" in the due color, "In 12 days" quiet |
 | `Modal` | any dialog (becomes a sheet on phones) |
 | `DeleteNoteDialog` | confirming a note deletion |
 | `Empty` | an empty list or no-results message |
@@ -61,7 +83,7 @@ variable, never a value, so a scheme change recolors everything.
 | `Avatar` | a student's photo or initial |
 | `DateLabel` | a date with a consistent format |
 
-Utility classes in `ui.module.css` (`primary`, `secondary`, `danger`, `dangerOutline`, `textLink`, `panel`,
+Utility classes in `ui.module.css` (`primary` on the ribbon, `secondary`, `quiet`, `danger`, `dangerOutline`, `textLink`, `panel`,
 `form`, `muted`, `error`, `notice`, `segment`, `srOnly`) are the one set of buttons, links and panels; screens do not
 invent their own.
 

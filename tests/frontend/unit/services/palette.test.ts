@@ -35,6 +35,30 @@ describe("buildPalette", () => {
     }
   });
 
+  // Card 251: the planner material keeps text readable on the sheet and the ground, and the ribbon visible.
+  const planner = [
+    ["--text", "--sheet", 4.5], ["--text", "--ground", 4.5], ["--muted", "--sheet", 4.5], ["--muted", "--ground", 4.5],
+    ["--ribbon-text", "--ribbon", 4.5], ["--warn", "--warn-soft", 4.5], ["--ribbon", "--sheet", 3], ["--ribbon", "--ground", 3], ["--ribbon", "--nav", 3],
+  ] as const;
+  it("keeps the planner pairs readable (AA) in both modes over 180 input triples", () => {
+    for (const t of triples) {
+      const p = buildPalette(t);
+      for (const mode of [p.light, p.dark]) for (const [fg, bg, min] of planner) expect(contrastRatio(mode[fg], mode[bg]), JSON.stringify([t, fg, bg])).toBeGreaterThanOrEqual(min);
+    }
+  });
+
+  it("keeps the planner pairs readable (AA) in all eight blocks of tokens.css", () => {
+    const css = readFileSync("src/app/tokens.css", "utf8") as string;
+    const vars = (selector: string) => Object.fromEntries([...css.split(`${selector} {`)[1].split("\n}")[0].matchAll(/^\s*(--[a-z0-9-]+):\s*([^;]+);/gm)].map((m) => [m[1], m[2].trim()]));
+    const long = (h: string) => (h.length === 4 ? "#" + [...h.slice(1)].map((c) => c + c).join("") : h);
+    for (const scheme of ["", "fjord", "rose", "mocha"]) for (const dark of [false, true]) {
+      const base = vars(dark ? ':root[data-theme="dark"]' : ":root");
+      const own = scheme ? vars(`:root[data-scheme="${scheme}"]${dark ? '[data-theme="dark"]' : ""}`) : {};
+      const v = { ...base, ...own } as Record<string, string>;
+      for (const [fg, bg, min] of planner) expect(contrastRatio(long(v[fg]), long(v[bg])), `${scheme || "sage"} ${dark ? "dark" : "light"} ${fg} on ${bg}`).toBeGreaterThanOrEqual(min);
+    }
+  });
+
   it("flags white on white and leaves a comfortable input alone", () => {
     expect(buildPalette({ accent: "#8b5d33", background: "#ffffff", text: "#ffffff" }).adjusted).toBe(true);
     expect(buildPalette({ accent: "#8b5d33", background: "#f8f9f6", text: "#304c58" }).adjusted).toBe(false);
@@ -45,7 +69,7 @@ describe("buildPalette", () => {
     expect(buildPalette(t)).toEqual(buildPalette({ accent: "#8b5d33", background: "#f8f9f6", text: "#304c58" }));
     const p = buildPalette(t);
     for (const [name, value] of [...Object.entries(p.light), ...Object.entries(p.dark)]) {
-      expect(value, name).toMatch(name.includes("shadow") ? /^0 \d+px \d+px #[0-9a-f]{6,8}$|^0 \d+px \d+px \d+px #[0-9a-f]{6,8}$/ : name === "--swatch-line" || name.startsWith("--overlay") ? /^#[0-9a-f]{4,8}$/ : /^#[0-9a-f]{6}$/);
+      expect(value, name).toMatch(name.includes("shadow") ? /^0 \d+px \d+px (\d+px )?#[0-9a-f]{6,8}(, 0 \d+px \d+px (\d+px )?#[0-9a-f]{6,8})*$/ : name === "--swatch-line" || name.startsWith("--overlay") ? /^#[0-9a-f]{4,8}$/ : /^#[0-9a-f]{6}$/);
     }
   });
 
