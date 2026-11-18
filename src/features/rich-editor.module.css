@@ -1,5 +1,13 @@
 .editor {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   min-width: 0;
+}
+.content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
 }
 .toolbarWrap {
   position: sticky;
@@ -93,7 +101,8 @@
   font-size: 0.75rem;
 }
 .content :global(.ProseMirror) {
-  min-height: 420px;
+  flex: 1;
+  min-height: 240px;
   padding: 20px 0;
   color: var(--text);
   font-size: 0.95rem;

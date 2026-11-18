@@ -14,6 +14,8 @@ import {
   CalendarClock,
   Pin,
   Trash2,
+  SlidersHorizontal,
+  Users,
 } from "lucide-react";
 import { useApp } from "../app/context";
 import { Empty, Modal, DeleteNoteDialog} from "../shared/ui";
@@ -71,6 +73,10 @@ function NoteEditor() {
   const [status, setStatus] = useState("All changes saved");
   const [error, setError] = useState("");
   const [panel, setPanel] = useState("comments");
+  // Card 242: both panels start closed and are not remembered.
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [peopleOpen, setPeopleOpen] = useState(false);
+  const peopleToggle = useRef<HTMLButtonElement>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(true);
   const [commentsError, setCommentsError] = useState("");
@@ -387,13 +393,56 @@ function NoteEditor() {
   titleDraft !== note.title || draftBody !== null;
   return (
     <>
+      <div className={css.screen} onKeyDown={(e) => {
+        // The sheet only exists on phones; the window of the page that holds the screen knows its width.
+        if (e.key === "Escape" && peopleOpen && e.currentTarget.ownerDocument.defaultView?.matchMedia("(max-width: 767px)").matches) {
+          setPeopleOpen(false);
+          peopleToggle.current?.focus();
+        }
+      }}>
       <div className={css.editorTop}>
         <Link className={both.textLink} to="/notes">
           <ArrowLeft size={16} /> All notes
         </Link>
+        <input
+          className={css.noteTitle}
+          aria-label="Note title"
+          value={titleDraft}
+          disabled={!canEdit || saving}
+          onChange={(e) => {
+            setTitleDraft(e.target.value);
+            if (isNewNote) edit({ title: e.target.value });
+          }}
+        />
         <span role="status" className={both.muted}>
           <Check size={14} /> {saving ? "Saving…" : hasDraftChanges ? "Unsaved changes" : status}
         </span>
+        <button
+          type="button"
+          className={s.primary}
+          disabled={!canEdit || saving || pinning || (!hasDraftChanges && !dirty)}
+          onClick={saveNote}
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+        <button
+          type="button"
+          className={s.secondary}
+          disabled={!canEdit || saving || !hasDraftChanges}
+          onClick={cancelEdits}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          className={s.secondary}
+          onClick={() => {
+            setPanel("history");
+            setPeopleOpen(true);
+          }}
+        >
+          <History size={18} aria-hidden="true" /> History
+        </button>
         {canEdit && (
           <button className={s.secondary} type="button" onClick={openReminder} disabled={saving || reminderSaving}>
             <CalendarClock size={18} aria-hidden="true" /> Reminder
@@ -418,6 +467,14 @@ function NoteEditor() {
             <Trash2 size={18} aria-hidden="true" /> Delete note
           </button>
         )}
+        <button type="button" className={`${s.secondary} ${css.toggle}`} aria-expanded={detailsOpen} aria-controls="note-details"
+          onClick={() => setDetailsOpen((o) => !o)}>
+          <SlidersHorizontal size={18} aria-hidden="true" /> Details
+        </button>
+        <button type="button" ref={peopleToggle} className={`${s.secondary} ${css.toggle}`} aria-expanded={peopleOpen} aria-controls="note-people"
+          onClick={() => setPeopleOpen((o) => !o)}>
+          <Users size={18} aria-hidden="true" /> People
+        </button>
       </div>
       {note.remindAt && <p className={css.reminderSummary}>Reminder: {reminderLabel(note.remindAt)}</p>}
       {reminderNotice && <p className={s.notice} role="status">{reminderNotice}</p>}
@@ -447,111 +504,91 @@ function NoteEditor() {
           </form>
         </Modal>
       )}
-      <div className={css.editorLayout}>
-        <section className={css.editor}>
-          <span className={s.eyebrow}>Your ideas, unfolding</span>
-          <input
-            className={css.noteTitle}
-            aria-label="Note title"
-            value={titleDraft}
-            disabled={!canEdit || saving}
-            onChange={(e) => {
-              setTitleDraft(e.target.value);
-              if (isNewNote) edit({ title: e.target.value });
-            }}
-          />
+      <div id="note-details" className={css.details} data-open={detailsOpen}>
+        <div className={css.detailsInner}>
+          <div className={css.detailsPad}>
           <div className={css.noteMetadata}>
-            <label>
-              Course
-              <select
-                value={note.courseId}
-                disabled={!canEdit || saving}
-                onChange={(e) => edit({ courseId: e.target.value })}
-              >
-                <option value="">Not detected</option>
-                {state.courses.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.code}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Lecture date
+              <label>
+                Course
+                <select
+                  value={note.courseId}
+                  disabled={!canEdit || saving}
+                  onChange={(e) => edit({ courseId: e.target.value })}
+                >
+                  <option value="">Not detected</option>
+                  {state.courses.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.code}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Lecture date
+                <input
+                  type="date"
+                  aria-label="Lecture date"
+                  aria-describedby={!note.lectureDate ? "note-date-missing" : undefined}
+                  value={note.lectureDate}
+                  disabled={!canEdit || saving}
+                  onChange={(e) => edit({ lectureDate: e.target.value })}
+                />
+                {!note.lectureDate && <small id="note-date-missing">Not detected</small>}
+              </label>
+              <label>
+                Category
+                <select
+                  value={note.category}
+                  disabled={!canEdit || saving}
+                  onChange={(e) => edit({ category: e.target.value })}
+                >
+                  {["School", "Work", "Meetings", "Personal"].map((c) => (
+                    <option key={c}>{c}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Visibility
+                <select
+                  value={note.visibility}
+                  disabled={!canEdit || saving}
+                  onChange={(e) =>
+                    edit({ visibility: e.target.value as Note["visibility"] })
+                  }
+                >
+                  <option value="private">Private</option>
+                  <option value="shared">Shared</option>
+                </select>
+              </label>
+            </div>
+            <label className={css.tagsLabel}>
+              Tags
               <input
-                type="date"
-                aria-label="Lecture date"
-                aria-describedby={!note.lectureDate ? "note-date-missing" : undefined}
-                value={note.lectureDate}
-                disabled={!canEdit || saving}
-                onChange={(e) => edit({ lectureDate: e.target.value })}
-              />
-              {!note.lectureDate && <small id="note-date-missing">Not detected</small>}
-            </label>
-            <label>
-              Category
-              <select
-                value={note.category}
-                disabled={!canEdit || saving}
-                onChange={(e) => edit({ category: e.target.value })}
-              >
-                {["School", "Work", "Meetings", "Personal"].map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Visibility
-              <select
-                value={note.visibility}
+                placeholder="Add tags, separated by commas"
+                value={note.tags.join(", ")}
                 disabled={!canEdit || saving}
                 onChange={(e) =>
-                  edit({ visibility: e.target.value as Note["visibility"] })
+                  edit({
+                    tags: e.target.value.split(",").map((t) => t.trimStart()),
+                  })
                 }
-              >
-                <option value="private">Private</option>
-                <option value="shared">Shared</option>
-              </select>
+              />
             </label>
+            {/* A future "Linked event" row goes here. */}
           </div>
-          <label className={css.tagsLabel}>
-            Tags
-            <input
-              placeholder="Add tags, separated by commas"
-              value={note.tags.join(", ")}
-              disabled={!canEdit || saving}
-              onChange={(e) =>
-                edit({
-                  tags: e.target.value.split(",").map((t) => t.trimStart()),
-                })
-              }
-            />
-          </label>
-
+        </div>
+      </div>
+      <div className={css.editorLayout} data-people={peopleOpen}>
+        <section className={css.editor}>
           <Suspense fallback={loadingEditor}>
             <RichEditor key={editorKey} html={editorHtml(note.body, note.format)} label="Note body"
               editable={canEdit && !saving} onChange={setDraftBody} />
           </Suspense>
-          <div className={s.actions}>
-            <button
-              type="button"
-              className={s.primary}
-              disabled={!canEdit || saving || pinning || (!hasDraftChanges && !dirty)}
-              onClick={saveNote}
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
-            <button
-              type="button"
-              className={s.secondary}
-              disabled={!canEdit || saving || !hasDraftChanges}
-              onClick={cancelEdits}
-            >
-              Cancel
-            </button>
-          </div>
         </section>
-        <aside className={css.inspector}>
+        <div className={css.people} data-open={peopleOpen}>
+        <aside id="note-people" className={css.inspector} aria-label="People and history">
+          <button type="button" className={`${s.secondary} ${css.sheetClose}`}
+            onClick={() => { setPeopleOpen(false); peopleToggle.current?.focus(); }}>Close panel</button>
           <Collaborators
             key={`${note.id}:${state.user?.id || ""}`}
             noteId={note.id}
@@ -717,6 +754,8 @@ function NoteEditor() {
             </>
           )}
         </aside>
+        </div>
+      </div>
       </div>
       {confirmDelete && (
         <DeleteNoteDialog
