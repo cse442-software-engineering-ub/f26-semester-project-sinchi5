@@ -1,14 +1,91 @@
+/* Card 242: the screen fills the viewport below the page padding (and the phone top bar and tab bar), so the writing area gets the rest. */
+.screen {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 2 * clamp(20px, 3vw, 48px));
+}
 .editorTop {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 8px 10px;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 .editorTop .muted {
-  margin-left: auto;
   font-size: 0.68rem;
+}
+.editorTop .noteTitle {
+  flex: 1 1 12rem;
+  min-width: 0;
+  width: auto;
+  font-size: 1.2rem;
+  font-weight: 550;
+  letter-spacing: -0.03em;
+}
+.toggle[aria-expanded="true"] {
+  background: var(--sage);
+  border-color: var(--primary);
+}
+.sheetHead,
+.scrim {
+  display: none;
+}
+.sheetTitle {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.menu {
+  min-width: 200px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  z-index: 30;
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+}
+.menuItem[data-highlighted] {
+  background: var(--nav);
+  outline: none;
+}
+.menuItem[data-disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+.menuItem:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+.menuDanger {
+  color: var(--danger);
+}
+.details {
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  transition: grid-template-rows var(--motion-base) var(--ease-out), visibility 0s linear var(--motion-base);
+}
+.details[data-open="true"] {
+  grid-template-rows: 1fr;
+  visibility: visible;
+  transition: grid-template-rows var(--motion-base) var(--ease-out);
+}
+.detailsInner {
+  min-height: 0;
+  overflow: hidden;
+}
+.detailsPad {
+  padding: 0 0 14px;
 }
 .reminderSummary {
   margin: 0 0 18px;
@@ -16,33 +93,46 @@
   font-size: 0.78rem;
 }
 .editorLayout {
+  --people-w: 300px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 24px;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) 0;
+  transition: grid-template-columns var(--motion-base) var(--ease-out);
+}
+.editorLayout[data-people="true"] {
+  grid-template-columns: minmax(0, 1fr) calc(var(--people-w) + 24px);
+}
+/* contain: size keeps the side panel from making the row taller than the writing area; it scrolls instead. */
+.people {
+  min-width: 0;
+  contain: size;
+  overflow: hidden auto;
+  visibility: hidden;
+  transition: visibility 0s linear var(--motion-base);
+}
+.people[data-open="true"] {
+  visibility: visible;
+  transition: none;
 }
 .editor {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
-  padding: 35px;
+  padding: 24px 35px;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 12px;
 }
-.editor .noteTitle {
-  font-size: 1.8rem;
-  font-weight: 550;
-  letter-spacing: -0.05em;
+.noteTitle {
   border: 0;
   padding: 0;
-  margin-bottom: 25px;
   height: auto;
-  min-height: 58px;
+  min-height: 44px;
 }
 .noteMetadata {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 22px;
 }
 .noteMetadata label {
   font-size: 0.65rem;
@@ -58,6 +148,8 @@
   color: var(--muted);
 }
 .inspector {
+  width: var(--people-w);
+  margin-left: 24px;
   padding: 20px;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -135,26 +227,63 @@
 }
 @media (max-width: 1250px) {
   .editorLayout {
-      grid-template-columns: minmax(0, 1fr) 265px;
+      --people-w: 265px;
     }
   .editor {
-      padding: 25px;
-    }
-}
-@media (max-width: 1023px) {
-  .editorLayout {
-      grid-template-columns: minmax(0, 1fr);
-    }
-  .inspector {
-      max-width: none;
+      padding: 20px 25px;
     }
 }
 @media (max-width: 767px) {
   .editor {
       padding: 22px 18px;
     }
-  .editor .noteTitle {
-      font-size: 1.45rem;
+  .editorTop .noteTitle {
+      font-size: 1.1rem;
+    }
+  /* Phones: People is a bottom sheet over the page, not a column. */
+  .editorLayout,
+  .editorLayout[data-people="true"] {
+      grid-template-columns: minmax(0, 1fr);
+      transition: none;
+    }
+  .people {
+      display: contents;
+    }
+  .inspector {
+      position: fixed;
+      inset: auto 0 0 0;
+      z-index: 20;
+      width: auto;
+      margin: 0;
+      max-height: 75dvh;
+      overflow-y: auto;
+      border-radius: 14px 14px 0 0;
+      padding-bottom: calc(20px + env(safe-area-inset-bottom));
+      transform: translateY(100%);
+      visibility: hidden;
+      transition: transform var(--motion-base) var(--ease-drawer), visibility 0s linear var(--motion-base);
+    }
+  .people[data-open="true"] .inspector {
+      transform: none;
+      visibility: visible;
+      transition: transform var(--motion-base) var(--ease-drawer);
+    }
+  .sheetHead {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+  .scrim {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 19;
+      background: var(--overlay);
+    }
+  .screen {
+      min-height: calc(100dvh - 56px - var(--tabbar) - 2 * clamp(20px, 3vw, 48px));
     }
   .noteMetadata {
       grid-template-columns: minmax(0, 1fr);
@@ -176,6 +305,18 @@ so iPhone Safari doesn't zoom in when one is tapped. */
     }
   .editorTop .muted {
       font-size: 0.6rem;
+      max-width: 5.5rem;
+      line-height: 1.2;
+    }
+  /* Card 242: Save, Details, People and More share one row under the title at 320 px. */
+  .editorTop .noteTitle {
+      flex-basis: 5rem;
+    }
+  .editorTop button {
+      padding-inline: 10px;
+    }
+  .toggle svg {
+      display: none;
     }
   .editorTop .iconButton {
       min-width: 35px;
@@ -198,3 +339,14 @@ so iPhone Safari doesn't zoom in when one is tapped. */
   letter-spacing: -0.04em;
 }
 
+
+@media (prefers-reduced-motion: reduce) {
+  .details,
+  .details[data-open="true"],
+  .editorLayout,
+  .inspector,
+  .people[data-open="true"] .inspector {
+    transition-duration: 0s;
+    transition-delay: 0s;
+  }
+}
