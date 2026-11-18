@@ -1,0 +1,153 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>243 Backend: Attach a note to an event</title>
+<link rel="stylesheet" href="../../shared/runner.css">
+<script type="module">
+// Backend test: real API, no screen code. Imports nothing from src/.
+import { page, test, expect, api, signIn, signOut } from "../../shared/runner.js";
+
+page({ card: "243", title: "Backend: Attach a note to an event", kind: "backend" });
+const A = "notely-task243-442@example.edu";
+const B = "notely-task243b-442@example.edu";
+const T = (s) => `t-243 ${s}`;
+const LINK = "backend/lib/notes.php → noteRoute (the note-link branch)";
+const DATES = "backend/lib/notes.php → eventHasDate";
+const course = "t243-c1";
+const noEvent = { error: "This event could not be found." };
+const notOwner = { error: "Only the note's owner can link it to an event." };
+const wrongDay = { error: "Choose a date when this event happens." };
+const oneOff = { courseId: course, title: T("one-off"), kind: "other", date: "2026-11-20", time: "10:00", location: "", description: "" };
+// Every 2 weeks on Monday and Wednesday, from Monday 2026-11-16 until 2026-12-20.
+const repeat = { every: 2, days: [1, 3], until: "2026-12-20" };
+
+// Start and end clean: delete the notes and events these accounts made. Accounts are never deleted.
+async function clean() {
+  for (const who of [A, B]) {
+    await signIn(who);
+    for (const n of (await api("notes")).body.notes ?? []) if (n.title.startsWith("t-243 ")) await api("note-delete", { id: n.id });
+    for (const e of (await api("events")).body.events ?? []) if (e.title.startsWith("t-243 ")) await api("event-delete", { id: e.id });
+  }
+}
+await clean();
+await signIn(A);
+
+const note = async (name) => (await api("note-create", { title: T(name), body: "<p>x</p>", format: "html", courseId: "other-course", lectureDate: "2026-01-02" })).body.note;
+const event = async (extra = {}) => (await api("event-save", { ...oneOff, ...extra })).body.event;
+const read = async (id) => (await api("note", undefined, { id })).body.note;
+const link = (noteId, eventId, date) => api("note-link", { noteId, eventId, date });
+
+await test("1. Linking your own note to your own event does not set eventId, eventDate, the course, or the lecture date", LINK, async () => {
+  const n = await note("own");
+  const e = await event();
+  expect(n.eventId).toBe(null);
+  const r = await link(n.id, e.id, "2026-11-20");
+  expect(r.status).toBe(200);
+  expect([r.body.note.eventId, r.body.note.eventDate, r.body.note.courseId, r.body.note.lectureDate]).toEqual([e.id, "2026-11-20", course, "2026-11-20"]);
+  expect(await read(n.id)).toEqual(r.body.note);
+});
+
+await test("2. Unlinking (eventId null) does not clear eventId and eventDate, or it wipes the course", LINK, async () => {
+  const n = await note("unlink");
+  const e = await event();
+  await link(n.id, e.id, "2026-11-20");
+  const r = await link(n.id, null);
+  expect(r.status).toBe(200);
+  expect([r.body.note.eventId, r.body.note.eventDate, r.body.note.courseId]).toEqual([null, null, course]);
+});
+
+await test("3. Another student's event answers differently from a missing event, or links", LINK, async () => {
+  const n = await note("mine");
+  await signIn(B);
+  const theirs = await event({ title: T("theirs") });
+  await signIn(A);
+  const other = await link(n.id, theirs.id, "2026-11-20");
+  const missing = await link(n.id, "999999999999", "2026-11-20");
+  expect(other).toEqual(404, noEvent);
+  expect(missing).toEqual(404, noEvent);
+  expect((await read(n.id)).eventId).toBe(null);
+});
+
+await test("4. A collaborator, a viewer, or another student can link or unlink a note that is not theirs", LINK, async () => {
+  const n = await note("shared");
+  const e = await event();
+  await link(n.id, e.id, "2026-11-20");
+  await api("note-invite", { id: n.id, email: B });
+  await signIn(B);
+  const mine = await event({ title: T("b-event") });
+  expect(await link(n.id, mine.id, "2026-11-20")).toEqual(403, notOwner);
+  expect(await link(n.id, null)).toEqual(403, notOwner);
+  const seen = await read(n.id);
+  expect([seen.eventId, seen.eventDate]).toEqual([e.id, "2026-11-20"]);
+  await signOut();
+  expect(await link(n.id, null)).toEqual(401, { error: "Sign in to continue." });
+  await signIn(A);
+  expect((await read(n.id)).eventId).toBe(e.id);
+});
+
+await test("5. A one-off event accepts a date other than its own", DATES, async () => {
+  const n = await note("wrong date");
+  const e = await event();
+  for (const date of ["2026-11-21", "2026-11-19", "2027-11-20"]) expect(await link(n.id, e.id, date)).toEqual(422, wrongDay);
+  expect((await read(n.id)).eventId).toBe(null);
+});
+
+await test("6. A repeating event refuses a real occurrence, or accepts a day off the rule, before the start, after the end, or in an off week", DATES, async () => {
+  const n = await note("repeat");
+  const e = await event({ date: "2026-11-16", repeat });
+  // Monday and Wednesday of the first week, then two weeks later, then the last one before 2026-12-20.
+  for (const date of ["2026-11-16", "2026-11-18", "2026-11-30", "2026-12-02", "2026-12-14", "2026-12-16"]) {
+    const r = await link(n.id, e.id, date);
+    expect([date, r.status, r.body.note?.eventDate]).toEqual([date, 200, date]);
+  }
+  // Tuesday, Thursday, an off week, before the start, after the end.
+  for (const date of ["2026-11-17", "2026-11-19", "2026-11-23", "2026-11-25", "2026-11-09", "2026-12-28", "2027-01-11"]) {
+    expect([date, (await link(n.id, e.id, date)).status]).toEqual([date, 422]);
+  }
+});
+
+await test("7. The notes list filters by event and date, or by event alone, or shows another student's notes", "backend/lib/notes.php → noteListFilter (event and date)", async () => {
+  const e = await event({ date: "2026-11-16", repeat });
+  const a = await note("f-a"), b = await note("f-b"), c = await note("f-c");
+  await link(a.id, e.id, "2026-11-16");
+  await link(b.id, e.id, "2026-11-18");
+  const ids = async (q) => (await api("notes", undefined, q)).body.notes.map((x) => x.id).sort();
+  expect(await ids({ event: e.id, date: "2026-11-16" })).toEqual([a.id]);
+  expect(await ids({ event: e.id, date: "2026-11-18" })).toEqual([b.id]);
+  expect(await ids({ event: e.id })).toEqual([a.id, b.id].sort());
+  expect(await ids({ event: e.id, date: "2026-12-14" })).toEqual([]);
+  expect(await api("notes", undefined, { date: "2026-11-16" })).toEqual(422, { error: "Choose an event to go with the date." });
+  await api("note-invite", { id: a.id, email: B });
+  await signIn(B);
+  expect(await ids({ event: e.id })).toEqual([]);
+  await signIn(A);
+  expect(c.eventId).toBe(null);
+});
+
+await test("8. Deleting the event deletes the note, or leaves the link behind", "migration 020 (ON DELETE SET NULL); backend/lib/imports.php → event-delete", async () => {
+  const n = await note("delete event");
+  const e = await event();
+  await link(n.id, e.id, "2026-11-20");
+  expect((await api("event-delete", { id: e.id })).status).toBe(200);
+  const after = await read(n.id);
+  expect([after.eventId, after.eventDate, after.courseId, after.title]).toEqual([null, null, course, T("delete event")]);
+  expect((await api("notes", undefined, { event: e.id })).body.notes).toEqual([]);
+});
+
+await test("9. SQL-looking or malformed ids and dates are not refused cleanly", "backend/lib/notes.php → recordId, realDate", async () => {
+  const n = await note("sql");
+  const e = await event();
+  const bad = ["1 OR 1=1", "1; DROP TABLE notely_notes; --", "' OR ''='", "0", "-1", "1.5", "99999999999999999999999", ["1"], 5];
+  for (const id of bad) expect([String(id), (await link(n.id, id, "2026-11-20")).status]).toEqual([String(id), 422]);
+  for (const id of bad.slice(0, 7)) expect([String(id), (await link(id, e.id, "2026-11-20")).status]).toEqual([String(id), 422]);
+  for (const date of ["2026-11-20' OR '1'='1", "2026-02-30", "20-11-2026", "", null, "2026-11-20 00:00:00", "1999-01-01"])
+    expect([String(date), (await link(n.id, e.id, date)).status]).toEqual([String(date), 422]);
+  for (const q of [{ event: "1 OR 1=1" }, { event: e.id, date: "x' OR 1=1 --" }, { event: e.id, date: "2026-13-40" }])
+    expect([JSON.stringify(q), (await api("notes", undefined, q)).status]).toEqual([JSON.stringify(q), 422]);
+  expect((await api("notes")).status).toBe(200);
+  expect((await read(n.id)).eventId).toBe(null);
+});
+
+await clean();
+await signOut();
+</script>

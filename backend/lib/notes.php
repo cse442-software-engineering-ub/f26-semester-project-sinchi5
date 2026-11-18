@@ -8,10 +8,11 @@ if (PHP_SAPI !== 'cli' && !defined('NOTELY_INTERNAL')) {
 // GET routes only read; every other note route writes inside one transaction.
 const NOTE_READ_ROUTES = ['note', 'notes', 'note-versions', 'note-comments', 'note-collaborators'];
 const NOTE_ROUTES = [...NOTE_READ_ROUTES, 'note-create', 'note-title', 'note-content', 'note-save', 'note-pin',
-    'note-reminder', 'note-restore', 'note-delete', 'note-comment', 'note-invite', 'note-permission'];
+    'note-reminder', 'note-restore', 'note-delete', 'note-comment', 'note-invite', 'note-permission', 'note-link'];
 const NOTE_CATEGORIES = ['School', 'Work', 'Meetings', 'Personal'];
 const NOTE_COLUMNS = 'n.id, n.owner_user_id, n.title, n.body, n.body_format, n.body_text, n.highlights, n.course_id,
-    n.lecture_date, n.category, n.visibility, n.tags, n.pinned, n.remind_at, n.created_at, n.updated_at, n.checklist';
+    n.lecture_date, n.category, n.visibility, n.tags, n.pinned, n.remind_at, n.created_at, n.updated_at, n.checklist,
+    n.event_id, n.event_date';
 
 // Card 240: a note body is cleaned HTML. The incoming string is measured; backend/index.php lets these routes read twice
 // this much so JSON escaping of quotes still fits.
@@ -368,7 +369,7 @@ function noteFields(array $input): array
 // Optional narrowing for the notes list (cards 41, 55, and 175). Every filter is optional, an empty value
 // counts as absent, and filters combine with AND on top of "notes this user may view".
 // Returns [extra SQL starting with " AND ...", bound values].
-function noteListFilter(array $query): array
+function noteListFilter(array $query, string $userId): array
 {
     $sql = '';
     $values = [];
@@ -437,7 +438,35 @@ function noteListFilter(array $query): array
         $sql .= " AND n.lecture_date $operator ?";
         $values[] = $date;
     }
+    // Card 243: notes linked to an event (and one occurrence of it). Only the owner's notes: the event is theirs.
+    $event = $text('event');
+    $eventDate = $text('date');
+    if ($event !== null || $eventDate !== null) {
+        if ($event === null) throw new HttpError(422, 'Choose an event to go with the date.');
+        $sql .= ' AND n.owner_user_id = ? AND n.event_id = ?';
+        array_push($values, $userId, recordId($event, 'Choose a valid event.'));
+        if ($eventDate !== null) {
+            if (!realDate($eventDate)) throw new HttpError(422, 'Choose a valid date for the event.');
+            $sql .= ' AND n.event_date = ?';
+            $values[] = $eventDate;
+        }
+    }
     return [$sql, $values];
+}
+
+// Card 243: is $date one of the days this event happens? Repeats follow the schedule screen's rule: weeks start on
+// Sunday, every 1 or 2 weeks counted from the week of the first date, on the chosen days (0 is Sunday), until a date.
+function eventHasDate(array $event, string $date): bool
+{
+    if ($event['repeat_rule'] === null) return $date === $event['event_date'];
+    $rule = json_decode($event['repeat_rule'], true, 8, JSON_THROW_ON_ERROR);
+    if ($date < $event['event_date'] || $date > $rule['until']) return false;
+    $utc = new DateTimeZone('UTC');
+    $day = new DateTimeImmutable($date, $utc);
+    if (!in_array((int) $day->format('w'), $rule['days'], true)) return false;
+    $weekOf = static fn (DateTimeImmutable $d): DateTimeImmutable => $d->modify('-' . $d->format('w') . ' days');
+    $weeks = intdiv($weekOf(new DateTimeImmutable($event['event_date'], $utc))->diff($weekOf($day))->days, 7);
+    return $weeks % $rule['every'] === 0;
 }
 
 // Card 60: the notes list order. modified (default) and created are newest first, title is A to Z
@@ -513,6 +542,8 @@ function noteJson(array $row): array
         'checklist' => $checklist,
         'courseId' => $row['course_id'],
         'lectureDate' => $row['lecture_date'] ?? '',
+        'eventId' => $row['event_id'] === null ? null : (string) $row['event_id'],
+        'eventDate' => $row['event_id'] === null ? null : $row['event_date'], // the FK clears only event_id
         'category' => $row['category'],
         'visibility' => $row['visibility'],
         'tags' => json_decode($row['tags'], true) ?: [],
@@ -615,7 +646,7 @@ function noteAction(PDO $db, array $session, string $route, array $input, array 
 function noteRoute(PDO $db, array $user, string $route, array $input): array
 {
     if ($route === 'notes') {
-        [$filterSql, $filterValues] = noteListFilter($_GET);
+        [$filterSql, $filterValues] = noteListFilter($_GET, (string) $user['id']);
         $rows = query($db, 'SELECT ' . NOTE_COLUMNS . ' FROM notely_notes n
             LEFT JOIN notely_note_editors e ON e.note_id = n.id AND e.user_id = ?
             WHERE (n.owner_user_id = ? OR e.user_id IS NOT NULL)' . $filterSql . '
@@ -635,6 +666,32 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
         $id = (string) $db->lastInsertId();
         http_response_code(201);
         return ['note' => loadNote($db, $id)];
+    }
+
+    if ($route === 'note-link') {
+        $noteId = noteId($input['noteId'] ?? null);
+        $eventId = $input['eventId'] ?? null;
+        $date = $input['date'] ?? null;
+        if ($eventId !== null) {
+            $eventId = recordId($eventId, 'Choose a valid event.');
+            if (!realDate($date)) throw new HttpError(422, 'Choose the date of the event.');
+        }
+        $role = noteRole($db, $noteId, $user, true);
+        if ($role === 'none') throw new HttpError(404, 'This note could not be found.');
+        if ($role !== 'owner') throw new HttpError(403, "Only the note's owner can link it to an event.");
+        if ($eventId === null) {
+            // Unlinking keeps the course and lecture date the link set.
+            query($db, 'UPDATE notely_notes SET event_id = NULL, event_date = NULL, updated_at = updated_at WHERE id = ?', [$noteId]);
+            return ['note' => loadNote($db, $noteId)];
+        }
+        // Another student's event gets the same answer as a missing one, so IDs can't be probed.
+        $event = query($db, 'SELECT course_id, event_date, repeat_rule FROM notely_events WHERE id = ? AND owner_user_id = ? FOR UPDATE',
+            [$eventId, $user['id']])->fetch();
+        if (!$event) throw new HttpError(404, 'This event could not be found.');
+        if (!eventHasDate($event, $date)) throw new HttpError(422, 'Choose a date when this event happens.');
+        query($db, 'UPDATE notely_notes SET event_id = ?, event_date = ?, course_id = ?, lecture_date = ?, updated_at = updated_at WHERE id = ?',
+            [$eventId, $date, $event['course_id'], $date, $noteId]);
+        return ['note' => loadNote($db, $noteId)];
     }
 
     $read = in_array($route, NOTE_READ_ROUTES, true);
