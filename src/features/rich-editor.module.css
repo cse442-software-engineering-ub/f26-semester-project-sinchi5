@@ -146,11 +146,14 @@
 .content :global(.ProseMirror mark[data-color="pink"]) { background: var(--highlight-pink); color: var(--highlight-ink); }
 .content :global(.ProseMirror ul[data-type="taskList"]) { list-style: none; padding-left: 0; }
 .content :global(.ProseMirror ul[data-type="taskList"] > li) { display: flex; gap: 8px; align-items: flex-start; }
-.content :global(.ProseMirror ul[data-type="taskList"] > li > label) { flex: 0 0 auto; padding-top: 0.4em; }
+.content :global(.ProseMirror ul[data-type="taskList"] > li > label) { display: block; flex: 0 0 auto; margin-top: 0.3rem; }
 .content :global(.ProseMirror ul[data-type="taskList"] > li > div) { flex: 1; min-width: 0; }
-.content :global(.ProseMirror ul[data-type="taskList"] input) { width: 1.1rem; height: 1.1rem; }
+.content :global(.ProseMirror ul[data-type="taskList"] input) { display: block; width: 1.1rem; height: 1.1rem; min-height: 0; margin: 0; padding: 0; }
 .content :global(.ProseMirror li[data-checked="true"] > div) { text-decoration: line-through; color: var(--muted); }
 
+@media (min-width: 768px) {
+  .toolbar { flex-wrap: wrap; overflow-x: visible; }
+}
 @media (max-width: 1023px) {
   .toolbarWrap { top: calc(56px + env(safe-area-inset-top)); }
 }

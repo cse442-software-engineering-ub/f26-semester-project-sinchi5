@@ -172,3 +172,25 @@ await test("10. The toolbar pushes the page sideways at 320 px, or its buttons a
     .map((c) => `${c.getAttribute("aria-label")} ${Math.round(c.getBoundingClientRect().height)}px`);
   expect(offenders).toEqual([]);
 });
+const TASKS = '<ul data-type="taskList"><li data-type="taskItem" data-checked="true"><p>Buy ink</p></li><li data-type="taskItem" data-checked="false"><p>Print the slides for Thursday and bring them to the lab</p></li></ul>';
+const sameRow = (root: Element) =>
+  [...root.querySelectorAll('.ProseMirror ul[data-type="taskList"] > li')].map((li) => {
+    const box = li.querySelector("input")!.getBoundingClientRect(), text = li.querySelector("p")!.getBoundingClientRect();
+    return box.width > 0 && box.top < text.bottom && box.bottom > text.top && box.left < text.left;
+  });
+await test("11. A checklist box sits under its text instead of beside it, in the editor or the read-only shared view", "src/features/rich-editor.module.css → ul[data-type=taskList]", async () => {
+  const root = await open(note(TASKS), {}, 375);
+  expect(sameRow(root)).toEqual([true, true]);
+  stubApi(routes(note(TASKS, { sharedBy: { id: "2", name: "Grace", courseCode: "CSE 442" }, permission: "view" })));
+  const shared = mount(ui("/notes/n1"), { width: 375 });
+  await waitFor(() => shared.querySelector('.ProseMirror ul[data-type="taskList"] input'));
+  expect(sameRow(shared)).toEqual([true, true]);
+});
+await test("12. The toolbar scrolls sideways on a wide screen so tools are cut off, or it is not sticky", "src/features/rich-editor.module.css → .toolbar", async () => {
+  const root = await open(note("<p>Hello</p>"), {}, 1440);
+  const win = root.ownerDocument.defaultView!;
+  const bar = root.querySelector<HTMLElement>('[role="toolbar"]')!;
+  expect([bar.scrollWidth === bar.clientWidth, win.getComputedStyle(bar.parentElement!).position]).toEqual([true, "sticky"]);
+  const right = Math.max(...[...bar.querySelectorAll("button, select")].map((c) => c.getBoundingClientRect().right));
+  expect(right <= bar.getBoundingClientRect().right).toBe(true);
+});
