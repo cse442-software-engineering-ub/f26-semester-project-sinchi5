@@ -7,7 +7,6 @@ export class NoteServiceError extends Error {
   constructor(message: string, public status: number) { super(message); }
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const NOTE_CATEGORIES = ["School", "Work", "Meetings", "Personal"];
 
 // Sends JSON requests to the PHP API. POSTs carry the session's CSRF token, fetched on first use.
@@ -93,16 +92,17 @@ export function createHttpNotes(
     async restore(noteId, versionId) {
       return (await send<{ note: Note }>("note-restore", { id: noteId, versionId })).note;
     },
-    // The prototype preview options can still slow down or fail comment requests on purpose.
-    async comments(noteId, scenario = "success") {
-      if (scenario !== "success") await wait(scenario === "slow" ? 600 : 300);
-      if (scenario === "failure") throw new Error("Comments could not be loaded.");
+    async comments(noteId) {
       return (await send<{ comments: Comment[] }>(query("note-comments", noteId))).comments;
     },
-    async comment(noteId, body, scenario = "success") {
-      if (scenario !== "success") await wait(scenario === "slow" ? 600 : 300);
-      if (scenario === "failure") throw new Error("Your comment could not be posted.");
+    async comment(noteId, body) {
       return (await send<{ comment: Comment }>("note-comment", { id: noteId, body })).comment;
+    },
+    async deleteComment(noteId, commentId) {
+      await send("note-comment-delete", { id: noteId, commentId });
+    },
+    async removeCollaborator(noteId, userId) {
+      await send("note-collaborator-remove", { id: noteId, userId });
     },
     async collaborators(noteId) {
       return (await send<{ collaborators: Collaborator[] }>(query("note-collaborators", noteId))).collaborators;

@@ -41,10 +41,6 @@ export interface Category {
 export interface Note {
   id: string;
   ownerId?: string;
-  // Recorded at creation time so comment permission checks (task #65) can
-  // tell the creator apart from anyone else, since every mock user shares
-  // the literal id "student" - ownerId alone can't distinguish people.
-  ownerEmail?: string;
   title: string;
   // Cleaned HTML from the server (card 240); the browser demo may still hold plain text (format "text").
   body: string;
@@ -80,9 +76,6 @@ export interface Comment {
   authorId: string;
   createdAt: string;
 }
-// Prototype-only: lets the UI demo loading/posting success/failure without a
-// real network layer to intercept, same purpose as ImportRepository's scenario.
-export type CommentScenario = "success" | "slow" | "failure";
 export const MAX_COMMENT_LENGTH = 2000;
 export interface RepeatRule {
   every: 1 | 2;
@@ -201,6 +194,8 @@ export interface NoteRepository {
   setCollaboratorPermission(id: string,collaboratorId: string,permission: CollaboratorPermission,): Promise<Collaborator>;
   collaborators(id: string): Promise<Collaborator[]>;
   inviteCollaborator(id: string, email: string): Promise<{ collaborator: Collaborator }>;
+  // Card 247: the owner removes anyone; a collaborator leaves by removing their own id.
+  removeCollaborator(id: string, collaboratorId: string): Promise<void>;
   list(query?: NoteQuery): Promise<Note[]>;
   get(id: string): Promise<Note>;
   save(note: Note): Promise<Note>;
@@ -209,8 +204,9 @@ export interface NoteRepository {
   create(data: Partial<Note>): Promise<Note>;
   // Removes the note with its comments, versions, and collaborator entries.
   delete(id: string): Promise<void>;
-  comments(id: string, scenario?: CommentScenario): Promise<Comment[]>;
-  comment(id: string, body: string, scenario?: CommentScenario): Promise<Comment>;
+  comments(id: string): Promise<Comment[]>;
+  comment(id: string, body: string): Promise<Comment>;
+  deleteComment(id: string, commentId: string): Promise<void>;
   versions(id: string): Promise<NoteVersion[]>;
   restore(id: string, versionId: string): Promise<Note>;
 }
@@ -218,7 +214,6 @@ export interface Collaborator {
   id: string;
   name: string;
   email: string;
-  status?: "Pending" | "Invited" | "Accepted";
   permission: CollaboratorPermission;
 }
 export interface ScheduleRepository {

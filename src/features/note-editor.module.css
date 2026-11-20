@@ -206,27 +206,80 @@
 }
 .collaboratorList li {
   display: grid;
-  gap: 4px;
-  margin-bottom: 16px;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--rule);
   overflow-wrap: anywhere;
 }
-.comment {
-  border-bottom: 1px solid var(--rule);
-  padding: 0 0 18px;
-  margin-bottom: 18px;
+.person {
+  display: grid;
+  gap: 2px;
 }
-.comment strong {
-  font-size: 0.75rem;
-}
-.comment small {
-  display: block;
+.personEmail {
+  font-size: var(--fs-small);
   color: var(--muted);
-  font-size: 0.6rem;
-  margin-top: 4px;
+}
+.personActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.personActions select {
+  flex: 1 1 8rem;
+  min-width: 0;
+  min-height: 44px;
+}
+.personActions button,
+.inviteRow button,
+.comment button {
+  min-height: 44px;
+}
+.invite {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.inviteRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.inviteRow select {
+  flex: 1 1 10rem;
+  min-width: 0;
+  min-height: 44px;
+}
+.comment {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  border-bottom: 1px solid var(--rule);
+  padding: 0 0 var(--space-4);
+  margin-bottom: var(--space-4);
+  overflow-wrap: anywhere;
+}
+.commentHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  width: 100%;
+}
+.commentHead strong {
+  font-size: var(--fs-small);
+}
+.commentHead time {
+  color: var(--muted);
+  font-size: var(--fs-small);
 }
 .comment p {
-  font-size: 0.76rem;
-  margin-top: 12px;
+  font-size: var(--fs-body);
+  max-width: var(--measure-read);
+}
+.commentLow {
+  color: var(--warn);
 }
 .version {
   display: flex;

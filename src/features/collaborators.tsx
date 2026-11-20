@@ -1,174 +1,116 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Dialog } from "@base-ui/react/dialog";
-import type { Collaborator, NoteRepository } from "../domain";
-import { Modal } from "../shared/ui";
+import { useEffect, useRef, useState } from "react";
+import type { Collaborator, CollaboratorPermission, Friend, NoteRepository } from "../domain";
+import { createHttpFriends } from "../services/friends-http";
 import css from "./note-editor.module.css";
 import s from "../shared/ui.module.css";
 // Shared classes this screen's own rules also name (see note-editor.module.css), applied together.
 const both = { muted: `${s.muted} ${css.muted}` };
 
-export function Collaborators({ noteId, isOwner, repository }: {
+// Card 247: the note's collaborators from the server. The owner invites accepted friends and manages
+// permissions; a collaborator sees who else is in and can leave. Nothing here is typed as an email.
+export function Collaborators({ noteId, isOwner, userId, repository, onLeft }: {
   noteId: string;
   isOwner: boolean;
+  userId: string;
   repository: NoteRepository;
+  onLeft: () => void;
 }) {
   const [entries, setEntries] = useState<Collaborator[]>([]);
-  const [open, setOpen] = useState(false);
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
-  const [listError, setListError] = useState("");
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [pick, setPick] = useState("");
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-  const [success, setSuccess] = useState("");
-  const [changingPermission, setChangingPermission] = useState<string | null>(null);
-  const [permissionError, setPermissionError] = useState("");
+  const [listError, setListError] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState("");
   const pending = useRef(false);
   const active = useRef(true);
 
   useEffect(() => {
     active.current = true;
-    let mounted = true;
-    repository.collaborators(noteId).then((items) => {
-      if (mounted) setEntries(unique(items));
-    }).catch(() => {
-      if (mounted) setListError("Could not load collaborators. Reopen the note to try again.");
-    }).finally(() => {
-      if (mounted) setLoading(false);
-    });
-    return () => { mounted = false; active.current = false; };
-  }, [noteId, repository]);
+    repository.collaborators(noteId).then((items) => active.current && setEntries(items))
+      .catch((e: Error) => active.current && setListError(e.message || "Could not load collaborators. Reopen the note to try again."))
+      .finally(() => active.current && setLoading(false));
+    if (isOwner) createHttpFriends().list().then((lists) => active.current && setFriends(lists.friends)).catch(() => {});
+    return () => { active.current = false; };
+  }, [noteId, repository, isOwner]);
 
-  async function invite(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  // One request at a time; `key` names the control that is waiting.
+  async function run(key: string, action: () => Promise<void>) {
     if (pending.current) return;
-    const input = event.currentTarget.elements.namedItem("email") as HTMLInputElement;
-    if (!input.validity.valid) {
-      setError("Enter a valid email address.");
-      input.focus();
-      return;
-    }
     pending.current = true;
-    setSending(true);
+    setBusy(key);
     setError("");
-    try {
-      const { collaborator } = await repository.inviteCollaborator(noteId, email.trim());
-      if (!active.current) return;
-      setEntries((items) => unique([...items, collaborator]));
-      setSuccess(`Invitation sent to ${collaborator.name}.`);
-      setOpen(false);
-    } catch (failure) {
-      if (active.current) setError(failure instanceof Error ? failure.message : "Could not send the invitation. Please try again.");
-    } finally {
+    try { await action(); } catch (e) { if (active.current) setError((e as Error).message); } finally {
       pending.current = false;
-      if (active.current) setSending(false);
+      if (active.current) setBusy("");
     }
   }
-
-  async function changePermission(
-    collaboratorId: string,
-    permission: "view" | "edit",
-  ) {
-    setChangingPermission(collaboratorId);
-    setPermissionError("");
-
-    try {
-      const updated = await repository.setCollaboratorPermission(
-        noteId,
-        collaboratorId,
-        permission,
-      );
-
-      if (!active.current) return;
-
-      setEntries((items) =>
-        items.map((entry) =>
-          entry.id === collaboratorId ? updated : entry,
-        ),
-      );
-    } catch (failure) {
-      if (active.current) {
-        setPermissionError(
-          failure instanceof Error
-            ? failure.message
-            : "Could not update collaborator permission.",
-        );
-      }
-    } finally {
-      if (active.current) {
-        setChangingPermission(null);
-      }
-    }
-  }
+  const invitable = friends.filter((f) => !entries.some((e) => e.id === f.userId));
+  const invite = () => run("invite", async () => {
+    const friend = invitable.find((f) => f.userId === pick);
+    if (!friend) return;
+    const { collaborator } = await repository.inviteCollaborator(noteId, friend.email);
+    setEntries((items) => [...items.filter((e) => e.id !== collaborator.id), collaborator]);
+    setPick("");
+  });
+  const setPermission = (entry: Collaborator, permission: CollaboratorPermission) => run(`perm:${entry.id}`, async () => {
+    const updated = await repository.setCollaboratorPermission(noteId, entry.id, permission);
+    setEntries((items) => items.map((e) => (e.id === entry.id ? updated : e)));
+  });
+  const remove = (entry: Collaborator) => run(`remove:${entry.id}`, async () => {
+    await repository.removeCollaborator(noteId, entry.id);
+    if (entry.id === userId) return onLeft();
+    setEntries((items) => items.filter((e) => e.id !== entry.id));
+  });
 
   return (
     <section aria-label="Collaborators" className={css.collaborators}>
       <h3>Collaborators</h3>
-      {loading && <p role="status">Loading collaborators...</p>}
+      {loading && <p role="status">Loading collaborators…</p>}
       {listError && <p role="alert" className={s.error}>{listError}</p>}
       {!loading && !listError && !entries.length && <p className={both.muted}>No collaborators yet.</p>}
-    <ul className={css.collaboratorList}>
-      {entries.map((entry) => (
-        <li key={entry.id}>
-          <strong>{entry.name}</strong>
-          <span>{entry.email}</span>
-          {entry.status && <small>{entry.status}</small>}
-
-          {isOwner ? (
-            <label>
-              Permission
-              <select
-                aria-label={`Permission for ${entry.name}`}
-                value={entry.permission}
-                disabled={changingPermission === entry.id}
-                onChange={(event) =>
-                  changePermission(
-                    entry.id,
-                    event.target.value as "view" | "edit",
-                  )
-                }
-              >
-                <option value="edit">Can edit</option>
-                <option value="view">Can view</option>
-              </select>
-            </label>
-          ) : (
-            <small>
-              {entry.permission === "edit" ? "Can edit" : "Can view"}
-            </small>
-          )}
-        </li>
+      <ul className={css.collaboratorList}>
+        {entries.map((entry) => (
+          <li key={entry.id}>
+            <span className={css.person}>
+              <strong>{entry.name}</strong>
+              <span className={css.personEmail}>{entry.email}</span>
+            </span>
+            <span className={css.personActions}>
+              {isOwner ? (
+                <select aria-label={`Permission for ${entry.name}`} value={entry.permission} disabled={!!busy}
+                  onChange={(e) => setPermission(entry, e.target.value as CollaboratorPermission)}>
+                  <option value="edit">Can edit</option>
+                  <option value="view">Can view</option>
+                </select>
+              ) : (
+                <small>{entry.permission === "edit" ? "Can edit" : "Can view"}</small>
+              )}
+              {isOwner && <button type="button" className={s.secondary} disabled={!!busy}
+                aria-label={`Remove ${entry.name}`} onClick={() => remove(entry)}>Remove</button>}
+              {!isOwner && entry.id === userId && <button type="button" className={s.secondary} disabled={!!busy}
+                onClick={() => remove(entry)}>Leave this note</button>}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {error && <p role="alert" className={s.error}>{error}</p>}
+      {isOwner && !loading && (invitable.length ? (
+        <div className={css.invite}>
+          <label htmlFor="invite-friend">Invite a friend</label>
+          <span className={css.inviteRow}>
+            <select id="invite-friend" value={pick} disabled={!!busy} onChange={(e) => setPick(e.target.value)}>
+              <option value="">Choose a friend</option>
+              {invitable.map((f) => <option key={f.userId} value={f.userId}>{f.name}</option>)}
+            </select>
+            <button type="button" className={s.secondary} disabled={!pick || !!busy} onClick={invite}>
+              {busy === "invite" ? "Inviting…" : "Invite"}
+            </button>
+          </span>
+        </div>
+      ) : (
+        <p className={both.muted}>{friends.length ? "Every friend is already on this note." : "Add a friend to share this note with them."}</p>
       ))}
-    </ul>
-
-    {permissionError && (
-      <p role="alert" className={s.error}>
-        {permissionError}
-      </p>
-    )}
-      {success && <p role="status">{success}</p>}
-      {isOwner && <button className={s.secondary} disabled={loading || !!listError || sending} onClick={() => {
-        setEmail(""); setError(""); setSuccess(""); setOpen(true);
-      }}>Invite collaborator</button>}
-      {open && <Modal title="Invite collaborator" description="Invite a registered classmate by email." onClose={() => setOpen(false)} dismissible={!sending}>
-        <form className={s.form} noValidate onSubmit={invite} aria-busy={sending}>
-          <label htmlFor="collaborator-email">Classmate's email</label>
-          <input id="collaborator-email" name="email" type="email" required autoComplete="email"
-            value={email} disabled={sending} aria-invalid={!!error} aria-describedby={error ? "invite-error" : undefined}
-            onChange={(event) => { setEmail(event.target.value); setError(""); }} />
-          {error && <p id="invite-error" role="alert" className={s.error}>{error}</p>}
-          {sending && <p role="status">Sending invitation...</p>}
-          <div className={s.actions}>
-            <Dialog.Close className={s.secondary} disabled={sending}>Cancel</Dialog.Close>
-            <button type="submit" className={s.primary} disabled={sending}>{sending ? "Sending..." : "Send invitation"}</button>
-          </div>
-        </form>
-      </Modal>}
     </section>
   );
-}
-
-function unique(entries: Collaborator[]) {
-  return entries.filter((entry, index) => entries.findIndex((other) =>
-    other.id === entry.id || other.email.trim().toLowerCase() === entry.email.trim().toLowerCase(),
-  ) === index);
 }
