@@ -67,7 +67,7 @@ function Picker({ note, busy, error, onPick, onClose }: { note: Note; busy: bool
   const days = useMemo(() => {
     const byDate = new Map<string, ReturnType<typeof expandRepeats>>();
     for (const e of state.events) {
-      if (e.sharedBy || (!all && e.courseId !== note.courseId)) continue;
+      if (e.sharedBy || (!all && e.courseId && e.courseId !== note.courseId)) continue;
       for (const o of expandRepeats(e, shift(around, -60), shift(around, 90))) byDate.set(o.date, [...(byDate.get(o.date) ?? []), { ...o, id: e.id }]);
     }
     const gap = (d: string) => Math.abs(Date.parse(d) - Date.parse(around));
