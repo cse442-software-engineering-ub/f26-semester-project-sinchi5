@@ -208,3 +208,38 @@ await test("14. The note page scrolls sideways at 375", EDITOR, async () => {
   await openEditor(375);
   expect(pageScrollWidth() <= 375).toBe(true);
 });
+await test("15. The focus outline is the same distance from the text box on all four sides (within 1 px)", "src/features/rich-editor.module.css → .ProseMirror:focus-visible", async () => {
+  for (const width of [1440, 768, 375]) {
+  const root = await openEditor(width);
+  const text = root.querySelector(".ProseMirror") as HTMLElement;
+  text.focus();
+  const cs = win(root).getComputedStyle(text);
+  const gap = parseFloat(cs.outlineOffset); // the ring is drawn this far from every edge of the box
+  const b = box(text), bar = box(root.querySelector('[role="toolbar"]')!.parentElement!);
+  const ringTop = b.top - gap - parseFloat(cs.outlineWidth);
+  expect(cs.outlineStyle).toBe("solid");
+  expect(Math.abs(gap + parseFloat(cs.outlineWidth)) <= 1).toBe(true); // on the edge: ring and box coincide on every side
+  expect(ringTop >= bar.bottom - 1).toBe(true);
+  }
+});
+await test("16. The first line of text starts within the box's top padding (not a line lower)", "src/features/rich-editor.module.css → .ProseMirror padding", async () => {
+  for (const width of [1440, 768, 375]) {
+  const root = await openEditor(width);
+  const text = root.querySelector(".ProseMirror") as HTMLElement;
+  const cs = win(root).getComputedStyle(text);
+  const first = text.firstElementChild as HTMLElement;
+  const topGap = box(first).top - box(text).top - parseFloat(cs.paddingTop);
+  const sideGap = box(first).left - box(text).left - parseFloat(cs.paddingLeft);
+  expect(Math.abs(topGap) <= 1).toBe(true);
+  expect(Math.abs(sideGap) <= 1).toBe(true);
+  expect(parseFloat(cs.paddingTop)).toBe(parseFloat(cs.paddingLeft));
+  expect(parseFloat(cs.paddingTop) < parseFloat(cs.fontSize) * 1.2).toBe(true); // a small gap, never a line
+  }
+});
+await test("17. The editor box's left edge is within 2 px of the first toolbar button's left edge at 1440 and 768", "src/features/rich-editor.module.css → .content padding-inline", async () => {
+  for (const width of [1440, 768]) {
+    const root = await openEditor(width);
+    const first = root.querySelector('[role="toolbar"] button') as HTMLElement;
+    expect(Math.abs(box(root.querySelector(".ProseMirror")!).left - box(first).left) <= 2).toBe(true);
+  }
+});
