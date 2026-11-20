@@ -8,7 +8,7 @@ import { weekAhead, comingUp } from "../services/upcoming";
 import { notePreview } from "../services/noteText";
 import { expandRepeats } from "../services/recurrence";
 import { EventDialog } from "./schedule";
-import { type CourseEvent, type UploadKind, isClass } from "../domain";
+import { type CourseEvent, type UploadKind, isClass, isDue } from "../domain";
 import css from "./dashboard.module.css";
 import s from "../shared/ui.module.css";
 
@@ -96,30 +96,38 @@ export function Dashboard({ onImport, onCreate, onAddCourse }: {
   const hour = now.getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
-  // Hour rail: 8 AM to 6 PM, stretched to cover any earlier or later event.
-  const timed = day.filter((e) => minutesOf(e.time) !== null);
-  const allDay = day.filter((e) => minutesOf(e.time) === null);
+  // Hour rail: 8 AM to 6 PM, stretched to cover any earlier or later class. Due items never widen it:
+  // one that falls inside the hours sits on the rail, the rest (a 23:59 deadline) become a Due pin in the strip.
   const span = (e: CourseEvent) => (isClass(e.kind) ? CLASS_MIN : 30);
+  const timed = day.filter((e) => minutesOf(e.time) !== null);
   let startH = 8;
   let endH = 18;
-  for (const e of timed) {
+  for (const e of timed.filter((x) => !isDue(x.kind))) {
     const m = minutesOf(e.time)!;
     startH = Math.min(startH, Math.floor(m / 60));
     endH = Math.max(endH, Math.ceil((m + span(e)) / 60));
   }
   endH = Math.min(endH, 24);
+  const fits = (e: CourseEvent) => !isDue(e.kind) || (minutesOf(e.time)! >= startH * 60 && minutesOf(e.time)! + span(e) <= endH * 60);
+  const onRail = timed.filter(fits);
+  const allDay = day.filter((e) => minutesOf(e.time) === null || !fits(e));
   const total = (endH - startH) * 60;
-  // Overlapping events sit side by side: greedy lanes, one lane count for the day.
-  const sorted = [...timed].sort((a, b) => minutesOf(a.time)! - minutesOf(b.time)!);
+  // Overlapping events sit side by side: greedy lanes, counted per cluster of overlapping events.
+  const sorted = [...onRail].sort((a, b) => minutesOf(a.time)! - minutesOf(b.time)!);
   const laneEnds: number[] = [];
-  const placed = sorted.map((e) => {
+  const placed: { e: CourseEvent; m: number; lane: number; lanes: number }[] = [];
+  let cluster = 0;
+  let clusterEnd = 0;
+  for (const e of sorted) {
     const m = minutesOf(e.time)!;
+    if (m >= clusterEnd) { laneEnds.length = 0; cluster = placed.length; }
     let lane = laneEnds.findIndex((end) => end <= m);
     if (lane < 0) lane = laneEnds.length;
     laneEnds[lane] = m + span(e);
-    return { e, m, lane };
-  });
-  const lanes = Math.max(1, laneEnds.length);
+    clusterEnd = Math.max(clusterEnd, m + span(e));
+    placed.push({ e, m, lane, lanes: 1 });
+    for (let i = cluster; i < placed.length; i++) placed[i].lanes = laneEnds.length;
+  }
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const rel = Math.min(total, Math.max(0, nowMin - startH * 60));
   const parked = nowMin < startH * 60 ? "top" : nowMin > endH * 60 ? "bottom" : undefined;
@@ -179,7 +187,7 @@ export function Dashboard({ onImport, onCreate, onAddCourse }: {
             <li key={`${e.id}-${e.date}`}>
               <button type="button" onClick={() => openEvent(e)} style={{ "--c": courseOf(e.courseId)?.color } as React.CSSProperties}>
                 <strong>{e.title}</strong>
-                <span>{courseOf(e.courseId)?.code ?? "Personal"} · {e.kind}</span>
+                <span>{minutesOf(e.time) !== null && <b>Due {formatEventTime(e.time)} · </b>}{courseOf(e.courseId)?.code ?? "Personal"} · {e.kind}</span>
               </button>
             </li>
           ))}
@@ -188,12 +196,12 @@ export function Dashboard({ onImport, onCreate, onAddCourse }: {
       <div className={css.rail} ref={railRef} data-rail>
         <div className={css.railInner} style={{ "--hours": endH - startH } as React.CSSProperties}>
           {Array.from({ length: endH - startH }, (_, i) => (
-            <div className={css.hour} key={i} style={{ top: `${(i / (endH - startH)) * 100}%` }}>
+            <div className={css.hour} key={i} data-near={(isToday && Math.abs((startH + i) * 60 - nowMin) < 25) || undefined} style={{ top: `${(i / (endH - startH)) * 100}%` }}>
               <span>{hourLabel(startH + i)}</span>
             </div>
           ))}
           <div className={css.blocks}>
-            {placed.map(({ e, m, lane }) => {
+            {placed.map(({ e, m, lane, lanes }) => {
               const c = courseOf(e.courseId);
               const end = m + span(e);
               const range = isClass(e.kind) ? `${formatEventTime(e.time)} – ${formatEventTime(`${Math.floor(end / 60) % 24}:${String(end % 60).padStart(2, "0")}`)}` : formatEventTime(e.time);
@@ -205,7 +213,7 @@ export function Dashboard({ onImport, onCreate, onAddCourse }: {
                   data-block
                   onClick={() => openEvent(e)}
                   style={{
-                    top: `${((m - startH * 60) / total) * 100}%`,
+                    top: `${Math.min((m - startH * 60) / total, 1 - span(e) / total) * 100}%`,
                     height: `${(span(e) / total) * 100}%`,
                     left: `${(lane / lanes) * 100}%`,
                     width: `${100 / lanes}%`,
@@ -235,6 +243,19 @@ export function Dashboard({ onImport, onCreate, onAddCourse }: {
           {day.length === 0 && <p className={css.railEmpty}>{`Nothing scheduled ${isToday ? "today" : "this day"}`}</p>}
         </div>
       </div>
+      <div className={css.footer}>
+        <button type="button" className={s.secondary} onClick={onCreate}><FileText size={15} aria-hidden="true" /> Start a note</button>
+        <button type="button" className={s.secondary} onClick={() => onImport("document")}><UploadCloud size={15} aria-hidden="true" /> Upload a file</button>
+        <button type="button" className={s.secondary} onClick={() => onImport("scan")}><Camera size={15} aria-hidden="true" /> Scan your notes</button>
+        {state.courses.length === 0 ? (
+          <>
+            <p className={css.quietLine}>No courses yet. Add a course to group its notes and events.</p>
+            <Link className={s.primary} to="/courses"><Plus size={15} aria-hidden="true" /> Add course</Link>
+          </>
+        ) : (
+          <button type="button" className={s.secondary} onClick={onAddCourse}><Plus size={15} aria-hidden="true" /> Add course</button>
+        )}
+      </div>
     </div>
   );
 
@@ -254,6 +275,7 @@ export function Dashboard({ onImport, onCreate, onAddCourse }: {
                   <span className={css.rowText}>
                     <strong>{note ? note.title : e.title}</strong>
                     <small>{c?.code ?? "Class"}{e.time ? ` · ${formatEventTime(e.time)}` : ""}</small>
+                    {note && notePreview(note) && <small className={css.excerpt}>{notePreview(note)}</small>}
                   </span>
                   {note ? (
                     <Link className={s.secondary} to={`/notes/${note.id}`} aria-label={`Open note for ${c?.code ?? e.title}`}>Open</Link>
@@ -279,7 +301,7 @@ export function Dashboard({ onImport, onCreate, onAddCourse }: {
             {due.map((e) => {
               const n = daysAway(e.date);
               return (
-                <li key={`${e.id}-${e.date}`} style={{ "--c": courseOf(e.courseId)?.color } as React.CSSProperties}>
+                <li key={`${e.id}-${e.date}`} className={css.dueRow} style={{ "--c": courseOf(e.courseId)?.color } as React.CSSProperties}>
                   <span className={css.dot} aria-hidden="true" />
                   <button type="button" className={css.rowText} onClick={() => openEvent(e)}>
                     <strong>{e.title}</strong>
@@ -290,13 +312,13 @@ export function Dashboard({ onImport, onCreate, onAddCourse }: {
               );
             })}
             {later.map((e) => (
-              <li key={`${e.id}-${e.date}`} style={{ "--c": courseOf(e.courseId)?.color } as React.CSSProperties}>
+              <li key={`${e.id}-${e.date}`} className={css.dueRow} style={{ "--c": courseOf(e.courseId)?.color } as React.CSSProperties}>
                 <span className={css.dot} aria-hidden="true" />
                 <button type="button" className={css.rowText} onClick={() => openEvent(e)}>
                   <strong>{e.title}</strong>
                   <small>{courseOf(e.courseId)?.code ?? "Personal"} · <time dateTime={e.date}>{new Date(`${e.date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</time></small>
                 </button>
-                <Chip>{`in ${e.daysAway} days`}</Chip>
+                <Chip>{`In ${e.daysAway} days`}</Chip>
               </li>
             ))}
           </ul>
@@ -328,26 +350,13 @@ export function Dashboard({ onImport, onCreate, onAddCourse }: {
           <Empty title="No notes yet">Start a note below and it will wait for you here.</Empty>
         )}
       </section>
-
-      <div className={css.footer}>
-        <button type="button" className={s.secondary} onClick={onCreate}><FileText size={15} aria-hidden="true" /> Start a note</button>
-        <button type="button" className={s.secondary} onClick={() => onImport("document")}><UploadCloud size={15} aria-hidden="true" /> Upload a file</button>
-        <button type="button" className={s.secondary} onClick={() => onImport("scan")}><Camera size={15} aria-hidden="true" /> Scan your notes</button>
-        {state.courses.length === 0 ? (
-          <>
-            <p className={css.quietLine}>No courses yet. Add a course to group its notes and events.</p>
-            <Link className={s.primary} to="/courses"><Plus size={15} aria-hidden="true" /> Add course</Link>
-          </>
-        ) : (
-          <button type="button" className={s.secondary} onClick={onAddCourse}><Plus size={15} aria-hidden="true" /> Add course</button>
-        )}
-      </div>
     </div>
   );
 
   const marked = [...new Set(expandedEvents.map((e) => e.date))];
   return (
     <>
+      <div className={css.greeting}>
       <PageHeading
         eyebrow={now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
         title={`${greeting}, ${state.user?.name.split(" ")[0] || "friend"}.`}
@@ -362,6 +371,7 @@ export function Dashboard({ onImport, onCreate, onAddCourse }: {
           )
         }
       />
+      </div>
       {burst && (
         <div className={css.burst} data-burst aria-hidden="true">
           {PIECES.map((style, i) => <i key={i} style={style} />)}

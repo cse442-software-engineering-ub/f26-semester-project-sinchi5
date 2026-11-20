@@ -16,6 +16,8 @@ export interface OnboardingState {
 }
 // Weekly classes are on the schedule, but they aren't something due (card 48).
 export const isClass = (kind: EventKind) => (CLASS_KINDS as readonly EventKind[]).includes(kind);
+// Work that falls due (assignment, quiz, exam, deadline): drawn as a Due pin when its time lies off the rail.
+export const isDue = (kind: EventKind) => kind === "assignment" || kind === "quiz" || kind === "exam" || kind === "deadline";
 export interface Course {
   id: string;
   code: string;

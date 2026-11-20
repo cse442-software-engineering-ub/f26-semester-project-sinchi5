@@ -2,10 +2,14 @@
    Everything follows the width of the spread itself (container queries), so the sidebar never leaves dead space. */
 .today {
   display: grid;
-  gap: var(--space-5);
+  gap: var(--space-3);
   min-width: 0;
 }
-.spread {
+/* Compact greeting: the shared heading's bottom margin gives way so the day starts higher. */
+.greeting > header {
+  margin-bottom: var(--space-3);
+}
+.dayPage {
   --hour: 4.5rem;
 }
 .dayPage,
@@ -20,11 +24,12 @@
 /* Left page: the day */
 .dayHead {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-4);
 }
 .dayName {
-  font-size: clamp(2rem, 1.6rem + 1.2vw, 3rem);
+  font-size: clamp(1.5rem, 1.3rem + 0.7vw, 2rem);
   line-height: var(--lh-display);
   letter-spacing: var(--ls-display);
   font-weight: 650;
@@ -38,6 +43,9 @@
   font-size: var(--fs-lead);
   line-height: var(--lh-lead);
   font-variant-numeric: tabular-nums;
+}
+.dayDate {
+  font-size: var(--fs-body);
 }
 .dayDate > span:first-child {
   color: var(--text);
@@ -67,6 +75,10 @@
   font-size: var(--fs-body);
   line-height: var(--lh-body);
   font-weight: 600;
+}
+.allDay b {
+  font-weight: 600;
+  color: var(--warn);
 }
 .allDay span {
   color: var(--muted);
@@ -271,6 +283,13 @@
   line-height: var(--lh-small);
   font-variant-numeric: tabular-nums;
 }
+.rowText .excerpt {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: 2px;
+}
 .rowText .preview {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -310,15 +329,31 @@
     padding-block: var(--space-3);
   }
 }
-/* Wide spreads: taller hours, and the right page lays its recent notes out in columns. */
-@container (min-width: 1200px) {
-  .spread {
-    --hour: 5.25rem;
+/* Side by side, 8 AM to 6 PM fills the viewport height under the greeting, so the rail, the Now ribbon and the facing page are all in view without scrolling. */
+@container (min-width: 721px) {
+  .dayPage {
+    --hour: clamp(2.75rem, calc((100dvh - 26rem) / 10), 5.25rem);
   }
+}
+@container (min-width: 1200px) {
   .recent {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
     column-gap: var(--space-5);
+  }
+}
+/* A due row's chip sits under its title on a phone. */
+@container (max-width: 720px) {
+  .list > .dueRow {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: var(--space-3);
+    row-gap: 0;
+  }
+  .list > .dueRow > :last-child:not(.rowText) {
+    grid-column: 2;
+    justify-self: start;
+    margin-bottom: var(--space-2);
   }
 }
 
@@ -344,6 +379,20 @@
 .season {
   color: var(--primary);
   display: inline-flex;
+}
+/* On a phone the season glyph rides the title's corner instead of taking a row of its own. */
+@media (max-width: 767px) {
+  .greeting {
+    position: relative;
+  }
+  .season {
+    position: absolute;
+    top: var(--space-3);
+    right: 0;
+  }
+}
+.hour[data-near] span {
+  opacity: 0;
 }
 .burst {
   position: fixed;

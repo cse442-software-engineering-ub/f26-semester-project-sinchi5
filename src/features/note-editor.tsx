@@ -442,7 +442,7 @@ function NoteEditor() {
           </button>
         )}
         <button
-          className={note.pinned ? s.primary : s.secondary}
+          className={s.secondary}
           aria-label={note.pinned ? "Unpin note" : "Pin note"}
           aria-pressed={Boolean(note.pinned)}
           disabled={pinning || !canEdit || saving}

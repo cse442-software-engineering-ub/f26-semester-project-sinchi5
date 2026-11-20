@@ -1,4 +1,4 @@
-﻿import type { CourseEvent } from "../domain";
+﻿import { isClass, type CourseEvent } from "../domain";
 
 export interface SemesterWeek {
   weekStart: string;
@@ -50,7 +50,7 @@ export function semesterList(
   courseId?: string,
 ): SemesterList {
   const filtered = events.filter((event) => {
-    if (event.kind === "lecture") return false;
+    if (isClass(event.kind)) return false;
 
     if (courseId === undefined) return true;
 

@@ -7,6 +7,12 @@
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
   gap: var(--space-gutter);
 }
+/* Four cards in three columns leave an orphan, so wide screens use two columns. */
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 .grid > li {
   display: flex;
   min-width: 0;
@@ -48,6 +54,9 @@
 .name {
   font-size: var(--fs-lead);
   line-height: var(--lh-lead);
+}
+.meta > span {
+  font-size: inherit;
 }
 .meta {
   font-size: var(--fs-small);
@@ -115,20 +124,7 @@
   margin-top: var(--space-2);
 }
 
-/* On a phone the shared heading shrinks its primary button to an icon and squeezes the title, so both actions
-   drop to their own row under the title with their words. */
+/* Wraps the heading's two buttons so they stay one group. */
 .bar {
   display: contents;
-}
-@media (max-width: 767px) {
-  div:has(> .bar):has(> .bar) {
-    grid-column: 1 / -1;
-    grid-row: 3;
-    justify-content: flex-start;
-  }
-  .bar > .act.act.act {
-    font-size: var(--fs-body);
-    padding: 0 var(--space-4);
-    gap: var(--space-2);
-  }
 }

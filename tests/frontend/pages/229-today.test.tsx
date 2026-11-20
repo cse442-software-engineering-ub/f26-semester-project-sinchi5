@@ -157,5 +157,5 @@ await test("13. The next exam past this week is missing from Today or lacks its 
   const root = mount(at());
   await waitFor(() => byRole("heading", "Due"));
   const text = byRole("heading", "Due")!.closest("section")!.textContent ?? "";
-  expect([text.includes("Event x1"), text.includes("in 10 days")]).toEqual([true, true]);
+  expect([text.includes("Event x1"), text.includes("In 10 days")]).toEqual([true, true]);
 });
