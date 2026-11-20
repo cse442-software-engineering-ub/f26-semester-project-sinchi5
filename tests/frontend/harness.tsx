@@ -45,9 +45,10 @@ export function stubApi(answers: Record<string, Answer | ((req: Sent) => Answer)
   return api;
 }
 
-function unmount() {
+// Closes the mounted screen and removes every iframe: el.closest("iframe") cannot see out of its own document, so frames used to pile up.
+export function unmount() {
   mounted?.root.unmount();
-  mounted?.el.closest("iframe")?.remove();
+  document.querySelectorAll("iframe").forEach((f) => f.remove());
   mounted?.el.remove();
   mounted = null; scope = document;
 }
@@ -56,12 +57,18 @@ function unmount() {
 export function mount(ui: ReactElement, { width }: { width?: number } = {}) {
   unmount();
   let el: HTMLElement;
+  const loading: Promise<void>[] = [];
   if (width) {
     const frame = document.createElement("iframe");
     frame.style.cssText = `width:${width}px;height:700px;border:1px solid gray;display:block`;
     document.body.append(frame);
     const doc = frame.contentDocument!;
-    for (const n of document.head.querySelectorAll("link[rel=stylesheet], style")) doc.head.append(n.cloneNode(true));
+    // The screen renders only after the copied stylesheets have loaded, so a layout read never sees an unstyled frame.
+    for (const n of document.head.querySelectorAll("link[rel=stylesheet], style")) {
+      const copy = n.cloneNode(true) as HTMLElement;
+      if (copy instanceof HTMLLinkElement) loading.push(new Promise((r) => { copy.onload = copy.onerror = () => r(); }));
+      doc.head.append(copy);
+    }
     doc.body.style.margin = "0";
     el = doc.createElement("div");
     doc.body.append(el);
@@ -71,8 +78,9 @@ export function mount(ui: ReactElement, { width }: { width?: number } = {}) {
     document.body.append(el);
   }
   const root = createRoot(el);
-  root.render(ui);
   mounted = { root, el };
+  if (loading.length) void Promise.all(loading).then(() => { if (mounted?.root === root) root.render(ui); });
+  else root.render(ui);
   return el;
 }
 
