@@ -699,7 +699,8 @@ function noteRoute(PDO $db, array $user, string $route, array $input): array
             [$eventId, $user['id']])->fetch();
         if (!$event) throw new HttpError(404, 'This event could not be found.');
         if (!eventHasDate($event, $date)) throw new HttpError(422, 'Choose a date when this event happens.');
-        query($db, 'UPDATE notely_notes SET event_id = ?, event_date = ?, course_id = ?, lecture_date = ?, updated_at = updated_at WHERE id = ?',
+        // A personal event (no course) keeps the note's own course.
+        query($db, 'UPDATE notely_notes SET event_id = ?, event_date = ?, course_id = COALESCE(?, course_id), lecture_date = ?, updated_at = updated_at WHERE id = ?',
             [$eventId, $date, $event['course_id'], $date, $noteId]);
         return ['note' => loadNote($db, $noteId)];
     }
