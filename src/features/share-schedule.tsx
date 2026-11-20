@@ -81,7 +81,7 @@ export function ShareScheduleDialog({ course, onClose }: { course: Course; onClo
         {!shares ? (
           !listError && <p role="status" className={s.muted}>Loading who can see it…</p>
         ) : shares.length ? (
-          <ul className={css.rows}>
+          <ul className={`${css.rows} ${own.rows}`}>
             {shares.map((share) => (
               <li key={share.userId}>
                 <Avatar user={{ id: share.userId, name: share.name, email: share.email, hasPhoto: false }} className={css.avatar} />

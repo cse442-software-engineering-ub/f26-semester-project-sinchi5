@@ -96,7 +96,7 @@ function ClassReview({ meeting, index, onChange }: {
   const summary = [meeting.days.map((day) => WEEKDAYS[day].slice(0, 3)).join(" "),
     meeting.time && formatEventTime(meeting.time), meeting.location].filter(Boolean).join(" · ");
   return (
-    <fieldset>
+    <fieldset className={css.item}>
       <legend>{`Detected ${meeting.kind}`}</legend>
       {meeting.include && (!meeting.starts || !meeting.ends) && (
         <p className={s.notice}>Needs review: choose when this class starts and ends.</p>
@@ -329,6 +329,7 @@ export function ImportDialog({
           ? "Review detected dates before adding them to your schedule."
           : "Choose a file, then give it a place in your account."
       }
+      wide={kind === "syllabus" && phase === "review"}
       onClose={onClose}
     >
       {kind === "syllabus" && <Steps phase={phase} />}
@@ -695,7 +696,7 @@ export function ImportDialog({
               setJob({ ...job, events: job.events.map((v, j) => (j !== i ? v : "date" in change || "time" in change
                 ? { ...event, hint: undefined, rangeStart: undefined, rangeEnd: undefined, week: undefined, ...change } : { ...v, ...change })) });
             return (
-              <fieldset key={i}>
+              <fieldset key={i} className={css.item}>
                 <legend>{event.source === "manual" ? "Added by you" : `Detected ${event.kind}`}</legend>
                 {event.needsReview && (
                   <p className={s.notice}>
