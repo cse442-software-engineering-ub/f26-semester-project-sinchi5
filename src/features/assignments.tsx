@@ -1,8 +1,9 @@
-﻿import { useState } from "react";
+﻿import { useState, type CSSProperties } from "react";
 import type { CourseEvent } from "../domain";
 import { useApp } from "../app/context";
 import { dateKey } from "../services/fixtures";
 import { semesterList } from "../services/semester";
+import { Chip, PageHeading, Sheet } from "../shared/ui";
 import { EventDialog } from "./schedule";
 import css from "./assignments.module.css";
 import s from "../shared/ui.module.css";
@@ -24,6 +25,12 @@ function displayTime(time: string) {
   const displayHour = hour % 12 || 12;
 
   return `${displayHour}:${minute} ${suffix}`;
+}
+
+// A Sunday-to-Saturday week (keyed by its Sunday) holds `today` when today is 0 to 6 days after it.
+function holdsToday(weekStart: string, today: string) {
+  const days = (Date.parse(`${today}T12:00:00Z`) - Date.parse(`${weekStart}T12:00:00Z`)) / 86400000;
+  return days >= 0 && days < 7;
 }
 
 export function Assignments() {
@@ -53,12 +60,16 @@ export function Assignments() {
     );
   }
 
-  function eventRow(event: CourseEvent) {
+  function eventRow(event: CourseEvent, isPast = false) {
+    const course = state.courses.find((c) => c.id === event.courseId);
+
     return (
       <button
         key={event.id}
         type="button"
         className={css.row}
+        data-past={isPast || undefined}
+        style={{ "--edge": course?.color ?? "var(--hover-line)" } as CSSProperties}
         onClick={() => setSelectedEvent(event)}
       >
         <span className={css.when}>
@@ -68,8 +79,9 @@ export function Assignments() {
 
         <span className={css.info}>
           <strong>{event.title}</strong>
-          <span>
+          <span className={css.meta}>
             {courseLabel(event)} · {event.kind}
+            {isPast ? <Chip>Past</Chip> : event.date === today ? <Chip tone="due">Today</Chip> : null}
           </span>
         </span>
       </button>
@@ -79,31 +91,28 @@ export function Assignments() {
   return (
     <>
       <div className={css.page}>
-        <div className={css.heading}>
-          <div>
-            <h1>Assignments</h1>
-            <p className={s.muted}>
-              Everything due this semester, in order.
-            </p>
-          </div>
+        <PageHeading
+          title="Assignments"
+          description="Everything due this semester, in order."
+          actions={
+            <label className={css.filter}>
+              Course
+              <select
+                value={courseFilter}
+                onChange={(event) => setCourseFilter(event.target.value)}
+              >
+                <option value="__all__">All</option>
+                <option value="">Personal</option>
 
-          <label className={css.filter}>
-            Course
-            <select
-              value={courseFilter}
-              onChange={(event) => setCourseFilter(event.target.value)}
-            >
-              <option value="__all__">All</option>
-              <option value="">Personal</option>
-
-              {state.courses.map((course) => (
-                <option key={course.id} value={course.id}>
-                  {course.code}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+                {state.courses.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.code}
+                  </option>
+                ))}
+              </select>
+            </label>
+          }
+        />
 
         {upcoming.length === 0 ? (
           <div className={s.empty}>
@@ -112,15 +121,20 @@ export function Assignments() {
           </div>
         ) : (
           <div className={css.weeks}>
-            {upcoming.map((week) => (
-              <section key={week.weekStart} className={css.week}>
-                <h2>{week.label}</h2>
+            {upcoming.map((week) => {
+              const current = holdsToday(week.weekStart, today);
 
-                <div className={css.rows}>
-                  {week.events.map(eventRow)}
-                </div>
-              </section>
-            ))}
+              return (
+                <Sheet key={week.weekStart} className={css.week}>
+                  <header className={css.weekHead}>
+                    <h2>{week.label}</h2>
+                    {current && <span className={css.ribbon}>This week</span>}
+                  </header>
+
+                  <div className={css.rows}>{week.events.map((e) => eventRow(e))}</div>
+                </Sheet>
+              );
+            })}
           </div>
         )}
 
@@ -135,13 +149,13 @@ export function Assignments() {
             </button>
 
             {showPast && (
-              <section className={css.week}>
-                <h2>Earlier this semester</h2>
+              <Sheet className={css.week}>
+                <header className={css.weekHead}>
+                  <h2>Earlier this semester</h2>
+                </header>
 
-                <div className={css.rows}>
-                  {past.map(eventRow)}
-                </div>
-              </section>
+                <div className={css.rows}>{past.map((e) => eventRow(e, true))}</div>
+              </Sheet>
             )}
           </div>
         )}

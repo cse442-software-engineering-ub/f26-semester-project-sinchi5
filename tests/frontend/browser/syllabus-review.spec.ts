@@ -7,7 +7,7 @@ import { LECTURE, openUpload, readOf, reviewSyllabus, section, signUpWithCourse,
 
 const missing = (input: Locator) => input.evaluate((el) => (el as HTMLInputElement).validity.valueMissing);
 async function eventOn(page: Page, date: string, title: string) {
-  await page.goto(`/schedule?date=${date}`);
+  await page.goto(`/schedule?date=${date}&view=month`);
   return page.getByRole("button", { name: new RegExp(title.replace(/[()]/g, "\\$&")) });
 }
 

@@ -67,7 +67,7 @@ test("Task test 4 - Cancel and Escape keep the event and return to Event details
   await signUpWithEvents(page);
   await importQuiz(page);
   const deletes = countDeletes(page);
-  await page.goto("/schedule?date=2026-11-12");
+  await page.goto("/schedule?date=2026-11-12&view=month");
   await row(page, "Quiz 1").click();
   const details = await opened(page, "Event details");
   const open = details.getByRole("button", { name: "Delete event" });
@@ -111,7 +111,7 @@ test("Task test 5 - a deleted syllabus event is gone after a reload", async ({ p
   await signUpWithEvents(page);
   await importQuiz(page);
   const deletes = countDeletes(page);
-  await page.goto("/schedule?date=2026-11-12");
+  await page.goto("/schedule?date=2026-11-12&view=month");
   await row(page, "Quiz 1").click();
   await (await opened(page, "Event details")).getByRole("button", { name: "Delete event" }).click();
   await (await opened(page, "Delete this event?")).getByRole("button", { name: "Delete event" }).click();
@@ -123,7 +123,7 @@ test("Task test 5 - a deleted syllabus event is gone after a reload", async ({ p
   await Promise.all([page.waitForResponse(/route=events/), page.reload()]);
   await expect(page.getByRole("heading", { name: "November 12" })).toBeVisible();
   await expect(row(page, "Quiz 1")).toHaveCount(0);
-  await page.goto("/schedule?date=2026-11-19");
+  await page.goto("/schedule?date=2026-11-19&view=month");
   await expect(row(page, "Project draft")).toBeVisible();
   expect(deletes).toHaveLength(1);
 });
@@ -138,7 +138,7 @@ test("Task test 5 - one request while deleting, and a failure keeps the event", 
     await held;
     await route.fulfill({ status: 503, json: { error: "Uploads are unavailable right now. Please try again later." } });
   });
-  await page.goto("/schedule?date=2026-11-12");
+  await page.goto("/schedule?date=2026-11-12&view=month");
   await row(page, "Quiz 1").click();
   await (await opened(page, "Event details")).getByRole("button", { name: "Delete event" }).click();
   const confirm = await opened(page, "Delete this event?");
@@ -171,7 +171,7 @@ const lectureRow = (page: Page) => row(page, "CSE 442 Lecture");
 test("Card 48 - deleting a class asks this one or all, and this one leaves the others", async ({ page }) => {
   await importClass(page);
   const deletes = countDeletes(page);
-  await page.goto("/schedule?date=2026-08-26");
+  await page.goto("/schedule?date=2026-08-26&view=month");
   await lectureRow(page).click();
   await (await opened(page, "Event details")).getByRole("button", { name: "Delete event" }).click();
   const confirm = await opened(page, "Delete this event?");
@@ -183,13 +183,13 @@ test("Card 48 - deleting a class asks this one or all, and this one leaves the o
   await expect(row(page, "Quiz 1")).toBeVisible();
   expect(deletes).toHaveLength(1);
   expect(JSON.parse(deletes[0]).series).toBeUndefined();
-  await page.goto("/schedule?date=2026-08-31");
+  await page.goto("/schedule?date=2026-08-31&view=month");
   await expect(lectureRow(page)).toBeVisible();
 });
 
 test("Card 48 - editing one meeting says so, and leaves the other meetings as they were", async ({ page }) => {
   await importClass(page);
-  await page.goto("/schedule?date=2026-08-24");
+  await page.goto("/schedule?date=2026-08-24&view=month");
   await lectureRow(page).click();
   const details = await opened(page, "Event details");
   await expect(details.getByText("Imported from your syllabus. You can update these details. Changes apply to this meeting only.")).toBeVisible();
@@ -197,14 +197,14 @@ test("Card 48 - editing one meeting says so, and leaves the other meetings as th
   await details.getByRole("button", { name: "Save changes" }).click();
   await expect(details).toHaveCount(0);
   await expect(row(page, "Guest lecture")).toBeVisible();
-  await page.goto("/schedule?date=2026-08-31");
+  await page.goto("/schedule?date=2026-08-31&view=month");
   await expect(lectureRow(page)).toBeVisible();
 });
 
 test("Card 48 - Delete all removes every meeting of the class and nothing else", async ({ page }) => {
   await importClass(page);
   const deletes = countDeletes(page);
-  await page.goto("/schedule?date=2026-08-31");
+  await page.goto("/schedule?date=2026-08-31&view=month");
   await lectureRow(page).click();
   await (await opened(page, "Event details")).getByRole("button", { name: "Delete event" }).click();
   await (await opened(page, "Delete this event?")).getByRole("button", { name: "Delete all" }).click();
@@ -212,16 +212,16 @@ test("Card 48 - Delete all removes every meeting of the class and nothing else",
   expect(deletes).toHaveLength(1);
   expect(JSON.parse(deletes[0]).series).toBe(true);
   for (const date of ["2026-08-24", "2026-08-31", "2026-09-02"]) {
-    await Promise.all([page.waitForResponse(/route=events/), page.goto(`/schedule?date=${date}`)]);
+    await Promise.all([page.waitForResponse(/route=events/), page.goto(`/schedule?date=${date}&view=month`)]);
     await expect(lectureRow(page)).toHaveCount(0);
   }
-  await page.goto("/schedule?date=2026-08-26");
+  await page.goto("/schedule?date=2026-08-26&view=month");
   await expect(row(page, "Quiz 1")).toBeVisible();
 });
 
 test("Task test 6 - a signed-out visitor gets the sign-in screen, not the schedule", async ({ page }) => {
   const deletes = countDeletes(page);
-  await page.goto("/schedule");
+  await page.goto("/schedule?view=month");
   await expect(page.getByText("Good to see you again.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Add event" })).toHaveCount(0);
   expect(deletes).toHaveLength(0);

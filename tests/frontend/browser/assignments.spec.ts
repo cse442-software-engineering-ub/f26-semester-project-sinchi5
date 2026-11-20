@@ -32,7 +32,7 @@ async function addEvent(
   time: string,
   course = "CSE 442",
 ) {
-  await page.goto(`/schedule?date=${date}`);
+  await page.goto(`/schedule?date=${date}&view=month`);
   await page.getByRole("button", { name: "Add event" }).click();
 
   const dialog = page.getByRole("dialog", {

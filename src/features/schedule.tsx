@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Dialog } from "@base-ui/react/dialog";
 import { useSearchParams, Link } from "react-router-dom";
 import {
@@ -15,6 +15,9 @@ import { useApp, useHoldRefresh } from "../app/context";
 import {
   Modal,
   PageHeading,
+  Sheet,
+  Spread,
+  WeekStrip,
   EventRow,
   Empty,
   formatEventTime,
@@ -30,7 +33,7 @@ import {
 import s from "../shared/ui.module.css";
 import css from "./schedule.module.css";
 // Shared classes this screen's own rules also name (see schedule.module.css), applied together.
-const both = { actions: `${s.actions} ${css.actions}`, agenda: `${s.agenda} ${css.agenda}`, sectionHeading: `${s.sectionHeading} ${css.sectionHeading}` };
+const both = { actions: `${s.actions} ${css.actions}` };
 
 const WEEKDAYS = [
   "Sunday",
@@ -740,124 +743,198 @@ function DeleteEventDialog({
   );
 }
 
+const minutesOf = (time: string) => {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + (m || 0);
+};
+const hourName = (h: number) => `${h % 12 || 12} ${h < 12 ? "AM" : "PM"}`;
+const BLOCK = 60; // events carry a start time only, so a block on the rail is one hour long
+
+// shortcut: lanes are worked out per day, so one busy hour narrows that whole day's blocks; revisit if days get crowded.
+function laneOut(list: CourseEvent[]) {
+  const ends: number[] = [];
+  const lane = list.map((e) => {
+    const from = minutesOf(e.time);
+    let i = ends.findIndex((end) => end <= from);
+    if (i < 0) i = ends.push(0) - 1;
+    ends[i] = from + BLOCK;
+    return i;
+  });
+  return { lane, lanes: Math.max(1, ends.length) };
+}
+
+// The current time, refreshed each minute, for the Now ribbon.
+function useNow() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
+
+const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, 12);
+const byTime = (a: CourseEvent, b: CourseEvent) => a.time.localeCompare(b.time);
+
 export function Schedule() {
   const { state } = useApp();
+  const [params, setParams] = useSearchParams();
+  const now = useNow();
+  const today = dateKey(now);
 
-  const [
-    params,
-    setParams,
-  ] = useSearchParams();
-
-  const raw =
-    params.get("date");
-
+  const raw = params.get("date");
   const selected =
-    raw &&
-    /^\d{4}-\d{2}-\d{2}$/.test(
-      raw,
-    ) &&
-    !isNaN(Date.parse(raw))
-      ? raw
-      : dateKey();
+    raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) && !isNaN(Date.parse(raw)) ? raw : today;
+  const view = params.get("view") === "month" ? "month" : "week";
+  const date = new Date(selected + "T12:00:00");
 
-  const date = new Date(
-    selected + "T12:00:00",
-  );
+  const [event, setEvent] = useState<CourseEvent | null | undefined>();
 
-  const [event, setEvent] =
-    useState<
-      | CourseEvent
-      | null
-      | undefined
-    >();
-
-  const set = (
-    k: string,
-    v: string,
-  ) =>
+  const set = (k: string, v: string) =>
     setParams((p) => {
       p.set(k, v);
       return p;
     });
 
-  const first = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    1,
+  // The 6-week month grid always contains the selected day's week, so one expansion serves both views.
+  const first = new Date(date.getFullYear(), date.getMonth(), 1);
+  const days = Array.from({ length: 42 }, (_, i) => addDays(first, i - first.getDay()));
+  const visibleEvents = state.events.flatMap((e) =>
+    expandRepeats(e, dateKey(days[0]), dateKey(days[days.length - 1])),
   );
+  const dayEvents = visibleEvents.filter((e) => e.date === selected);
 
-  const start = new Date(first);
-
-  start.setDate(
-    1 - first.getDay(),
-  );
-
-  const days = Array.from(
-    { length: 42 },
-    (_, i) => {
-      const d = new Date(start);
-
-      d.setDate(
-        start.getDate() + i,
-      );
-
-      return d;
-    },
-  );
-
-  const visibleFrom = dateKey(days[0]);
-  const visibleTo = dateKey(
-    days[days.length - 1],
-  );
-
-  const visibleEvents =
-    state.events.flatMap((event) =>
-      expandRepeats(
-        event,
-        visibleFrom,
-        visibleTo,
-      ),
-    );
-
-  const dayEvents =
-    visibleEvents.filter(
-      (event) =>
-        event.date === selected,
-    );
-
-  function openEvent(
-    occurrence: CourseEvent,
-  ) {
-    const originalId =
-      occurrence.repeatOf ??
-      occurrence.id;
-
-    const original =
-      state.events.find(
-        (event) =>
-          event.id === originalId,
-      );
-
-    setEvent(
-      original ?? occurrence,
-    );
+  function openEvent(occurrence: CourseEvent) {
+    const originalId = occurrence.repeatOf ?? occurrence.id;
+    const original = state.events.find((e) => e.id === originalId);
+    setEvent(original ?? occurrence);
   }
 
-  function month(
-    delta: number,
-  ) {
-    set(
-      "date",
-      dateKey(
-        new Date(
-          date.getFullYear(),
-          date.getMonth() +
-            delta,
-          1,
-        ),
-      ),
-    );
+  function month(delta: number) {
+    set("date", dateKey(new Date(date.getFullYear(), date.getMonth() + delta, 1)));
   }
+
+  const colorOf = (e: CourseEvent) =>
+    state.courses.find((c) => c.id === e.courseId)?.color ?? "var(--muted)";
+  const codeOf = (e: CourseEvent) => state.courses.find((c) => c.id === e.courseId)?.code;
+
+  // Week: seven columns on one hour rail. Untimed items and deadlines go to the strip above the rail.
+  const week = Array.from({ length: 7 }, (_, i) => {
+    const d = addDays(date, i - date.getDay());
+    const key = dateKey(d);
+    const list = visibleEvents.filter((e) => e.date === key).sort(byTime);
+    const timed = list.filter((e) => e.time && e.kind !== "deadline");
+    return { d, key, strip: list.filter((e) => !timed.includes(e)), timed, ...laneOut(timed) };
+  });
+  const starts = week.flatMap((x) => x.timed.map((e) => minutesOf(e.time)));
+  const fromHour = Math.min(8, ...starts.map((m) => Math.floor(m / 60)));
+  const toHour = Math.min(24, Math.max(18, ...starts.map((m) => Math.ceil((m + BLOCK) / 60))));
+  const hours = Array.from({ length: toHour - fromHour }, (_, i) => fromHour + i);
+  const nowAt = (now.getHours() * 60 + now.getMinutes()) / 60 - fromHour;
+  const showNow = week.some((x) => x.key === today) && nowAt >= 0 && nowAt < toHour - fromHour;
+  const weekCount = week.reduce((n, x) => n + x.strip.length + x.timed.length, 0);
+
+  const agenda = (
+    <div className={css.agendaPage}>
+      <div className={css.agendaHead}>
+        <h2>
+          {date.toLocaleDateString(undefined, { month: "long", day: "numeric" })}
+        </h2>
+        <p>Your day at a glance</p>
+      </div>
+
+      <label className={css.mobileOnly}>
+        Jump to date
+        <input
+          type="date"
+          value={selected}
+          onChange={(e) => e.target.value && set("date", e.target.value)}
+        />
+      </label>
+
+      {dayEvents.length ? (
+        dayEvents.map((e) => <EventRow key={`${e.id}-${e.date}`} event={e} onClick={openEvent} />)
+      ) : (
+        <Empty title="A little breathing room">
+          No events on this day. Make it yours.
+          {state.events.length === 0 && (
+            <>
+              {" "}
+              {state.courses.length === 0
+                ? "Add a course first and its classes land here."
+                : "Upload a syllabus and its classes land here."}{" "}
+              <Link to="/courses">Go to Courses</Link>
+            </>
+          )}
+        </Empty>
+      )}
+
+      <button className={s.textLink} onClick={() => setEvent(null)}>
+        <Plus size={16} /> Add something to this day
+      </button>
+    </div>
+  );
+
+  const monthPage = (
+    <div className={css.monthPage}>
+      <div className={css.monthHead}>
+        <h2>{date.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</h2>
+
+        <div className={both.actions}>
+          <button className={s.secondary} onClick={() => set("date", today)}>
+            Today
+          </button>
+          <button className={s.iconButton} aria-label="Previous month" onClick={() => month(-1)}>
+            <ChevronLeft size={18} />
+          </button>
+          <button className={s.iconButton} aria-label="Next month" onClick={() => month(1)}>
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      </div>
+
+      <div className={css.calendar}>
+        {SHORT_WEEKDAYS.map((d) => (
+          <span className={css.weekday} key={d}>
+            {d}
+          </span>
+        ))}
+
+        {days.map((d) => {
+          const key = dateKey(d);
+
+          // A square fits only two events, so exams and due items go ahead of classes (card 48).
+          const events = visibleEvents
+            .filter((e) => e.date === key)
+            .sort((a, b) => Number(isClass(a.kind)) - Number(isClass(b.kind)));
+
+          return (
+            <button
+              key={key}
+              aria-label={`${d.toDateString()}, ${countOf(events.length, "event")}`}
+              aria-pressed={key === selected}
+              className={`${css.day} ${key === selected ? css.selectedDay : ""} ${
+                d.getMonth() !== date.getMonth() ? css.outside : ""
+              }`}
+              onClick={() => set("date", key)}
+            >
+              <span className={key === today ? css.todayNumber : ""}>{d.getDate()}</span>
+
+              {events.slice(0, 2).map((e) => (
+                <small key={e.id}>
+                  <i style={{ background: colorOf(e) }} />
+                  {e.time ? `${formatEventTime(e.time)} ` : ""}
+                  {e.kind}: {e.title}
+                </small>
+              ))}
+
+              {events.length > 2 && <small>+{events.length - 2} more</small>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 
   return (
     <>
@@ -866,283 +943,47 @@ export function Schedule() {
         title="Your schedule"
         description="Everything coming up. All in one place."
         actions={
-          <button
-            className={s.primary}
-            onClick={() =>
-              setEvent(null)
-            }
-          >
-            <Plus size={18} />{" "}
-            Add event
-          </button>
+          <>
+            <div className={s.segment} role="group" aria-label="Schedule view">
+              {(["week", "month"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  aria-pressed={view === v}
+                  className={view === v ? s.activeButton : ""}
+                  onClick={() => set("view", v)}
+                >
+                  {v === "week" ? "Week" : "Month"}
+                </button>
+              ))}
+            </div>
+            <button className={s.primary} onClick={() => setEvent(null)}>
+              <Plus size={18} /> Add event
+            </button>
+          </>
         }
       />
 
-      <div
-        className={
-          css.scheduleLayout
-        }
-      >
-        <section
-          className={`${s.panel} ${css.calendarPanel}`}
-        >
-          <div
-            className={
-              both.sectionHeading
-            }
-          >
-            <h2>
-              {date.toLocaleDateString(
-                undefined,
-                {
-                  month: "long",
-                  year: "numeric",
-                },
-              )}
-            </h2>
-
-            <div
-              className={
-                both.actions
-              }
-            >
-              <button
-                className={
-                  s.secondary
-                }
-                onClick={() =>
-                  set(
-                    "date",
-                    dateKey(),
-                  )
-                }
-              >
-                Today
-              </button>
-
-              <button
-                className={
-                  s.iconButton
-                }
-                aria-label="Previous month"
-                onClick={() =>
-                  month(-1)
-                }
-              >
-                <ChevronLeft
-                  size={18}
-                />
-              </button>
-
-              <button
-                className={
-                  s.iconButton
-                }
-                aria-label="Next month"
-                onClick={() =>
-                  month(1)
-                }
-              >
-                <ChevronRight
-                  size={18}
-                />
-              </button>
-            </div>
-          </div>
-
-          <div
-            className={css.calendar}
-          >
-            {[
-              "Sun",
-              "Mon",
-              "Tue",
-              "Wed",
-              "Thu",
-              "Fri",
-              "Sat",
-            ].map((d) => (
-              <span
-                className={
-                  css.weekday
-                }
-                key={d}
-              >
-                {d}
-              </span>
-            ))}
-
-            {days.map((d) => {
-              const key =
-                dateKey(d);
-
-              // A square fits only two events, so exams and due items go ahead of classes (card 48).
-              const events =
-                visibleEvents
-                  .filter(
-                    (e) =>
-                      e.date ===
-                      key,
-                  )
-                  .sort(
-                    (a, b) =>
-                      Number(
-                        isClass(
-                          a.kind,
-                        ),
-                      ) -
-                      Number(
-                        isClass(
-                          b.kind,
-                        ),
-                      ),
-                  );
-
-              return (
-                <button
-                  key={key}
-                  aria-label={`${d.toDateString()}, ${countOf(events.length, "event")}`}
-                  aria-pressed={
-                    key === selected
-                  }
-                  className={`${css.day} ${
-                    key === selected
-                      ? css.selectedDay
-                      : ""
-                  } ${
-                    d.getMonth() !==
-                    date.getMonth()
-                      ? css.outside
-                      : ""
-                  }`}
-                  onClick={() =>
-                    set(
-                      "date",
-                      key,
-                    )
-                  }
-                >
-                  <span
-                    className={
-                      key ===
-                      dateKey()
-                        ? css.todayNumber
-                        : ""
-                    }
-                  >
-                    {d.getDate()}
-                  </span>
-
-                  {events
-                    .slice(0, 2)
-                    .map((e) => (
-                      <small
-                        key={e.id}
-                      >
-                        <i
-                          style={{
-                            background:
-                              state.courses.find(
-                                (
-                                  c,
-                                ) =>
-                                  c.id ===
-                                  e.courseId,
-                              )
-                                ?.color,
-                          }}
-                        />
-
-                        {e.time
-                          ? `${formatEventTime(
-                              e.time,
-                            )} `
-                          : ""}
-                        {e.kind}:{" "}
-                        {e.title}
-                      </small>
-                    ))}
-
-                  {events.length >
-                    2 && (
-                    <small>
-                      +
-                      {events.length -
-                        2}{" "}
-                      more
-                    </small>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        <section
-          className={`${s.panel} ${both.agenda}`}
-        >
-          <div
-            className={
-              both.sectionHeading
-            }
-          >
-            <div>
-              <span
-                className={
-                  s.eyebrow
-                }
-              >
-                Your day at a
-                glance
-              </span>
-
-              <h2>
-                {date.toLocaleDateString(
-                  undefined,
-                  {
-                    month:
-                      "long",
-                    day: "numeric",
-                  },
-                )}
-              </h2>
-            </div>
-
-          </div>
-
-          <label
-            className={
-              css.mobileOnly
-            }
-          >
-            Jump to date
-            <input
-              type="date"
-              value={selected}
-              onChange={(e) =>
-                e.target.value &&
-                set(
-                  "date",
-                  e.target.value,
-                )
-              }
+      {view === "month" ? (
+        <Spread label="Month" left={monthPage} right={agenda} />
+      ) : (
+        <Sheet label="Week" className={css.weekSheet}>
+          <div className={css.strip}>
+            <WeekStrip
+              date={selected}
+              today={today}
+              selected={selected}
+              marked={week.filter((x) => x.strip.length + x.timed.length > 0).map((x) => x.key)}
+              onPrev={() => set("date", dateKey(addDays(date, -7)))}
+              onNext={() => set("date", dateKey(addDays(date, 7)))}
+              onToday={() => set("date", today)}
+              onSelect={(day) => set("date", day)}
             />
-          </label>
+          </div>
 
-          {dayEvents.length ? (
-            dayEvents.map(
-              (e) => (
-                <EventRow
-                  key={`${e.id}-${e.date}`}
-                  event={e}
-                  onClick={openEvent}
-                />
-              ),
-            )
-          ) : (
+          {weekCount === 0 && (
             <Empty title="A little breathing room">
-              No events on this
-              day. Make it yours.
+              Nothing planned this week. Make it yours.
               {state.events.length === 0 && (
                 <>
                   {" "}
@@ -1155,28 +996,96 @@ export function Schedule() {
             </Empty>
           )}
 
-          <button
-            className={s.textLink}
-            onClick={() =>
-              setEvent(null)
-            }
-          >
-            <Plus size={16} />{" "}
-            Add something to this
-            day
-          </button>
-        </section>
-      </div>
+          <div className={css.planner} style={{ "--rows": hours.length } as CSSProperties}>
+            {week.some((x) => x.strip.length > 0) && (
+              <div className={`${css.row} ${css.stripRow}`}>
+                <span className={css.railLabel}>All day</span>
+                {week.map((x) => (
+                  <div
+                    key={x.key}
+                    className={css.stripCell}
+                    data-day={x.key}
+                    data-selected={x.key === selected || undefined}
+                  >
+                    {x.strip.map((e) => (
+                      <button
+                        key={`${e.id}-${e.date}`}
+                        type="button"
+                        className={css.pill}
+                        style={{ "--c": colorOf(e) } as CSSProperties}
+                        onClick={() => openEvent(e)}
+                      >
+                        {e.time && <b>{formatEventTime(e.time)}</b>} {e.title}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className={css.row}>
+              <div className={css.rail} aria-hidden="true">
+                {hours.map((h) => (
+                  <span key={h} style={{ "--t": h - fromHour } as CSSProperties}>
+                    {hourName(h)}
+                  </span>
+                ))}
+                {showNow && (
+                  <span className={css.nowFlag} style={{ "--t": nowAt } as CSSProperties}>
+                    {formatEventTime(`${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}`)}
+                  </span>
+                )}
+              </div>
+
+              {week.map((x) => (
+                <div
+                  key={x.key}
+                  className={css.col}
+                  role="group"
+                  aria-label={x.d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                  data-day={x.key}
+                  data-today={x.key === today || undefined}
+                  data-selected={x.key === selected || undefined}
+                >
+                  {showNow && x.key === today && (
+                    <i className={css.now} style={{ "--t": nowAt } as CSSProperties} aria-hidden="true" />
+                  )}
+
+                  {x.timed.map((e, i) => (
+                    <button
+                      key={`${e.id}-${e.date}`}
+                      type="button"
+                      className={css.block}
+                      style={
+                        {
+                          "--c": colorOf(e),
+                          "--t": minutesOf(e.time) / 60 - fromHour,
+                          "--lane": x.lane[i],
+                          "--lanes": x.lanes,
+                        } as CSSProperties
+                      }
+                      onClick={() => openEvent(e)}
+                    >
+                      <b>{formatEventTime(e.time)}</b>{" "}
+                      <span>{e.title}</span>{" "}
+                      <small>
+                        {e.kind}
+                        {codeOf(e) ? ` · ${codeOf(e)}` : ""}
+                      </small>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </Sheet>
+      )}
 
       {event !== undefined && (
         <EventDialog
-          event={
-            event || undefined
-          }
+          event={event || undefined}
           date={selected}
-          onClose={() =>
-            setEvent(undefined)
-          }
+          onClose={() => setEvent(undefined)}
         />
       )}
     </>

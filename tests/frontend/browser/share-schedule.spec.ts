@@ -107,7 +107,7 @@ test("Card 144: classmate sees shared events read-only", async ({ page, isMobile
   }
   await expect(page.getByRole("link", { name: /Study session/ })).toBeVisible();
 
-  await page.goto(`/schedule?date=${tomorrow()}`);
+  await page.goto(`/schedule?date=${tomorrow()}&view=month`);
   const row = page.getByRole("button", { name: /Study session/ }).filter({ hasText: "Shared by Schedule Owner" });
   await expect(row).toContainText("7:00 PM");
   await row.click();
@@ -141,7 +141,7 @@ test("Card 144: stop sharing removes the classmate", async ({ page }) => {
   await signInAs(page, CLASSMATE);
   await page.goto("/courses");
   await expect(page.getByRole("heading", { name: "No courses yet" })).toBeVisible();
-  await page.goto(`/schedule?date=${tomorrow()}`);
+  await page.goto(`/schedule?date=${tomorrow()}&view=month`);
   await expect(page.getByText("A little breathing room")).toBeVisible();
 });
 

@@ -88,7 +88,7 @@ test("Test 2 - a note deleted from the editor leaves every place notes appear", 
   const noteUrl = page.url();
 
   // A lecture today links its notes from the schedule.
-  await page.goto("/schedule");
+  await page.goto("/schedule?view=month");
   await page.getByRole("button", { name: "Add event", exact: true }).click();
   const eventDialog = page.getByRole("dialog");
   await eventDialog.getByLabel("Title", { exact: true }).fill("Software engineering lecture");
@@ -96,7 +96,7 @@ test("Test 2 - a note deleted from the editor leaves every place notes appear", 
   await eventDialog.getByRole("combobox", { name: "Event type", exact: true }).selectOption("lecture");
   await eventDialog.getByRole("button", { name: "Create event" }).click();
   const openLectureNotes = async () => {
-    await page.goto("/schedule");
+    await page.goto("/schedule?view=month");
     await page.getByRole("button", { name: /Software engineering lecture/ }).click();
     await page.getByRole("link", { name: "Open lecture notes" }).click();
     await expect(page).toHaveURL(new RegExp(`/courses/${course}\\?lecture=`));

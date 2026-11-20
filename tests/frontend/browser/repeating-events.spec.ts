@@ -99,7 +99,7 @@ async function openAddEvent(page: Page) {
     })
     .click();
 
-  await page.goto("/schedule");
+  await page.goto("/schedule?view=month");
 
   await expect(
     page.getByRole("heading", {
@@ -463,7 +463,7 @@ test.describe("repeating event controls", () => {
         "2026-11-25",
         "2026-11-30",
     ]) {
-        await page.goto(`/schedule?date=${date}`);
+        await page.goto(`/schedule?date=${date}&view=month`);
 
         await expect(
         page.getByText("Work shift", {
@@ -472,7 +472,7 @@ test.describe("repeating event controls", () => {
         ).toBeVisible();
     }
 
-    await page.goto("/schedule?date=2026-12-02");
+    await page.goto("/schedule?date=2026-12-02&view=month");
 
     await expect(
         page.getByText("Work shift", {
@@ -509,7 +509,7 @@ test.describe("repeating event controls", () => {
         })
         .click();
 
-    await page.goto("/schedule?date=2026-11-25");
+    await page.goto("/schedule?date=2026-11-25&view=month");
 
     await page
         .getByText("Work shift", {
@@ -531,7 +531,7 @@ test.describe("repeating event controls", () => {
         })
         .click();
 
-    await page.goto("/schedule?date=2026-11-16");
+    await page.goto("/schedule?date=2026-11-16&view=month");
 
     await expect(
         page.getByText("Updated shift", {
@@ -539,7 +539,7 @@ test.describe("repeating event controls", () => {
         }),
     ).toBeVisible();
 
-    await page.goto("/schedule?date=2026-11-30");
+    await page.goto("/schedule?date=2026-11-30&view=month");
 
     await expect(
         page.getByText("Updated shift", {
@@ -607,7 +607,7 @@ test.describe("repeating event controls", () => {
         })
         .click();
 
-    await page.goto("/schedule?date=2026-11-23");
+    await page.goto("/schedule?date=2026-11-23&view=month");
 
     await page
         .getByText("Work shift", {
@@ -641,7 +641,7 @@ test.describe("repeating event controls", () => {
         })
         .click();
 
-    await page.goto("/schedule?date=2026-11-30");
+    await page.goto("/schedule?date=2026-11-30&view=month");
 
     await expect(
         page.getByText("Work shift", {

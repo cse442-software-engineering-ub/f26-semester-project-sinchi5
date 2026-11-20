@@ -74,7 +74,7 @@ test("fields are at least 16px on a phone", async ({ page }, testInfo) => {
   await openNote(page);
   expect(await smallFields(page), "note editor").toEqual([]);
 
-  await page.goto("/schedule");
+  await page.goto("/schedule?view=month");
   await page.getByRole("button", { name: "Add event" }).click();
   await expect(page.getByRole("dialog").getByLabel("Title")).toBeVisible();
   expect(await smallFields(page), "Add event").toEqual([]);

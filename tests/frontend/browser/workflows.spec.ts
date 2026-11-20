@@ -103,7 +103,7 @@ test("search, combined filters, clear and view persistence", async ({
 });
 test("manual event and lecture folder", async ({ page }) => {
   await demo(page);
-  await page.goto("/schedule");
+  await page.goto("/schedule?view=month");
   await page.getByRole("button", { name: "Add event", exact: true }).click();
   await page.getByLabel("Title", { exact: true }).fill("Study together");
   await page.getByRole("button", { name: "Create event" }).click();

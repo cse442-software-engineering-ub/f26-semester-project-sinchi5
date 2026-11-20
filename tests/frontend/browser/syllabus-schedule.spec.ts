@@ -20,9 +20,9 @@ test("Task tests 1 and 2: the confirmation links to imported events, labeled wit
   await expect(page.getByRole("button", { name: /Homework 1.*assignment · CSE 442 · Imported/ })).toBeVisible();
 
   // Phones open the schedule as an agenda without month arrows, so each day is opened by its date.
-  await page.goto("/schedule?date=2026-10-14");
+  await page.goto("/schedule?date=2026-10-14&view=month");
   await expect(page.getByRole("button", { name: /10:00 AM.*Midterm exam.*exam · CSE 442 · Imported/ })).toBeVisible();
-  await page.goto("/schedule?date=2026-12-04");
+  await page.goto("/schedule?date=2026-12-04&view=month");
   await expect(page.getByRole("button", { name: /Final project.*deadline · CSE 442 · Imported/ })).toBeVisible();
   expect(confirms).toHaveLength(1);
 });
@@ -137,7 +137,7 @@ test("uploading a syllabus again adds only what's new, and says what was already
   await dialog.getByRole("button", { name: "Add to schedule" }).click();
   await expect(dialog.getByText("Added 1 event to CSE 442. 4 were already on your schedule.")).toBeVisible();
   await dialog.getByRole("button", { name: "All done" }).click();
-  await page.goto("/schedule?date=2026-08-24");
+  await page.goto("/schedule?date=2026-08-24&view=month");
   await expect(page.getByRole("button", { name: /CSE 442 Lecture/ })).toHaveCount(1);
 });
 
@@ -210,6 +210,6 @@ test("imported events come from the server, so they survive a reload without dup
       localStorage.setItem(key, JSON.stringify({ ...data, events: [] }));
     }
   });
-  await page.goto("/schedule?date=2026-10-14");
+  await page.goto("/schedule?date=2026-10-14&view=month");
   await expect(page.getByRole("button", { name: /Midterm exam.*Imported/ })).toHaveCount(1);
 });
