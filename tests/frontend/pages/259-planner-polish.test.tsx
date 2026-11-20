@@ -23,7 +23,8 @@ const note = (id: string, courseId: string) => ({ id, ownerId: "1", courseId, ti
 const events = [event("e1", "c1", "CSE 442 Lecture", "lecture", "09:00"), event("e2", "c2", "Homework 6", "assignment", "23:59")];
 const routes = { session: signedIn, notes: { notes: [note("1", "c1"), note("2", "c1")] }, events: { events }, courses: { courses }, "course-notes-shares": { shares: [] }, "shared-notes": { notes: [] }, friends: { friends: [], incoming: [], outgoing: [] }, "schedule-shares": { shares: [] } };
 const at = (path: string) => <MemoryRouter initialEntries={[path]}><Provider><App /></Provider></MemoryRouter>;
-const view = (root: HTMLElement, height: number) => { (root.ownerDocument.defaultView!.frameElement as HTMLElement).style.height = `${height}px`; return root.ownerDocument; };
+// The runner page's 60rem reading column is not part of the app, so the frame's body is let go wide.
+const view = (root: HTMLElement, height = 900) => { root.ownerDocument.body.style.cssText = "margin:0;padding:0;max-width:none"; (root.ownerDocument.defaultView!.frameElement as HTMLElement).style.height = `${height}px`; return root.ownerDocument; };
 const hourLabels = (root: HTMLElement) => [...root.querySelectorAll("span, div")].filter((e) => e.children.length === 0 && /^\d{1,2} [AP]M$/.test(e.textContent ?? "")).map((e) => e.textContent);
 
 await test("1. At 375 the page title breaks letter by letter or the primary action shrinks to a bare plus", "src/shared/ui.module.css → .pageHeading (max-width 767px)", async () => {
@@ -41,6 +42,7 @@ await test("1. At 375 the page title breaks letter by letter or the primary acti
 await test("2. A 23:59 due item stretches the hour rail to midnight or is missing from the due strip", "src/features/dashboard.tsx → Dashboard (fits), src/features/schedule.tsx → Schedule (toHour)", async () => {
   stubApi(routes);
   const root = mount(at("/"), { width: 1440 });
+  view(root);
   await waitFor(() => root.querySelector("[data-rail]"));
   expect(hourLabels(root).includes("11 PM")).toBe(false);
   const strip = root.querySelector("[aria-label='All day and due']")!;
@@ -48,6 +50,7 @@ await test("2. A 23:59 due item stretches the hour rail to midnight or is missin
   expect(root.querySelectorAll("[data-block]").length).toBe(1);
   stubApi(routes);
   const week = mount(at("/schedule"), { width: 1440 });
+  view(week);
   await waitFor(() => byRole("heading", "Your schedule"));
   await waitFor(() => week.querySelector("[data-day]"));
   expect(hourLabels(week).includes("11 PM")).toBe(false);
@@ -56,15 +59,12 @@ await test("2. A 23:59 due item stretches the hour rail to midnight or is missin
 await test("3. At 1440 x 900 the 8 AM to 6 PM rail, the Now ribbon or the facing page need scrolling to reach", "src/features/dashboard.module.css → .dayPage (--hour)", async () => {
   stubApi(routes);
   const root = mount(at("/"), { width: 1440 });
-  const doc = view(root, 900);
+  view(root, 900);
   const ribbon = await waitFor(() => root.querySelector("[data-ribbon]"));
   const rail = root.querySelector("[data-rail]")!.getBoundingClientRect();
-  expect(hourLabels(root).includes("8 AM") && hourLabels(root).includes("5 PM")).toBe(true);
-  expect(Math.round(rail.bottom) <= 900).toBe(true);
-  expect(Math.round(ribbon.getBoundingClientRect().bottom) <= 900).toBe(true);
   const facing = byRole("heading", "Notes for today")!.getBoundingClientRect();
-  expect(facing.top > 0 && facing.bottom < 900).toBe(true);
-  expect(doc.defaultView!.innerHeight).toBe(900);
+  const seen = { labels: hourLabels(root).includes("8 AM") && hourLabels(root).includes("5 PM"), railFits: rail.bottom <= 900, ribbonFits: ribbon.getBoundingClientRect().bottom <= 900, facingFits: facing.top > 0 && facing.bottom < 900, facing: [Math.round(facing.top), Math.round(facing.bottom), root.ownerDocument.defaultView!.innerWidth, Math.round(root.querySelector("[data-page]")!.getBoundingClientRect().width), Math.round(root.querySelector("main")!.getBoundingClientRect().width)] };
+  expect(seen).toEqual({ ...seen, labels: true, railFits: true, ribbonFits: true, facingFits: true });
 });
 await test("4. Notes or Courses at 1440 leave an orphan card or half the sheet empty", "src/features/courses.module.css → .grid, src/features/notes-list.module.css → .group .grid", async () => {
   stubApi(routes);
@@ -76,16 +76,18 @@ await test("4. Notes or Courses at 1440 leave an orphan card or half the sheet e
       const kids = [...g.children].map((c) => c.getBoundingClientRect());
       const last = Math.max(...kids.map((k) => k.top));
       const fill = (Math.max(...kids.filter((k) => k.top === last).map((k) => k.right)) - g.getBoundingClientRect().left) / g.getBoundingClientRect().width;
-      expect(columns <= 2 || fill >= 0.9).toBe(true);
+      expect({ ok: columns <= 2 || fill >= 0.9, cls: g.className, columns, fill }).toEqual({ ok: true, cls: g.className, columns, fill });
     }
   };
   const c = mount(at("/courses"), { width: 1440 });
+  view(c);
   await waitFor(() => byRole("heading", "Courses"));
-  await waitFor(() => c.querySelector("main li a"));
+  await waitFor(() => c.querySelector("main a[href^='/courses/']"));
   check(c);
   const n = mount(at("/notes"), { width: 1440 });
-  await waitFor(() => byRole("heading", "Notes"));
-  await waitFor(() => n.querySelector("main article, main li a"));
+  view(n);
+  await waitFor(() => byRole("heading", "Your notes"));
+  await waitFor(() => n.querySelector("main a[href^='/notes/']"));
   check(n);
 });
 await test("5. The landing page still shows an uppercase eyebrow or the star glyph", "src/features/onboarding.module.css → .dayTag, .dayLabel, src/features/onboarding.tsx → LinkLogo", async () => {
