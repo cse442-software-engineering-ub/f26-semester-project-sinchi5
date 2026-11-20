@@ -126,7 +126,8 @@ await test("6. The formatting toolbar is not sticky inside the writing sheet, gr
   expect(win(root).getComputedStyle(bar.parentElement!).position).toBe("sticky");
   const groups = [...bar.querySelectorAll('[role="group"]')];
   expect(groups.map((g) => g.getAttribute("aria-label"))).toEqual(["Text style", "Font and size", "Color and highlight", "Lists", "Alignment", "Insert", "History"]);
-  expect(groups.slice(1).every((g) => parseFloat(win(root).getComputedStyle(g).borderLeftWidth) === 1)).toBe(true);
+  expect(groups.slice(0, -1).every((g) => win(root).getComputedStyle(g, "::after").width === "1px") && win(root).getComputedStyle(groups[0], "::before").content === "none").toBe(true);
+  expect(win(root).getComputedStyle(groups.at(-1)!, "::after").content).toBe("none");
   expect(new Set(groups.map((g) => Math.round(box(g).top))).size <= 2).toBe(true);
   const phone = (await openEditor(375)).querySelector('[role="toolbar"]') as HTMLElement;
   expect(phone.ownerDocument.defaultView!.getComputedStyle(phone).overflowX).toBe("auto");

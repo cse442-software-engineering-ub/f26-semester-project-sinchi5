@@ -35,11 +35,18 @@
   align-items: center;
   gap: 2px;
   padding: 0 var(--space-2);
-  border-left: 1px solid var(--rule);
 }
 .group:first-child {
   padding-left: 0;
-  border-left: 0;
+}
+/* The hairline closes the group before it, so a wrapped row never starts with one. */
+.group:not(:last-child)::after {
+  content: "";
+  align-self: center;
+  width: 1px;
+  height: 20px;
+  margin-left: var(--space-2);
+  background: var(--rule);
 }
 .tool,
 .select,
@@ -183,12 +190,12 @@
 
 @media (min-width: 768px) {
   .toolbar { flex-wrap: wrap; overflow-x: visible; row-gap: var(--space-1); }
-  .content { padding-inline: var(--space-6); }
+  .content { padding-inline: var(--space-7); }
 }
 /* A faint ruled margin down the left of the measure, like a planner page. */
 @media (min-width: 1024px) {
   .content {
-    background: linear-gradient(90deg, transparent max(12px, calc(50% - var(--measure-read) / 2 - 1.25rem)), var(--rule) 0, var(--rule) calc(max(12px, calc(50% - var(--measure-read) / 2 - 1.25rem)) + 1px), transparent 0) no-repeat;
+    background: linear-gradient(90deg, transparent max(var(--space-5), calc(50% - var(--measure-read) / 2 - 1.25rem)), var(--rule) 0, var(--rule) calc(max(var(--space-5), calc(50% - var(--measure-read) / 2 - 1.25rem)) + 1px), transparent 0) no-repeat;
   }
 }
 @media (max-width: 1023px) {
