@@ -64,7 +64,8 @@ export function createHttpNotes(
       const tag = q?.tag ? `&tag=${encodeURIComponent(q.tag)}` : "";
       // Card 246: list notes carry an excerpt, not the body, so the server does the keyword search.
       const search = q?.q ? `&q=${encodeURIComponent(q.q)}` : "";
-      const { notes } = await send<{ notes: Note[] }>(`notes${category}${tag}${search}`);
+      const event = q?.event ? `&event=${encodeURIComponent(q.event)}${q.eventDate ? `&date=${q.eventDate}` : ""}` : "";
+      const { notes } = await send<{ notes: Note[] }>(`notes${category}${tag}${search}${event}`);
       return filterNotes(notes, q);
     },
     async get(noteId) {
@@ -83,6 +84,9 @@ export function createHttpNotes(
     },
     async setReminder(noteId, remindAt) {
       return (await send<{ note: Note }>("note-reminder", { id: noteId, remindAt })).note;
+    },
+    async link(noteId, eventId, date) {
+      return (await send<{ note: Note }>("note-link", { noteId, eventId, date })).note;
     },
     async delete(noteId) {
       await send("note-delete", { id: noteId });

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Dialog } from "@base-ui/react/dialog";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
@@ -29,6 +29,7 @@ import {
   editableCourses,
   type CourseEvent,
   type EventKind,
+  type Note,
 } from "../domain";
 import s from "../shared/ui.module.css";
 import css from "./schedule.module.css";
@@ -89,10 +90,13 @@ function weekdayOf(date: string) {
 export function EventDialog({
   event,
   date,
+  occurrence,
   onClose,
 }: {
   event?: CourseEvent;
   date?: string;
+  // Card 245: the day of the meeting that was opened (a weekly event has many).
+  occurrence?: string;
   onClose: () => void;
 }) {
   const { state, repo, refresh } = useApp();
@@ -115,6 +119,8 @@ export function EventDialog({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [attach, setAttach] = useState<string[]>([]);
+  const [createdId, setCreatedId] = useState("");
 
   const update = (
     key: keyof CourseEvent,
@@ -203,7 +209,10 @@ export function EventDialog({
           setBusy(true);
 
           try {
-            await repo.schedule.save(value);
+            // Card 245: chosen notes attach to the first meeting; a retry after a failed attach skips the save.
+            const id = createdId || (await repo.schedule.save(value)).id;
+            if (!event) setCreatedId(id);
+            if (!event) for (const noteId of attach) await repo.notes.link(noteId, id, value.date);
             await refresh();
             onClose();
           } catch (e) {
@@ -455,6 +464,19 @@ export function EventDialog({
           />
         </label>
 
+        {!event && (
+          <fieldset className={css.attach}>
+            <legend>
+              Attach notes{" "}
+              <span className={`${s.muted} ${css.optional}`}>optional</span>
+            </legend>
+            <NotePicker
+              chosen={attach}
+              onPick={(n) => setAttach((list) => list.includes(n.id) ? list.filter((x) => x !== n.id) : [...list, n.id])}
+            />
+          </fieldset>
+        )}
+
         {event?.source ===
           "imported" && (
           <p
@@ -512,6 +534,10 @@ export function EventDialog({
         </div>
       </form>
 
+      {event && !event.sharedBy && (
+        <EventNotes event={event} date={occurrence ?? event.date} onOpen={onClose} />
+      )}
+
       {event && !event.sharedBy && confirming && (
         <DeleteEventDialog
           title={event.title}
@@ -540,6 +566,113 @@ export function EventDialog({
         />
       )}
     </Modal>
+  );
+}
+
+// Card 245: a searchable list of the student's own notes. `chosen` marks the ones already picked.
+function NotePicker({ chosen, exclude = [], onPick, reveal }: {
+  chosen?: string[];
+  exclude?: string[];
+  onPick: (note: Note) => void;
+  // Scroll the picker into view when it opens (it sits below the fold of the event window).
+  reveal?: boolean;
+}) {
+  const { repo } = useApp();
+  const [q, setQ] = useState("");
+  const [notes, setNotes] = useState<Note[] | null>(null);
+  const [failed, setFailed] = useState("");
+  useEffect(() => {
+    let current = true;
+    repo.notes.list({ q: q.trim() || undefined }).then(
+      (list) => current && setNotes(list.filter((n) => !n.sharedBy)),
+      (e: Error) => current && setFailed(e.message),
+    );
+    return () => { current = false; };
+  }, [repo, q]);
+  const shown = (notes ?? []).filter((n) => !exclude.includes(n.id));
+  return (
+    <div className={css.picker} ref={(el) => { if (reveal) el?.scrollIntoView({ block: "nearest" }); }}>
+      <input type="search" aria-label="Search your notes" placeholder="Search your notes" value={q}
+        onChange={(e) => setQ(e.target.value)} />
+      {failed && <p role="alert" className={s.error}>{failed}</p>}
+      {notes && !shown.length && <p className={s.muted}>No notes to choose.</p>}
+      <ul>
+        {shown.map((n) => (
+          <li key={n.id}>
+            <button type="button" aria-pressed={chosen ? chosen.includes(n.id) : undefined} onClick={() => onPick(n)}>
+              <strong>{n.title}</strong>
+              {n.excerpt && <span>{n.excerpt}</span>}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// Card 245: the notes attached to one meeting of an event, with link, new and unlink.
+function EventNotes({ event, date, onOpen }: { event: CourseEvent; date: string; onOpen: () => void }) {
+  const { repo, refresh } = useApp();
+  const navigate = useNavigate();
+  const [notes, setNotes] = useState<Note[] | null>(null);
+  const [picking, setPicking] = useState(false);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    repo.notes.list({ event: event.id, eventDate: date }).then(setNotes, (e: Error) => { setNotes([]); setError(e.message); });
+  }, [repo, event.id, date]);
+
+  async function run(work: () => Promise<void>) {
+    setError("");
+    setBusy(true);
+    try { await work(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  const open = (id: string) => { onOpen(); navigate(`/notes/${id}`); };
+
+  return (
+    <section className={css.notes} aria-label="Notes">
+      <h3>Notes</h3>
+      {error && <p role="alert" className={s.error}>{error}</p>}
+      {notes && !notes.length && <p className={s.muted}>No notes are attached to this meeting yet.</p>}
+      <ul className={css.noteList}>
+        {(notes ?? []).map((n) => (
+          <li key={n.id}>
+            <button type="button" className={css.noteOpen} onClick={() => open(n.id)}>
+              <strong>{n.title}</strong>
+              {n.excerpt && <span>{n.excerpt}</span>}
+            </button>
+            <button type="button" className={s.quiet} disabled={busy} aria-label={`Unlink ${n.title}`}
+              onClick={() => run(async () => {
+                await repo.notes.link(n.id, null, date);
+                setNotes((list) => (list ?? []).filter((x) => x.id !== n.id));
+              })}>
+              Unlink
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className={s.actions}>
+        <button type="button" className={s.secondary} aria-expanded={picking} onClick={() => setPicking(!picking)}>
+          Link a note
+        </button>
+        <button type="button" className={s.secondary} disabled={busy}
+          onClick={() => run(async () => {
+            const note = await repo.notes.create({ title: event.title, courseId: event.courseId, lectureDate: date });
+            await repo.notes.link(note.id, event.id, date);
+            await refresh();
+            open(note.id);
+          })}>
+          New note for this event
+        </button>
+      </div>
+      {picking && (
+        <NotePicker reveal exclude={(notes ?? []).map((n) => n.id)}
+          onPick={(n) => run(async () => {
+            const linked = await repo.notes.link(n.id, event.id, date);
+            setNotes((list) => [...(list ?? []), linked]);
+          })} />
+      )}
+    </section>
   );
 }
 
@@ -789,6 +922,7 @@ export function Schedule() {
   const date = new Date(selected + "T12:00:00");
 
   const [event, setEvent] = useState<CourseEvent | null | undefined>();
+  const [occurrence, setOccurrence] = useState<string>();
 
   const set = (k: string, v: string) =>
     setParams((p) => {
@@ -807,6 +941,7 @@ export function Schedule() {
   function openEvent(occurrence: CourseEvent) {
     const originalId = occurrence.repeatOf ?? occurrence.id;
     const original = state.events.find((e) => e.id === originalId);
+    setOccurrence(occurrence.date);
     setEvent(original ?? occurrence);
   }
 
@@ -1085,6 +1220,7 @@ export function Schedule() {
         <EventDialog
           event={event || undefined}
           date={selected}
+          occurrence={occurrence}
           onClose={() => setEvent(undefined)}
         />
       )}

@@ -63,6 +63,9 @@ export interface Note {
   sharedBy?: { id: string; name: string; courseCode: string };
   permission?: "view";
   remindAt?: string | null;
+  // Card 243: the event occurrence this note is attached to, if any.
+  eventId?: string | null;
+  eventDate?: string | null;
 }
 export interface NoteVersion {
   id: string;
@@ -166,6 +169,9 @@ export interface NoteQuery {
   from?: string;
   to?: string;
   sort?: string;
+  // Card 245: only the notes attached to this event (on this date, when given).
+  event?: string;
+  eventDate?: string;
 }
 export type ThemeMode = "system" | "light" | "dark";
 export type ColorScheme = "sage" | "fjord" | "rose" | "mocha";
@@ -206,6 +212,8 @@ export interface NoteRepository {
   save(note: Note): Promise<Note>;
   setPinned(id: string, pinned: boolean): Promise<Note>;
   setReminder(id: string, remindAt: string | null): Promise<Note>;
+  // Card 245: attaches the note to one occurrence of an event, or with eventId null detaches it.
+  link(id: string, eventId: string | null, date: string): Promise<Note>;
   create(data: Partial<Note>): Promise<Note>;
   // Removes the note with its comments, versions, and collaborator entries.
   delete(id: string): Promise<void>;
