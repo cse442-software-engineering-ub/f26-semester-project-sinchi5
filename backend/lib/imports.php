@@ -285,6 +285,7 @@ function importAction(PDO $db, array $config, array $session, string $route, arr
         $user = requireUser($db, $session, true);
         $job = ownedImport($db, $user, recordId($input['id'] ?? null, 'Choose a valid upload.'), true);
         $course = courseId($input['courseId'] ?? $job['courseId'], 'Choose a course for this syllabus.');
+        refuseSharedCourse($db, (string) $user['id'], $course);
         $created = 0;
         $skipped = 0;
         if ($job['state'] !== 'completed') {
@@ -332,7 +333,8 @@ function importAction(PDO $db, array $config, array $session, string $route, arr
         $values = $course === '' ? [$user['id']] : [$user['id'], courseId($course, 'Choose a valid course.')];
         $rows = query($db, 'SELECT ' . EVENT_COLUMNS . ' FROM notely_events
             WHERE owner_user_id = ?' . $filter . ' ORDER BY event_date, event_time, id', $values)->fetchAll();
-        return ['events' => array_map('eventJson', $rows)];
+        // Card 143: then the events of courses classmates shared with this student, each with sharedBy.
+        return ['events' => [...array_map('eventJson', $rows), ...sharedEvents($db, (string) $user['id'], $course === '' ? '' : $values[1])]];
     }
     if ($route === 'event-save') {
         $course = courseId($input['courseId'] ?? null, 'Choose a course for this event.');
@@ -346,6 +348,7 @@ function importAction(PDO $db, array $config, array $session, string $route, arr
         rateLimit($db, $config, 'data-write', (string) $session['user_id'], 1000);
         $db->beginTransaction();
         $user = requireUser($db, $session, true);
+        refuseSharedCourse($db, (string) $user['id'], $course);
         if ($id === null) {
             $count = (int) query($db, "SELECT COUNT(*) FROM notely_events WHERE owner_user_id = ? AND source = 'manual'", [$user['id']])->fetchColumn();
             if ($count >= MAX_MANUAL_EVENTS) throw new HttpError(422, 'You can add at most ' . MAX_MANUAL_EVENTS . ' events of your own.');
@@ -380,6 +383,7 @@ function importAction(PDO $db, array $config, array $session, string $route, arr
     // Each upload can store up to 20 MB, so one account can't fill the shared database.
     rateLimit($db, $config, 'syllabus-upload', (string) $user['id'], 20);
     $course = courseId($input['courseId'] ?? null, 'Choose a course for this syllabus.');
+    refuseSharedCourse($db, (string) $user['id'], $course);
     [$name, $type, $bytes] = syllabusFile($input);
     $insert = $db->prepare('INSERT INTO notely_import_jobs
         (owner_user_id, course_id, file_name, file_type, file_size, file_sha256, content) VALUES (?, ?, ?, ?, ?, ?, ?)');

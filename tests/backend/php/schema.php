@@ -76,6 +76,11 @@ $tables = [
         'name' => ['varchar(255)', 'NO'], 'color' => ['char(7)', 'NO'], 'term' => ['varchar(64)', 'NO'],
         'classes_start' => ['date', 'YES'], 'classes_end' => ['date', 'YES'], 'created_at' => ['datetime', 'NO'], 'updated_at' => ['datetime', 'NO'],
     ],
+    // Card 143: one row per course schedule shared, view only, with one classmate.
+    'notely_schedule_shares' => [
+        'owner_user_id' => ['bigint unsigned', 'NO'], 'course_id' => ['varchar(64)', 'NO'],
+        'viewer_user_id' => ['bigint unsigned', 'NO'], 'created_at' => ['datetime', 'NO'],
+    ],
     'notely_preferences' => [
         'user_id' => ['bigint unsigned', 'NO'], 'mode' => ["enum('system','light','dark')", 'NO'],
         'scheme' => ['varchar(40)', 'NO'], 'custom_themes' => ['json', 'YES'], 'updated_at' => ['datetime', 'NO'],
@@ -101,7 +106,8 @@ if ($fk !== 'CASCADE') { throw new RuntimeException('Missing session cascade'); 
 foreach (['notely_notes_owner_fk', 'notely_note_editors_note_fk', 'notely_note_editors_user_fk',
     'notely_note_versions_note_fk', 'notely_note_comments_note_fk', 'notely_note_comments_author_fk',
     'notely_import_jobs_owner_fk', 'notely_events_owner_fk', 'notely_profile_photos_user_fk',
-    'notely_course_note_shares_owner_fk', 'notely_course_note_shares_friend_fk'] as $constraint) {
+    'notely_course_note_shares_owner_fk', 'notely_course_note_shares_friend_fk',
+    'notely_schedule_shares_owner_fk', 'notely_schedule_shares_viewer_fk', 'notely_schedule_shares_course_fk'] as $constraint) {
     $rule = query($db, 'SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS
         WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = ?', [$constraint])->fetchColumn();
     if ($rule !== 'CASCADE') { throw new RuntimeException('Missing note cascade: ' . $constraint); }

@@ -17,6 +17,7 @@ require_once __DIR__ . '/lib/friends.php';
 require_once __DIR__ . '/lib/note-shares.php';
 require_once __DIR__ . '/lib/imports.php';
 require_once __DIR__ . '/lib/courses.php';
+require_once __DIR__ . '/lib/schedule-shares.php';
 require_once __DIR__ . '/lib/preferences.php';
 require_once __DIR__ . '/lib/syllabus-ai.php';
 
@@ -27,11 +28,11 @@ try {
     }
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
     $route = $_GET['route'] ?? 'session';
-    $routes = ['session', 'register', 'login', 'logout', 'onboarding', 'profile', 'profile-photo', 'profile-photo-remove', 'password', 'delete', 'reset-password', 'recovery-code', ...NOTE_ROUTES, ...IMPORT_ROUTES, ...COURSE_ROUTES, ...PREFERENCE_ROUTES, ...FRIEND_ROUTES, ...SHARE_ROUTES];
+    $routes = ['session', 'register', 'login', 'logout', 'onboarding', 'profile', 'profile-photo', 'profile-photo-remove', 'password', 'delete', 'reset-password', 'recovery-code', ...NOTE_ROUTES, ...IMPORT_ROUTES, ...COURSE_ROUTES, ...PREFERENCE_ROUTES, ...FRIEND_ROUTES, ...SHARE_ROUTES, ...SCHEDULE_SHARE_ROUTES];
     if (!is_string($route) || !in_array($route, $routes, true)) {
         throw new HttpError(404, 'This action was not found.');
     }
-    $expected = in_array($route, ['session', 'friends', ...NOTE_READ_ROUTES, ...IMPORT_READ_ROUTES, ...COURSE_READ_ROUTES, ...SHARE_READ_ROUTES], true) ? 'GET' : 'POST';
+    $expected = in_array($route, ['session', 'friends', ...NOTE_READ_ROUTES, ...IMPORT_READ_ROUTES, ...COURSE_READ_ROUTES, ...SHARE_READ_ROUTES, ...SCHEDULE_SHARE_READ_ROUTES], true) ? 'GET' : 'POST';
     $expected = $route === 'profile-photo' ? 'GET, POST' : $expected;
     if (!in_array($method, explode(', ', $expected), true)) {
         header('Allow: ' . $expected);
@@ -75,7 +76,7 @@ try {
     // Never trust client-supplied forwarding headers for throttling.
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     $session = readSession($db, $config);
-    if (in_array($route, ['onboarding', 'profile', 'profile-photo', 'profile-photo-remove', 'password', 'delete', 'recovery-code', ...NOTE_ROUTES, ...IMPORT_ROUTES, ...COURSE_ROUTES, ...PREFERENCE_ROUTES, ...FRIEND_ROUTES, ...SHARE_ROUTES], true)
+    if (in_array($route, ['onboarding', 'profile', 'profile-photo', 'profile-photo-remove', 'password', 'delete', 'recovery-code', ...NOTE_ROUTES, ...IMPORT_ROUTES, ...COURSE_ROUTES, ...PREFERENCE_ROUTES, ...FRIEND_ROUTES, ...SHARE_ROUTES, ...SCHEDULE_SHARE_ROUTES], true)
         && (!$session || !$session['user_id'])) {
         throw new HttpError(401, 'Sign in to continue.');
     }
@@ -102,6 +103,9 @@ try {
     } elseif (in_array($route, SHARE_ROUTES, true)) {
         if ($method === 'POST') requireCsrf($session, $config);
         $result = shareAction($db, $session, $route, $input);
+    } elseif (in_array($route, SCHEDULE_SHARE_ROUTES, true)) {
+        if ($method === 'POST') requireCsrf($session, $config);
+        $result = scheduleShareAction($db, $config, $session, $route, $input);
     } elseif (in_array($route, COURSE_ROUTES, true)) {
         if ($method === 'POST') requireCsrf($session, $config);
         $result = courseAction($db, $config, $session, $route, $input);
