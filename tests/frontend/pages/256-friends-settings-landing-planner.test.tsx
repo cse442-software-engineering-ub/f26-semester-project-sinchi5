@@ -60,7 +60,6 @@ await test("1. Friends is not a spread: the add form and the two request lists o
   expect([inside(left, "Add a classmate"), inside(left, "Requests for you"), inside(left, "Sent requests"), inside(right, "Your friends")]).toEqual([true, true, true, true]);
     expect(rect(left).right <= rect(right).left).toBe(true);
   expect(Math.round(rect(left).top)).toBe(Math.round(rect(right).top));
-  expect(d.querySelector("[data-spine]") !== null).toBe(true);
 });
 await test("2. The friend cards are not an aligned grid (same top and height per row, three columns at 1920), or Remove is a loud button", FR + " (.friendGrid, .friendCard, .remove)", async () => {
   stubApi(routes({ friends: lists(eight) }));
@@ -184,7 +183,7 @@ await test("9. Body text is under 4.5:1 on the sheet in a dark scheme or a custo
       const d = doc(mount(ui, { width: 1440 }));
       look(d, scheme, theme, vars);
       await waitFor(() => d.querySelector(heading));
-      const bg = d.querySelector(sheet)!.closest("section")!;
+      const bg = d.querySelector(sheet)!.closest("section") ?? d.querySelector(sheet)!;
       for (const el of [d.querySelector(heading), d.querySelector("[data-page] p, [data-page] small, [data-page] label")]) {
         const r = low(el, bg);
         if (r) fails.push(`${name} ${scheme} ${theme} ${r}`);

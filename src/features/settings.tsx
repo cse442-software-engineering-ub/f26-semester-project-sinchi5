@@ -2,7 +2,7 @@ import { AccountSettings } from "./account";
 import { useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useApp, useHoldRefresh } from "../app/context";
-import { Avatar, Modal, PageHeading, Spread } from "../shared/ui";
+import { Avatar, Modal, PageHeading } from "../shared/ui";
 import s from "../shared/ui.module.css";
 import a from "./appearance.module.css";
 import l from "./settings.module.css";
@@ -290,7 +290,12 @@ export function Settings() {
         title="Settings"
         description="Manage your account, appearance, and data."
       />
-      <Spread label="Settings" className={l.settings} left={index} right={section} />
+      <div className={l.wrap}>
+        <div className={l.layout}>
+          <div className={`${s.panel} ${l.index}`} data-page>{index}</div>
+          <div className={s.sheet} data-page>{section}</div>
+        </div>
+      </div>
       {reset && (
         <Modal
           title="Start fresh?"

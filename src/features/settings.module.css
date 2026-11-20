@@ -1,7 +1,44 @@
 /* Card 256: Settings is one sheet. The left page is an index of planner tabs (the ribbon hangs from the open one);
    the facing page holds that section. Under 720 px of the sheet the index becomes a row of tabs above the section. */
-.settings {
-  min-height: 28rem;
+.wrap {
+  container-type: inline-size;
+}
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+.layout > * {
+  min-width: 0;
+}
+.index {
+  align-self: start;
+}
+@container (min-width: 760px) {
+  .layout {
+    grid-template-columns: minmax(15rem, 19rem) minmax(0, 1fr);
+    align-items: start;
+  }
+  .index {
+    position: sticky;
+    top: var(--space-4);
+  }
+  /* The section page is wide, so Account's rows sit side by side. */
+  .rows {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4);
+  }
+  .rows > li {
+    align-items: flex-start;
+    padding: var(--space-4);
+    border-radius: var(--radius-card);
+    border-top: 0;
+    background: var(--ground);
+  }
+  .rows > li:last-child {
+    padding-bottom: var(--space-4);
+  }
 }
 .nav {
   display: grid;
@@ -89,7 +126,7 @@
   flex: 1 1 240px;
   margin: 0;
 }
-@container (max-width: 719px) {
+@container (max-width: 759px) {
   .nav {
     display: flex;
     flex-wrap: wrap;

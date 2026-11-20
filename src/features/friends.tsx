@@ -3,7 +3,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Users } from "lucide-react";
 import type { Friend, FriendLists } from "../domain";
 import { createHttpFriends } from "../services/friends-http";
-import { Avatar, Modal, PageHeading, Spread } from "../shared/ui";
+import { Avatar, Modal, PageHeading } from "../shared/ui";
 import { FieldError } from "./account";
 import { useHoldRefresh } from "../app/context";
 import css from "./friends.module.css";
@@ -134,6 +134,13 @@ export function Friends() {
                 onClick={() => { setPageError(""); setRemoving(friend); }}>Remove</button>
             </li>
           ))}
+          {lists.friends.length < 4 && (
+            <li className={css.hint}>
+              <strong>Find classmates</strong>
+              <span>Add a classmate by email and they appear here.</span>
+              <button type="button" className={s.quiet} onClick={() => document.getElementById("friend-email")?.focus()}>Add by email</button>
+            </li>
+          )}
         </ul>
       ) : (
         <div className={css.courseEmpty}>
@@ -148,7 +155,10 @@ export function Friends() {
     <div className={css.friends}>
       <PageHeading title="Friends" description="Add the classmates you study with by email." />
       {pageError && <p className={s.error} role="alert">{pageError}</p>}
-      <Spread label="Friends" left={left} right={right} />
+      <div className={css.layout}>
+        <div className={`${s.sheet} ${css.side}`} data-page>{left}</div>
+        <div className={s.sheet} data-page>{right}</div>
+      </div>
       {removing && (
         <RemoveFriendDialog friend={removing} onClose={() => setRemoving(undefined)}
           onRemove={async () => {

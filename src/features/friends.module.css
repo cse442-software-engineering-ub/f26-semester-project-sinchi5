@@ -1,7 +1,49 @@
 /* Cards 233, 256: Friends is a spread. The left page is ruled lists (add a classmate, requests for you, sent requests);
    the right page is an aligned grid of friend cards. Below 720 px of the sheet the pages stack. */
 .friends {
+  container-type: inline-size;
   min-width: 0;
+}
+/* Two sheets side by side from 880 px: the left one is content height and stays in view while the right one scrolls. */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+.layout > * {
+  min-width: 0;
+}
+@container (min-width: 880px) {
+  .layout {
+    grid-template-columns: minmax(22rem, 28rem) minmax(0, 1fr);
+    align-items: start;
+  }
+  .side {
+    position: sticky;
+    top: var(--space-4);
+  }
+}
+/* With few friends the grid ends in a quiet invitation, so the page is never an empty sheet. */
+.hint {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--ground);
+  box-shadow: inset 0 0 0 1px var(--spine);
+  color: var(--muted);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+.hint strong {
+  color: var(--text);
+}
+.hint .quiet {
+  margin-inline-start: calc(var(--space-3) * -1);
+  color: var(--text);
 }
 .group {
   min-width: 0;
@@ -151,36 +193,6 @@
   color: var(--muted);
   font-size: var(--fs-body);
   line-height: var(--lh-body);
-}
-/* Wide sheets put the email field and its button on one line. */
-@container (min-width: 900px) {
-  .addForm {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-  }
-  .addForm > label,
-  .addForm > small,
-  .addForm > p {
-    grid-column: 1 / -1;
-  }
-  .addForm > input {
-    grid-column: 1;
-  }
-  .addForm > .primary {
-    grid-column: 2;
-    grid-row: 2;
-    margin-top: 0;
-  }
-  .rows > li {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
-  .rowActions,
-  .pending {
-    grid-column: auto;
-  }
-  .rowActions > button {
-    flex: 0 0 auto;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   .friendCard {

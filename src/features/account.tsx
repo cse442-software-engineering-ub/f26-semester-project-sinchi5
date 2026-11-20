@@ -174,7 +174,7 @@ export function AccountSettings({ danger = false }: { danger?: boolean } = {}) {
         <button className={s.secondary} disabled={busy} onClick={() => open("profile")}>Edit account</button>
       </>
     </div>
-    <ul className={s.settingRows}>
+    <ul className={`${s.settingRows} ${d.rows}`}>
       <>
         <li>
           <span><strong>Password</strong><small>Use at least {PASSWORD_MIN} characters. A passphrase is easiest to remember.</small></span>
