@@ -45,9 +45,10 @@ export function stubApi(answers: Record<string, Answer | ((req: Sent) => Answer)
   return api;
 }
 
-function unmount() {
+// Closes the mounted screen and removes every iframe: el.closest("iframe") cannot see out of its own document, so frames used to pile up.
+export function unmount() {
   mounted?.root.unmount();
-  mounted?.el.closest("iframe")?.remove();
+  document.querySelectorAll("iframe").forEach((f) => f.remove());
   mounted?.el.remove();
   mounted = null; scope = document;
 }
