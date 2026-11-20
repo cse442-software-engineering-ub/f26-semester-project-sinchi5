@@ -236,3 +236,10 @@ await test("16. The first line of text starts within the box's top padding (not 
   expect(parseFloat(cs.paddingTop) < parseFloat(cs.fontSize) * 1.2).toBe(true); // a small gap, never a line
   }
 });
+await test("17. The editor box's left edge is within 2 px of the first toolbar button's left edge at 1440 and 768", "src/features/rich-editor.module.css → .content padding-inline", async () => {
+  for (const width of [1440, 768]) {
+    const root = await openEditor(width);
+    const first = root.querySelector('[role="toolbar"] button') as HTMLElement;
+    expect(Math.abs(box(root.querySelector(".ProseMirror")!).left - box(first).left) <= 2).toBe(true);
+  }
+});

@@ -9,7 +9,7 @@
   flex: 1;
   flex-direction: column;
   font-size: var(--fs-lead);
-  padding-inline: var(--space-5);
+  padding-inline: var(--space-3); /* the toolbar's own inset, so the writing box lines up with its buttons */
 }
 /* Sticky inside the sheet, grouped with hairline separators; two neat rows on wide screens, one scrolling row on phones. */
 .toolbarWrap {
@@ -189,7 +189,6 @@
 
 @media (min-width: 768px) {
   .toolbar { flex-wrap: wrap; overflow-x: visible; row-gap: var(--space-1); }
-  .content { padding-inline: var(--space-7); }
 }
 @media (max-width: 1023px) {
   .toolbarWrap { top: calc(56px + env(safe-area-inset-top)); }
