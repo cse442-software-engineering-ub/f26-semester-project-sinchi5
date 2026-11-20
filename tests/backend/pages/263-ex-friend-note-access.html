@@ -37,6 +37,7 @@ const friendId = async (email) => (await api("friends")).body.friends.find((f) =
 const a = await fresh(A, "Ada Owner");
 const b = await fresh(B, "Bea Friend");
 const c = await fresh(C, "Cy Friend");
+await signIn(A);
 await api("friend-request", { email: B });
 await signIn(B);
 await api("friend-respond", { id: (await api("friends")).body.incoming.find((f) => f.email === A).id, accept: true });
