@@ -136,3 +136,13 @@ await test("8. The linked chip and its buttons do not stay inside the page at 37
   await wait(400);
   expect(pageScrollWidth() <= 375).toBe(true);
 });
+await test("9. A personal event with no course can be chosen and linked", EDITOR, async () => {
+  const dentist = ev("e5", "", "Dentist", "2026-11-11");
+  const saved = note("n1", "Scrum roles", { eventId: "e5", eventDate: "2026-11-11" });
+  const { api } = await openDetails(routes(unlinked, { events: { events: [...events, dentist] }, "note-link": { note: saved } }));
+  await click(byRole("button", "Link to a class…"));
+  const dialog = await waitFor(() => byRole("dialog"));
+  await click(dialog.querySelector("section[aria-label='Wed Nov 11'] button") as HTMLElement);
+  await waitFor(() => chip());
+  expect(api.sent.find((s) => s.route === "note-link")!.body).toEqual({ noteId: "n1", eventId: "e5", date: "2026-11-11" });
+});
