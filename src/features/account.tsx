@@ -142,7 +142,7 @@ export function AccountSettings({ danger = false }: { danger?: boolean } = {}) {
     </Modal>}
     {code && <Modal title="Your new recovery code" dismissible={false} onClose={() => {}}><RecoveryCode code={code} onDone={() => setCode("")} /></Modal>}
   </>;
-  const dangerBlock = <section className={d.danger} aria-labelledby="delete-heading">
+  const dangerBlock = <section className={`${s.panel} ${d.danger}`} aria-labelledby="delete-heading">
     <h2 id="delete-heading">Delete account</h2>
     <p className={s.muted}>Permanently remove your account and log out everywhere.</p>
     <button className={s.dangerOutline} onClick={() => open("delete")}>Delete account</button>
@@ -150,7 +150,7 @@ export function AccountSettings({ danger = false }: { danger?: boolean } = {}) {
     {dialogs}
   </section>;
   if (danger) return dangerBlock;
-  return <section aria-labelledby="account-heading">
+  return <section className={s.panel} aria-labelledby="account-heading">
     <div className={s.settingsHeading}>
       <h2 id="account-heading">Account</h2>
       <p className={s.muted}>Manage how you log in and keep your account secure.</p>
@@ -174,7 +174,7 @@ export function AccountSettings({ danger = false }: { danger?: boolean } = {}) {
         <button className={s.secondary} disabled={busy} onClick={() => open("profile")}>Edit account</button>
       </>
     </div>
-    <ul className={`${s.settingRows} ${d.rows}`}>
+    <ul className={s.settingRows}>
       <>
         <li>
           <span><strong>Password</strong><small>Use at least {PASSWORD_MIN} characters. A passphrase is easiest to remember.</small></span>

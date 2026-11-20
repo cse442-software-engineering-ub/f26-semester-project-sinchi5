@@ -58,10 +58,10 @@ await test("3. Friends or Settings no longer shows its heading after the split",
   at("/friends"); await waitFor(() => byRole("heading", "Friends"));
   at("/settings"); await waitFor(() => byRole("heading", "Settings"));
 });
-await test("4. The landing page's sample day keeps one color in every scheme", "src/features/onboarding.module.css → .day (--ground in src/app/tokens.css)", async () => {
+await test("4. The landing artwork keeps one color in every scheme", "src/features/onboarding.module.css → .onboardingArt (--art-bg in src/app/tokens.css)", async () => {
   stubApi({ session: signedOut });
   mount(<MemoryRouter initialEntries={["/"]}><Provider><Onboarding /></Provider></MemoryRouter>);
-  await followsScheme("backgroundColor", () => document.querySelector('[class*="day"]'));
+  await followsScheme("backgroundColor", () => document.querySelector('[class*="onboardingArt"]'));
 });
 await test("5. The Now ribbon keeps one color in every scheme", "src/features/dashboard.module.css → .ribbon (--ribbon in src/app/tokens.css)", async () => {
   stubApi(routes()); at("/");

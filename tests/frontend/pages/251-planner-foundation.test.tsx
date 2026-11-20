@@ -165,7 +165,7 @@ await test("11. Reduced motion does not stop the planner's motion, or a transiti
 });
 await test("12. The scheme swatches do not preview each scheme's ground, sheet and ribbon, or switching scheme or mode does not change the sheet and ribbon live", "src/features/settings.tsx → SCHEMES, src/app/context.tsx → apply", async () => {
   stubApi({ ...routes, preferences: (r: { body: any }) => ({ preferences: { mode: r.body.mode, scheme: r.body.scheme } }) });
-  const el = mount(app("/settings?section=appearance"));
+  const el = mount(app("/settings"));
   try {
     const swatches: Record<string, string[]> = {};
     for (const [label, sel] of [["Sage", ":root"], ["Fjord", ':root[data-scheme="fjord"]'], ["Rosé", ':root[data-scheme="rose"]'], ["Mocha", ':root[data-scheme="mocha"]']] as const) {

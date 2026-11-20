@@ -19,7 +19,7 @@ const CTX = "src/app/context.tsx → setPreferences / Provider";
 const TOKENS = "src/app/tokens.css";
 const routes = { notes: { notes: [] }, events: { events: [] }, courses: { courses: [] } };
 const root = document.documentElement;
-const ui = () => <MemoryRouter initialEntries={["/settings?section=appearance"]}><Provider><App /></Provider></MemoryRouter>;
+const ui = () => <MemoryRouter initialEntries={["/settings"]}><Provider><App /></Provider></MemoryRouter>;
 const saved = (r: { body: any }) => ({ preferences: { mode: r.body.mode, scheme: r.body.scheme } });
 const asked = (api: { sent: { route: string; body: any }[] }) => api.sent.filter((r) => r.route === "preferences").map((r) => r.body);
 

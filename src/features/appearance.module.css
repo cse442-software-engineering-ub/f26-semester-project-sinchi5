@@ -1,80 +1,33 @@
-/* Card 256: Appearance on the facing page. Mode is a segmented control; every scheme and custom theme is a real
-   miniature planner (ground, sheet, ribbon) in its own colors. */
 .group {
   border: 0;
-  margin: 0 0 var(--space-6);
+  margin: 0 0 18px;
   padding: 0;
   min-width: 0;
 }
 .group legend {
   padding: 0;
-  margin-bottom: var(--space-3);
-  font-size: var(--fs-lead);
-  line-height: var(--lh-lead);
-  letter-spacing: var(--ls-lead);
-  font-weight: 600;
-}
-.segmented {
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  max-width: 24rem;
-  border-radius: var(--radius-control);
-  background: var(--ground);
-  box-shadow: inset 0 0 0 1px var(--spine);
-}
-.mode {
-  position: relative;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 0 var(--space-3);
-  border-radius: 8px;
-  color: var(--muted);
-  font-size: var(--fs-body);
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color var(--motion-fast) var(--ease-out);
-}
-.mode input {
-  position: absolute;
-  opacity: 0;
-  inset: 0;
-  margin: 0;
-  cursor: pointer;
-}
-.mode:has(input:checked) {
-  background: var(--sheet);
-  color: var(--text);
-  font-weight: 600;
-  box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--sheet-edge);
-}
-.mode:has(input:focus-visible),
-.option:has(input:focus-visible) {
-  outline: 3px solid var(--ribbon);
-  outline-offset: 2px;
+  margin-bottom: 8px;
+  font-weight: 700;
 }
 .options {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 8.5rem), 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 10px;
 }
 .option {
   position: relative;
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-2);
-  border-radius: var(--radius-card);
-  background: var(--sheet);
-  box-shadow: inset 0 0 0 1px var(--sheet-edge);
-  font-size: var(--fs-body);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  font-size: 0.8125rem;
   cursor: pointer;
-  transition: box-shadow var(--motion-fast) var(--ease-out);
-}
-.option:hover {
-  box-shadow: inset 0 0 0 1px var(--hover-line);
 }
 .option input {
   position: absolute;
@@ -84,56 +37,32 @@
   cursor: pointer;
 }
 .option:has(input:checked) {
-  box-shadow: inset 0 0 0 2px var(--ribbon);
-  font-weight: 600;
+  border: 2px solid var(--primary);
+  padding: 9px;
+  background: var(--sage);
+  font-weight: 700;
 }
-.optionName {
-  padding: 0 var(--space-1) var(--space-1);
-  overflow-wrap: anywhere;
+.option:has(input:focus-visible) {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
 }
-/* The miniature planner. Three coloured spans: the ground, the sheet lying on it, the ribbon hanging from the sheet. */
-.mini {
-  position: relative;
-  display: block;
-  aspect-ratio: 16 / 10;
-  overflow: hidden;
-  border-radius: 8px;
-  box-shadow: inset 0 0 0 1px var(--spine);
-}
-.miniGround {
-  position: absolute;
-  inset: 0;
-}
-.miniSheet {
-  position: absolute;
-  inset: 16% 9% 0;
+.swatch {
   display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 9%;
-  padding: 0 10% 12% 34%;
-  border-radius: 6px 6px 0 0;
-  box-shadow: 0 1px 3px var(--spine);
+  width: 56px;
+  height: 28px;
+  border: 1px solid var(--swatch-line);
+  border-radius: 6px;
+  overflow: hidden;
 }
-.miniSheet i {
-  display: block;
-  height: 2px;
-  border-radius: 1px;
-  background: rgb(0 0 0 / 0.14);
+.swatch span {
+  flex: 1;
 }
-.miniSheet i:nth-child(2) {
-  width: 70%;
-}
-.miniSheet i:nth-child(3) {
-  width: 45%;
-}
-.miniRibbon {
+.check {
   position: absolute;
-  top: 16%;
-  left: 20%;
-  width: 9%;
-  height: 40%;
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
+  top: 6px;
+  right: 8px;
+  font-size: 0.75rem;
+  color: var(--primary);
 }
 .alert {
   margin: 0;
@@ -141,24 +70,25 @@
   font-weight: 600;
 }
 .themeItem {
-  display: grid;
-  gap: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   min-width: 0;
 }
 .itemActions {
   display: flex;
-  gap: var(--space-2);
+  gap: 6px;
 }
 .itemActions button {
   flex: 1;
-  padding-inline: var(--space-2);
+  padding-inline: 8px;
 }
 .newRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2) var(--space-3);
-  margin-top: var(--space-4);
+  gap: 8px 12px;
+  margin-top: 12px;
 }
 .newRow p {
   margin: 0;
@@ -166,14 +96,14 @@
 .editor {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-5);
-  margin-top: var(--space-4);
-  padding: var(--space-5);
-  border-radius: var(--radius-card);
-  background: var(--ground);
-  box-shadow: inset 0 0 0 1px var(--spine);
+  gap: clamp(16px, 3vw, 24px);
+  margin-top: 16px;
+  padding: clamp(12px, 3vw, 20px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
 }
-@container (min-width: 1100px) {
+@media (min-width: 900px) {
   .editor {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
@@ -181,7 +111,7 @@
 .editorFields {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: 12px;
   min-width: 0;
 }
 .editorFields h3 {
@@ -192,7 +122,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: var(--fs-body);
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 .nameField input {
@@ -201,7 +131,7 @@
 .colorRow {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  gap: var(--space-3);
+  gap: 10px;
 }
 .colorField input {
   width: 100%;
@@ -212,61 +142,55 @@
 .fieldError {
   margin: 0;
   color: var(--danger);
-  font-size: var(--fs-body);
+  font-size: 0.8125rem;
 }
 .note {
   margin: 0;
-  padding: var(--space-3);
+  padding: 10px 12px;
   border-radius: 8px;
-  background: var(--sheet);
-  font-size: var(--fs-body);
+  background: var(--surface-soft);
+  font-size: 0.8125rem;
 }
 .editorActions {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: 8px;
 }
 .preview {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: var(--space-3);
+  gap: 10px;
   align-content: start;
   min-width: 0;
 }
 .previewPane {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border-radius: var(--radius-card);
-  background: var(--ground);
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
   color: var(--text);
-  box-shadow: inset 0 0 0 1px var(--spine);
 }
 .previewCard {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-3);
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--sheet);
-  box-shadow: inset 0 0 0 1px var(--sheet-edge);
-  font-size: var(--fs-body);
+  background: var(--surface);
+  font-size: 0.8125rem;
 }
 .previewCard small {
   color: var(--muted);
 }
 .previewButton {
   align-self: flex-start;
-  margin-top: var(--space-1);
-  padding: 4px var(--space-3);
+  margin-top: 4px;
+  padding: 4px 12px;
   border-radius: 7px;
-  background: var(--ribbon);
-  color: var(--ribbon-text);
-}
-@media (prefers-reduced-motion: reduce) {
-  .mode,
-  .option {
-    transition: none;
-  }
+  background: var(--primary);
+  color: var(--primary-text);
 }

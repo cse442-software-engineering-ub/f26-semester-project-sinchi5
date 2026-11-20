@@ -22,35 +22,30 @@ const h2s = () => [...body().querySelectorAll("h2")].map((h) => h.textContent);
 const nav = () => document.querySelector('nav[aria-label="Settings sections"]');
 const buttons = (root: Element) => [...root.querySelectorAll("button")].map((b) => b.textContent);
 
-await test("1. Each section does not open on its own page: Account with Delete account last, then Appearance, then Data", SET, async () => {
-  const known = (t: string | null) => ["Account", "Appearance", "Data", "Delete account"].includes(t!);
+await test("1. The sections are not Account, Appearance, Data, Delete account in that order", SET, async () => {
   ui();
   await waitFor(() => nav());
-  expect(h2s().filter(known)).toEqual(["Account", "Delete account"]);
-  for (const [section, heading] of [["appearance", "Appearance"], ["data", "Data"]]) {
-    ui(`/settings?section=${section}`);
-    await waitFor(() => body().querySelector(`#${section}-section`));
-    expect(h2s().filter(known)).toEqual([heading]);
-  }
+  expect(h2s().filter((t) => ["Account", "Appearance", "Data", "Delete account"].includes(t!))).toEqual(["Account", "Appearance", "Data", "Delete account"]);
 });
 await test("2. The section list has more or fewer than Account, Appearance, Data, or marks none as current", SET + " (nav)", async () => {
   ui();
   const list = await waitFor(() => nav());
-  expect([...list.querySelectorAll("a")].map((a) => [a.querySelector("strong")!.textContent, a.getAttribute("aria-current")])).toEqual([["Account", "true"], ["Appearance", null], ["Data", null]]);
+  expect([...list.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("aria-current")])).toEqual([["Account", "true"], ["Appearance", null], ["Data", null]]);
 });
 await test("3. ?section=data does not open Data, and clicking Appearance does not mark it", SET + " (section from the address)", async () => {
   ui("/settings?section=data");
   const list = await waitFor(() => nav());
-  expect(list.querySelector('[aria-current="true"] strong')!.textContent).toBe("Data");
-  await click([...list.querySelectorAll("a")].find((a) => a.querySelector("strong")!.textContent === "Appearance") as HTMLElement);
-  await waitFor(() => list.querySelector('[aria-current="true"] strong')!.textContent === "Appearance");
+  expect(list.querySelector('[aria-current="true"]')!.textContent).toBe("Data");
+  await click([...list.querySelectorAll("a")].find((a) => a.textContent === "Appearance") as HTMLElement);
+  await waitFor(() => list.querySelector('[aria-current="true"]')!.textContent === "Appearance");
 });
-await test("4. Delete account is not on the Account page below its list of actions, or is still inside that list", "src/features/account.tsx → AccountSettings (danger)", async () => {
+await test("4. Delete account is before Data, or still inside Account's list of actions", "src/features/account.tsx → AccountSettings (danger)", async () => {
   ui();
   await waitFor(() => nav());
   const account = body().querySelector('[aria-labelledby="account-heading"]')!;
+  const data = body().querySelector('[aria-labelledby="data-heading"]')!;
   const del = byRole("button", "Delete account")!;
-  expect([account.contains(del), !!(account.compareDocumentPosition(del) & Node.DOCUMENT_POSITION_FOLLOWING), body().querySelector('[aria-labelledby="data-heading"]')]).toEqual([false, true, null]);
+  expect([account.contains(del), !!(data.compareDocumentPosition(del) & Node.DOCUMENT_POSITION_FOLLOWING)]).toEqual([false, true]);
   expect(buttons(account)).toEqual(["Change photo", "Edit account", "Change password", "Replace recovery code"]);
 });
 await test("5. Sign out or a course list is still on Settings", "src/features/account.tsx → AccountSettings, src/features/settings.tsx", async () => {
@@ -61,13 +56,13 @@ await test("5. Sign out or a course list is still on Settings", "src/features/ac
   expect([exact(/^sign out$/i), exact(/^log out$/i), /courses?\b(?!,)/i.test(text.replace("Notes, courses, and events", "")), /prototype|sample workspace/i.test(text)]).toEqual([false, false, false, false]);
 });
 await test("6. Appearance lost the Mode, Color scheme or Your themes groups", "src/features/settings.tsx → Appearance", async () => {
-  ui("/settings?section=appearance");
+  ui();
   await waitFor(() => nav());
   const legends = [...body().querySelectorAll("fieldset legend")].map((l) => l.textContent);
   expect(legends).toEqual(["Mode", "Color scheme", "Your themes"]);
 });
 await test("7. Clear workspace does not open \"Start fresh?\", or the Data line is missing", SET + " (Data)", async () => {
-  ui("/settings?section=data");
+  ui();
   await waitFor(() => nav());
   expect(body().textContent!.includes("Notes, courses, and events are saved to your account.")).toBe(true);
   await click(byRole("button", "Clear workspace"));

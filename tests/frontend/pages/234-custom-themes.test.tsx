@@ -20,7 +20,7 @@ const four = [forest, dusk, { ...forest, id: "c3c3c3c3c3c3c3c3", name: "Sand" },
 const CTX = "src/app/context.tsx → Provider (apply effect), saveTheme, deleteTheme";
 const SET = "src/features/settings.tsx → Appearance, ThemeEditor";
 const root = document.documentElement;
-const ui = () => <MemoryRouter initialEntries={["/settings?section=appearance"]}><Provider><App /></Provider></MemoryRouter>;
+const ui = () => <MemoryRouter initialEntries={["/settings"]}><Provider><App /></Provider></MemoryRouter>;
 const routes = { notes: { notes: [] }, events: { events: [] }, courses: { courses: [] } };
 const LIMIT = "You can save up to 4 themes. Delete one to add another.";
 const sent = (api: { sent: { route: string; body: any }[] }, route: string) => api.sent.filter((r) => r.route === route).map((r) => r.body);

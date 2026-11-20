@@ -1,8 +1,8 @@
 import { AccountSettings } from "./account";
-import { useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useApp, useHoldRefresh } from "../app/context";
-import { Avatar, Modal, PageHeading } from "../shared/ui";
+import { Modal, PageHeading } from "../shared/ui";
 import s from "../shared/ui.module.css";
 import a from "./appearance.module.css";
 import l from "./settings.module.css";
@@ -19,20 +19,7 @@ const SCHEMES: [ColorScheme, string, string[]][] = [
 ];
 
 // Native radios give the arrow-key and Tab behavior of a radio group.
-const SECTIONS = [
-  ["account", "Account", "Your name, photo, password and recovery code."],
-  ["appearance", "Appearance", "Mode, color scheme and your own themes."],
-  ["data", "Data", "What is saved to your account."],
-] as const;
-
-// A miniature planner sheet: ground, sheet, ribbon. The three spans carry the scheme's colors; the rules are decoration.
-function Mini({ colors }: { colors: string[] }) {
-  return (
-    <span className={a.mini} aria-hidden="true">
-      {colors.map((c, i) => <span key={i} className={[a.miniGround, a.miniSheet, a.miniRibbon][i]} style={{ background: c }}>{i === 1 && <><i /><i /><i /></>}</span>)}
-    </span>
-  );
-}
+const SECTIONS = [["account", "Account"], ["appearance", "Appearance"], ["data", "Data"]] as const;
 
 const MAX_THEMES = 4;
 const isHex = (v: string) => /^#[0-9a-f]{6}$/i.test(v);
@@ -138,9 +125,9 @@ function Appearance() {
     <>
       <fieldset className={a.group}>
         <legend>Mode</legend>
-        <div className={a.segmented}>
+        <div className={a.options}>
           {MODES.map(([key, label]) => (
-            <label key={key} className={a.mode}>
+            <label key={key} className={a.option}>
               <input type="radio" name="mode" checked={current.mode === key} onChange={() => choose({ ...current, mode: key })} />
               {label}
             </label>
@@ -153,8 +140,8 @@ function Appearance() {
           {SCHEMES.map(([key, label, colors]) => (
             <label key={key} className={a.option}>
               <input type="radio" name="scheme" checked={current.scheme === key} onChange={() => choose({ ...current, scheme: key })} />
-              <Mini colors={colors} />
-              <span className={a.optionName}>{label}</span>
+              <span className={a.swatch} aria-hidden="true">{colors.map((c) => <span key={c} style={{ background: c }} />)}</span>
+              {label}
             </label>
           ))}
         </div>
@@ -167,8 +154,8 @@ function Appearance() {
               <div key={t.id} className={a.themeItem}>
                 <label className={a.option}>
                   <input type="radio" name="scheme" checked={current.scheme === `custom:${t.id}`} onChange={() => choose({ ...current, scheme: `custom:${t.id}` })} />
-                  <Mini colors={swatchOf(t)} />
-                  <span className={a.optionName}>{t.name}</span>
+                  <span className={a.swatch} aria-hidden="true">{swatchOf(t).map((c) => <span key={c} style={{ background: c }} />)}</span>
+                  {t.name}
                 </label>
                 <div className={a.itemActions}>
                   <button type="button" className={s.secondary} aria-label={`Edit ${t.name}`} onClick={() => setEditor({ theme: t })}>Edit</button>
@@ -224,65 +211,8 @@ export function Settings() {
   const [params] = useSearchParams();
   const asked = params.get("section");
   const current = SECTIONS.find(([key]) => key === asked)?.[0] ?? "account";
-  const index = (
-    <>
-      <nav className={l.nav} aria-label="Settings sections">
-        {SECTIONS.map(([key, label, about]) => (
-          <Link key={key} to={`/settings?section=${key}`} aria-current={current === key ? "true" : undefined}>
-            <strong>{label}</strong>
-            <small>{about}</small>
-          </Link>
-        ))}
-      </nav>
-      {state.user && (
-        <div className={l.who}>
-          <Avatar user={state.user} version={state.photoVersion} alt="" />
-          <span className={l.whoText}><strong>{state.user.name}</strong><small>{state.user.email}</small></span>
-        </div>
-      )}
-    </>
-  );
-  const section = current === "account" ? (
-    <div id="account-section" className={l.section}>
-      <AccountSettings />
-      <AccountSettings danger />
-    </div>
-  ) : current === "appearance" ? (
-    <section id="appearance-section" className={l.section} aria-labelledby="appearance-heading">
-      <div className={s.settingsHeading}>
-        <h2 id="appearance-heading">Appearance</h2>
-        <p className={s.muted}>Choose a theme, or follow your device.</p>
-      </div>
-      <Appearance />
-    </section>
-  ) : (
-    <section id="data-section" className={l.section} aria-labelledby="data-heading">
-      <div className={s.settingsHeading}>
-        <h2 id="data-heading">Data</h2>
-        <p className={s.muted}>
-          Notes, courses, and events are saved to your account.
-        </p>
-      </div>
-      <ul className={s.settingRows}>
-        <li>
-          <span>
-            <strong>Clear workspace</strong>
-            <small>
-              Remove every note, course, and event from your account.
-            </small>
-          </span>
-          <button className={s.secondary} onClick={() => { setError(""); setConfirmText(""); setReset(true); }}>
-            Clear workspace
-          </button>
-        </li>
-      </ul>
-      {error && !reset && (
-        <p className={s.error} role="alert">
-          {error}
-        </p>
-      )}
-    </section>
-  );
+  // Scroll to the section named in the address (not on first load of the default).
+  useEffect(() => { if (asked) document.getElementById(`${current}-section`)?.scrollIntoView?.({ block: "start" }); }, [asked, current]);
   return (
     <>
       <PageHeading
@@ -290,11 +220,49 @@ export function Settings() {
         title="Settings"
         description="Manage your account, appearance, and data."
       />
-      <div className={l.wrap}>
-        <div className={l.layout}>
-          <div className={`${s.panel} ${l.index}`} data-page>{index}</div>
-          <div className={s.sheet} data-page>{section}</div>
-        </div>
+      <div className={l.layout}>
+      <nav className={l.nav} aria-label="Settings sections">
+        {SECTIONS.map(([key, label]) => (
+          <Link key={key} to={`/settings?section=${key}`} aria-current={current === key ? "true" : undefined}>{label}</Link>
+        ))}
+      </nav>
+      <div className={l.sections}>
+        <div id="account-section" className={l.section}><AccountSettings /></div>
+        <section id="appearance-section" className={`${s.panel} ${l.section}`} aria-labelledby="appearance-heading">
+          <div className={s.settingsHeading}>
+            <h2 id="appearance-heading">Appearance</h2>
+            <p className={s.muted}>Choose a theme, or follow your device.</p>
+          </div>
+          <Appearance />
+        </section>
+        <section id="data-section" className={`${s.panel} ${l.section}`} aria-labelledby="data-heading">
+          <div className={s.settingsHeading}>
+            <h2 id="data-heading">Data</h2>
+            <p className={s.muted}>
+              Notes, courses, and events are saved to your account.
+            </p>
+          </div>
+          <ul className={s.settingRows}>
+            <li>
+              <span>
+                <strong>Clear workspace</strong>
+                <small>
+                  Remove every note, course, and event from your account.
+                </small>
+              </span>
+              <button className={s.secondary} onClick={() => { setError(""); setConfirmText(""); setReset(true); }}>
+                Clear workspace
+              </button>
+            </li>
+          </ul>
+          {error && !reset && (
+            <p className={s.error} role="alert">
+              {error}
+            </p>
+          )}
+        </section>
+        <AccountSettings danger />
+      </div>
       </div>
       {reset && (
         <Modal

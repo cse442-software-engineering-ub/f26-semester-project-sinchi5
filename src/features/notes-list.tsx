@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useApp, useHoldRefresh } from "../app/context";
+import { LinkControls } from "./link-event";
 import { PageHeading, NoteCard, Empty, Modal, DeleteNoteDialog, Sheet, countOf } from "../shared/ui";
 import { isNoteCategory, NOTE_CATEGORIES, type NoteCategory } from "../services/categories";
 import type { Course, Note } from "../domain";
@@ -440,6 +441,7 @@ export function Notes() {
             >
               {group.map((n, i) => (
                 <div key={n.id} className={css.cell} style={{ "--i": Math.min(i, 8) } as CSSProperties}>
+                  <div className={css.cardWrap}>
                   <NoteCard
                     note={n}
                     pinSlot={n.ownerId === state.user?.id}
@@ -464,6 +466,9 @@ export function Notes() {
                       <Pin size={14} aria-hidden="true" />
                     </button>
                   )}
+                  </div>
+                  <LinkControls note={n} compact canLink={n.ownerId === state.user?.id}
+                    onLinked={(linked) => { setNotes((all) => all.map((x) => (x.id === linked.id ? { ...x, ...linked, excerpt: x.excerpt } : x))); void refresh(); }} />
                 </div>
               ))}
             </div>
