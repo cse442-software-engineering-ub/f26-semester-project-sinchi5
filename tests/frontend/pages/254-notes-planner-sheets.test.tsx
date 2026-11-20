@@ -132,13 +132,11 @@ await test("6. The formatting toolbar is not sticky inside the writing sheet, gr
   const phone = (await openEditor(375)).querySelector('[role="toolbar"]') as HTMLElement;
   expect(phone.ownerDocument.defaultView!.getComputedStyle(phone).overflowX).toBe("auto");
 });
-await test("7. The writing area is not a centered reading measure with generous line height, or the top bar is not one line above the sheet", EDITOR, async () => {
+await test("7. The writing area does not have generous line height, or the top bar is not one line above the sheet", EDITOR, async () => {
   const root = await openEditor(1920);
   const text = root.querySelector(".ProseMirror") as HTMLElement;
   const sheet = sheetOf(root);
   const cs = win(root).getComputedStyle(text);
-  expect(box(text).width <= 68 * parseFloat(cs.fontSize) && box(text).width < box(sheet).width * 0.7).toBe(true);
-  expect(Math.abs(box(text).left - box(sheet).left - (box(sheet).right - box(text).right)) <= 2).toBe(true);
   expect(parseFloat(cs.lineHeight) / parseFloat(cs.fontSize) >= 1.7).toBe(true);
   const bar = byRole("button", "Save")!.parentElement!;
   const mids = [...bar.children].map((c) => Math.round(box(c).top + box(c).height / 2));
@@ -183,4 +181,30 @@ await test("10. At 375 the More actions menu is not there on the first paint of 
     expect(!!byRole("button", "More actions")).toBe(true);
     expect(byRole("button", "Cancel")).toBe(null);
   }
+});
+await test("11. Creating a note does not open the full note page (a dialog appears instead)", "src/features/notes-list.tsx → openCreateNote", async () => {
+  const api = stubApi(routes({ "note-create": { note: note("n99", "Untitled note", "") } }));
+  const root = at("/notes", 1440);
+  await waitFor(() => root.querySelectorAll("main h3").length >= 9);
+  await click([...root.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Create note")!);
+  await waitFor(() => root.querySelector(".ProseMirror"));
+  expect(root.querySelector('[role="dialog"]')).toBe(null);
+  expect(root.ownerDocument.activeElement?.getAttribute("aria-label")).toBe("Note title");
+  expect(api !== undefined).toBe(true);
+});
+await test("12. The writing area is under 80% of the main column width at 1440", EDITOR, async () => {
+  const root = await openEditor(1440);
+  expect(box(root.querySelector(".ProseMirror")!).width >= box(root.querySelector("main")!).width * 0.8).toBe(true);
+});
+await test("13. The editor outline is clipped: its top edge is outside the visible box", "src/features/rich-editor.module.css → .ProseMirror:focus-visible", async () => {
+  const root = await openEditor(1440);
+  const text = root.querySelector(".ProseMirror") as HTMLElement;
+  text.focus();
+  const cs = win(root).getComputedStyle(text);
+  const ring = box(text).top - parseFloat(cs.outlineOffset) - parseFloat(cs.outlineWidth);
+  expect(ring >= box(root.querySelector('[role="toolbar"]')!.parentElement!).bottom).toBe(true);
+});
+await test("14. The note page scrolls sideways at 375", EDITOR, async () => {
+  await openEditor(375);
+  expect(pageScrollWidth() <= 375).toBe(true);
 });
