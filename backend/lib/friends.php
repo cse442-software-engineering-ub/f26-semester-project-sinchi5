@@ -108,6 +108,10 @@ function friendAction(PDO $db, array $config, array $session, string $route, arr
         query($db, 'DELETE FROM notely_course_note_shares WHERE (owner_user_id = ? AND friend_user_id = ?)
             OR (owner_user_id = ? AND friend_user_id = ?)',
             [$row['requester_id'], $row['addressee_id'], $row['addressee_id'], $row['requester_id']]);
+        // Card 263: ending the friendship also ends note collaboration between them.
+        query($db, 'DELETE e FROM notely_note_editors e JOIN notely_notes n ON n.id = e.note_id
+            WHERE (n.owner_user_id = ? AND e.user_id = ?) OR (n.owner_user_id = ? AND e.user_id = ?)',
+            [$row['requester_id'], $row['addressee_id'], $row['addressee_id'], $row['requester_id']]);
     }
     $db->commit();
     http_response_code($status);

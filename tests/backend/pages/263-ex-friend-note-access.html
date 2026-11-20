@@ -1,0 +1,91 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>263 Backend: Ending a friendship removes note collaborator access</title>
+<link rel="stylesheet" href="../../shared/runner.css">
+<script type="module">
+// Backend test: real API, no screen code. Imports nothing from src/.
+import { page, test, expect, api, signIn, signOut } from "../../shared/runner.js";
+
+page({ card: "263", title: "Backend: Ending a friendship removes note collaborator access", kind: "backend" });
+const PASSWORD = "TestPassword2026!";
+// A and B are friends, A and C are friends. A owns a note shared with B and C. Cases run in order.
+const A = "notely-task263a-442@example.edu";
+const B = "notely-task263b-442@example.edu";
+const C = "notely-task263c-442@example.edu";
+const ROUTE = "backend/lib/friends.php → friendAction (the friend-remove branch)";
+const missing = { error: "This note could not be found." };
+
+// Every run starts from new accounts: one left by a stopped run is deleted first.
+async function fresh(email, name) {
+  if ((await api("session")).body.user) await signOut();
+  if ((await api("login", { email, password: PASSWORD })).status === 200) await api("delete", { currentPassword: PASSWORD });
+  const r = await api("register", { name, email, password: PASSWORD });
+  if (r.status !== 201) throw new Error(`could not create ${email}: ${r.status} ${JSON.stringify(r.body)}`);
+  return r.body.user;
+}
+async function removeAccount(email) {
+  if ((await api("session")).body.user?.email !== email) {
+    if ((await api("session")).body.user) await signOut();
+    if ((await api("login", { email, password: PASSWORD })).status !== 200) return;
+  }
+  await api("delete", { currentPassword: PASSWORD });
+}
+// The id of the friendship row between the signed-in student and the friend with this email.
+const friendId = async (email) => (await api("friends")).body.friends.find((f) => f.email === email).id;
+
+const a = await fresh(A, "Ada Owner");
+const b = await fresh(B, "Bea Friend");
+const c = await fresh(C, "Cy Friend");
+await api("friend-request", { email: B });
+await signIn(B);
+await api("friend-respond", { id: (await api("friends")).body.incoming.find((f) => f.email === A).id, accept: true });
+await signIn(A);
+await api("friend-request", { email: C });
+await signIn(C);
+await api("friend-respond", { id: (await api("friends")).body.incoming.find((f) => f.email === A).id, accept: true });
+await signIn(A);
+const note = (await api("note-create", { title: "t-263 shared", body: "<p>Original</p>", format: "html", visibility: "shared" })).body.note;
+
+const read = (id = note.id) => api("note", undefined, { id });
+const collaboratorIds = async () => (await api("note-collaborators", undefined, { id: note.id })).body.collaborators.map((x) => x.id);
+
+await test("1. An invited friend can open the note, and a second invited friend can too", ROUTE, async () => {
+  expect(await api("note-invite", { id: note.id, email: B })).toEqual(200, { collaborator: { id: b.id, name: "Bea Friend", email: B, permission: "view" } });
+  expect(await api("note-invite", { id: note.id, email: C })).toEqual(200, { collaborator: { id: c.id, name: "Cy Friend", email: C, permission: "view" } });
+  await signIn(B);
+  expect((await read()).status).toBe(200);
+});
+
+await test("2. After A ends the friendship, B can no longer open the note", ROUTE, async () => {
+  await signIn(A);
+  expect((await api("friend-remove", { id: await friendId(B) })).status).toBe(200);
+  expect(await collaboratorIds()).toEqual([c.id]);
+  await signIn(B);
+  expect(await read()).toEqual(404, missing);
+});
+
+await test("3. C, a friend who was also invited, still has access to the note", ROUTE, async () => {
+  await signIn(C);
+  const r = await read();
+  expect([r.status, r.body.note.title]).toEqual([200, "t-263 shared"]);
+});
+
+await test("4. In reverse, after B ends a friendship with A, A loses access to B's note", ROUTE, async () => {
+  // A and B become friends again, then B owns a note and invites A.
+  await signIn(A);
+  expect((await api("friend-request", { email: B })).status).toBe(201);
+  await signIn(B);
+  await api("friend-respond", { id: (await api("friends")).body.incoming.find((f) => f.email === A).id, accept: true });
+  const mine = (await api("note-create", { title: "t-263 from bea", body: "<p>Bea</p>", format: "html", visibility: "shared" })).body.note;
+  expect((await api("note-invite", { id: mine.id, email: A })).status).toBe(200);
+  await signIn(A);
+  expect((await read(mine.id)).status).toBe(200);
+  await signIn(B);
+  expect((await api("friend-remove", { id: await friendId(A) })).status).toBe(200);
+  await signIn(A);
+  expect(await read(mine.id)).toEqual(404, missing);
+});
+
+for (const email of [B, A, C]) await removeAccount(email);
+</script>
