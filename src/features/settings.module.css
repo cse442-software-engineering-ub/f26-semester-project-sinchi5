@@ -1,94 +1,136 @@
-/* Settings: a section list beside (desktop) or above (phone) the stacked sections. */
-.layout {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 1000px;
+/* Card 256: Settings is one sheet. The left page is an index of planner tabs (the ribbon hangs from the open one);
+   the facing page holds that section. Under 720 px of the sheet the index becomes a row of tabs above the section. */
+.settings {
+  min-height: 28rem;
 }
 .nav {
-  display: flex;
-  flex-direction: row;
-  gap: 8px;
-  overflow-x: auto;
+  display: grid;
+  gap: var(--space-1);
 }
 .nav a {
-  display: inline-flex;
-  align-items: center;
+  position: relative;
+  display: grid;
+  gap: 2px;
   min-height: 44px;
-  padding: 0 16px;
-  border-radius: 10px;
+  padding: var(--space-3) var(--space-5) var(--space-3) var(--space-4);
+  border-radius: var(--radius-control);
   color: var(--text);
   text-decoration: none;
-  white-space: nowrap;
+  transition: background-color var(--motion-fast) var(--ease-out);
+}
+.nav a:hover {
+  background: var(--ground);
+}
+.nav strong {
+  font-size: var(--fs-lead);
+  line-height: var(--lh-lead);
+  letter-spacing: var(--ls-lead);
+  font-weight: 600;
+}
+.nav small {
+  color: var(--muted);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
 }
 .nav a[aria-current="true"] {
-  background: var(--surface-soft);
-  font-weight: 700;
+  background: var(--ground);
 }
-.sections {
+/* The ribbon: a bookmark that hangs from the open tab. */
+.nav a[aria-current="true"]::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: var(--space-4);
+  width: 12px;
+  height: 28px;
+  background: var(--ribbon);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 74%, 0 100%);
+}
+.who {
   display: flex;
-  flex-direction: column;
-  gap: 20px;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--rule);
   min-width: 0;
-  max-width: 760px;
+}
+.whoText {
+  display: grid;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.who small {
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
 }
 .section {
-  scroll-margin-top: 16px;
+  min-width: 0;
 }
-/* The danger block sits apart, at the end of the page. */
+/* The danger block sits apart, at the end of the Account page. */
 .danger {
-  margin-top: 28px;
-  border: 1px dashed var(--muted);
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--rule);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 16px;
+  gap: var(--space-2) var(--space-4);
 }
 .danger > h2 {
   flex-basis: 100%;
   margin: 0;
+  font-size: var(--fs-title);
+  line-height: var(--lh-title);
+  letter-spacing: var(--ls-title);
 }
 .danger > p:not([role]) {
   flex: 1 1 240px;
   margin: 0;
 }
-@media (min-width: 900px) {
-  .layout {
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 32px;
-  }
+@container (max-width: 719px) {
   .nav {
-    position: sticky;
-    top: 16px;
-    flex-direction: column;
-    width: 180px;
-    flex-shrink: 0;
-    overflow: visible;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .nav a {
+    padding: 0 var(--space-4);
+    align-content: center;
+  }
+  .nav small,
+  .who {
+    display: none;
+  }
+  .nav a[aria-current="true"]::after {
+    right: var(--space-2);
+    width: 8px;
+    height: 20px;
   }
 }
 
 .confirmField {
-  margin-bottom: 17px;
+  margin-bottom: var(--space-4);
 }
 .fieldError {
   display: block;
-  margin-top: -8px;
+  margin-top: calc(var(--space-2) * -1);
   color: var(--danger);
-  font-size: 0.68rem;
+  font-size: var(--fs-small);
   line-height: 1.5;
 }
 .passwordRules + .fieldError {
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 .passwordRules {
   list-style: none;
-  margin: -6px 0 0;
+  margin: calc(var(--space-1) * -1) 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 0.68rem;
+  font-size: var(--fs-small);
   color: var(--muted);
 }
 .passwordRules li {
@@ -104,9 +146,10 @@
 }
 .recoveryCode {
   display: block;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--ground);
+  box-shadow: inset 0 0 0 1px var(--spine);
   font-family: monospace;
   font-size: 1.1rem;
   overflow-wrap: anywhere;
@@ -114,4 +157,9 @@
 }
 .accountText {
   overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav a {
+    transition: none;
+  }
 }

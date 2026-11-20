@@ -16,7 +16,7 @@ const ada = { id: "1", name: "Ada Lovelace", email: "ada@example.edu", hasPhoto:
 const session = { user: ada, onboarding: { completed: true, step: 3 }, csrfToken: "test-token" };
 const routes = { session, notes: { notes: [] }, events: { events: [] }, courses: { courses: [] } };
 const SET = "src/features/settings.tsx → Settings (the clear button)";
-const ui = () => <MemoryRouter initialEntries={["/settings"]}><Provider><App /></Provider></MemoryRouter>;
+const ui = () => <MemoryRouter initialEntries={["/settings?section=data"]}><Provider><App /></Provider></MemoryRouter>;
 const dialog = () => document.querySelector<HTMLElement>('[role="dialog"]');
 const inDialog = (name: string) => [...dialog()!.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent === name || b.getAttribute("aria-label") === name) ?? null;
 const clears = (api: { sent: { route: string; body: any }[] }) => api.sent.filter((r) => r.route === "workspace-clear").map((r) => r.body);
