@@ -128,8 +128,6 @@
 .content :global(.ProseMirror) {
   flex: 1;
   width: 100%;
-  max-width: var(--measure-read);
-  margin-inline: auto;
   min-height: 240px;
   padding: var(--space-6) 0 var(--space-8);
   color: var(--text);
@@ -140,7 +138,7 @@
 }
 .content :global(.ProseMirror:focus-visible) {
   outline: 2px solid var(--ribbon);
-  outline-offset: 4px;
+  outline-offset: -2px; /* inside the box: the scroll/sheet ancestors clip anything outside it */
 }
 .content :global(.ProseMirror p.is-editor-empty:first-child::before) {
   content: attr(data-placeholder);
@@ -191,12 +189,6 @@
 @media (min-width: 768px) {
   .toolbar { flex-wrap: wrap; overflow-x: visible; row-gap: var(--space-1); }
   .content { padding-inline: var(--space-7); }
-}
-/* A faint ruled margin down the left of the measure, like a planner page. */
-@media (min-width: 1024px) {
-  .content {
-    background: linear-gradient(90deg, transparent max(var(--space-5), calc(50% - var(--measure-read) / 2 - 1.25rem)), var(--rule) 0, var(--rule) calc(max(var(--space-5), calc(50% - var(--measure-read) / 2 - 1.25rem)) + 1px), transparent 0) no-repeat;
-  }
 }
 @media (max-width: 1023px) {
   .toolbarWrap { top: calc(56px + env(safe-area-inset-top)); }

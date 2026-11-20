@@ -49,13 +49,15 @@ await test("1. The count line is wrong: not '0 notes', '1 note' or '2 notes' in 
   }
 });
 await test("2. An empty account shows no next step: the empty state or its New note button is missing", PAGE, async () => {
-  stubApi(routes([]));
+  const fresh = note("n9", "Untitled note");
+  stubApi(routes([], { "note-create": { note: fresh }, note: { note: fresh }, "note-versions": { versions: [] }, "note-collaborators": { collaborators: [] }, "note-comments": { comments: [] }, friends: { friends: [], incoming: [], outgoing: [] } }));
   const root = mount(ui());
   await waitFor(() => byRole("heading", "No notes found"));
   const button = [...root.querySelectorAll<HTMLElement>("main button")].find((b) => b.textContent?.trim() === "New note") ?? null;
   expect(button !== null).toBe(true);
   await click(button);
-  await waitFor(() => byRole("dialog", "Create Note"));
+  await waitFor(() => byLabel("Note title"));
+  expect(byRole("dialog")).toBe(null);
 });
 await test("3. A failing notes request is hidden: the page stays empty or loading instead of showing the error", PAGE, async () => {
   stubApi(routes(() => ({ status: 500, body: { error: "Your notes are unavailable. Please try again later." } })));

@@ -401,6 +401,7 @@ function NoteEditor() {
           aria-label="Note title"
           value={titleDraft}
           disabled={!canEdit || saving}
+          autoFocus={isNewNote}
           onChange={(e) => {
             setTitleDraft(e.target.value);
             if (isNewNote) edit({ title: e.target.value });
