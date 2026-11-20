@@ -10,8 +10,9 @@ import {
   Users,
   Plus,
 } from "lucide-react";
-import { useApp } from "../app/context";
-import { Spread, Chip, NoteCard, Empty, countOf, formatEventWhen } from "../shared/ui";
+import { useApp, useHoldRefresh } from "../app/context";
+import { Spread, Chip, NoteCard, Empty, DeleteDialog, countOf, formatEventWhen } from "../shared/ui";
+import { NoteServiceError } from "../services/notes-http";
 import { dateKey } from "../services/fixtures";
 import { meetingTimes } from "./course-meetings";
 import type {
@@ -41,6 +42,8 @@ export function CoursePage() {
   const [uploading, setUploading] = useState(false);
   const [sharingSchedule, setSharingSchedule] = useState(false);
   const [startError, setStartError] = useState("");
+  const [deleteId, setDeleteId] = useState<string>();
+  useHoldRefresh(owned && deleteId === id);
   useEffect(() => {
     void repo.courses.folders(id).then(setFolders);
   }, [id, state.notes]);
@@ -57,6 +60,17 @@ export function CoursePage() {
       </Empty>
     );
   const selected = params.get("lecture");
+  async function deleteCourse() {
+    try {
+      await repo.courses.remove(id);
+    } catch (error) {
+      // Another window may have deleted it. Verify absence before leaving the detail page.
+      if (!(error instanceof NoteServiceError) || error.status !== 404
+          || (await repo.courses.list()).some(c => c.id === id)) throw error;
+    }
+    await refresh();
+    navigate("/courses", { replace: true });
+  }
   const today = dateKey();
   const meets = meetingTimes(state.events.filter((e) => e.courseId === id));
   const days = (date: string) =>
@@ -179,6 +193,7 @@ export function CoursePage() {
           <Link className={s.secondary} to={`/notes?course=${id}`}>
             All course notes
           </Link>
+          {owned && <button type="button" className={s.dangerOutline} onClick={() => setDeleteId(id)}>Delete course</button>}
         </div>
       </section>
     </>
@@ -186,6 +201,9 @@ export function CoursePage() {
   return (
     <>
       <Spread label={course.name} className={css.spread} left={left} right={right} />
+      {owned && deleteId === id && (
+        <DeleteDialog item="course" title={course.code} onDelete={deleteCourse} onClose={() => setDeleteId(undefined)} />
+      )}
       {sharingSchedule && <ShareScheduleDialog course={course} onClose={() => setSharingSchedule(false)} />}
       {uploading && <ImportDialog kind="syllabus" startingCourseId={id} onClose={() => setUploading(false)} />}
       {sharing && (

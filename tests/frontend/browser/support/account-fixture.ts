@@ -274,6 +274,9 @@ export const test = base.extend<{ accountApi: void }>({
       if (action === "course-delete") {
         if (!savedCourses.some((c) => c.id === String(body.id) && c.ownerId === user!.id)) throw new ApiError(404, "This course could not be found.");
         savedCourses = savedCourses.filter((c) => c.id !== String(body.id));
+        for (const note of notes.values()) {
+          if (note.ownerId === user.id && note.courseId === body.id) note.courseId = "";
+        }
         savedEvents = savedEvents.filter((e) => e.courseId !== String(body.id) || e.ownerId !== user!.id);
         scheduleShares = scheduleShares.filter((x) => x.courseId !== String(body.id));
         return { deleted: true };
