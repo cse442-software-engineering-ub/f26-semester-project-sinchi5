@@ -4,7 +4,7 @@ import { Plus, FileText, Camera, UploadCloud, ArrowUpRight, MapPin } from "lucid
 import { useApp } from "../app/context";
 import { PageHeading, Spread, Chip, WeekStrip, Empty, formatEventTime } from "../shared/ui";
 import { dateKey } from "../services/fixtures";
-import { weekAhead } from "../services/upcoming";
+import { weekAhead, comingUp } from "../services/upcoming";
 import { notePreview } from "../services/noteText";
 import { expandRepeats } from "../services/recurrence";
 import { EventDialog } from "./schedule";
@@ -138,8 +138,10 @@ export function Dashboard({ onImport, onCreate, onAddCourse }: {
 
   const classes = day.filter((e) => isClass(e.kind));
   const due = expandedEvents
-    .filter((e) => !isClass(e.kind) && e.date >= today && e.date <= shiftDay(today, 7))
+    .filter((e) => !isClass(e.kind) && e.date >= today && e.date <= shiftDay(today, 6))
     .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+  // The next exams and projects past the week close the Due list ("in N days").
+  const later = comingUp(expandedEvents, today, 2);
   const daysAway = (d: string) => Math.round((Date.parse(`${d}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86_400_000);
 
   async function startNote(e: CourseEvent) {
@@ -272,7 +274,7 @@ export function Dashboard({ onImport, onCreate, onAddCourse }: {
 
       <section aria-labelledby="due-heading" className={css.section}>
         <h2 id="due-heading">Due</h2>
-        {due.length ? (
+        {due.length || later.length ? (
           <ul className={css.list}>
             {due.map((e) => {
               const n = daysAway(e.date);
@@ -287,6 +289,16 @@ export function Dashboard({ onImport, onCreate, onAddCourse }: {
                 </li>
               );
             })}
+            {later.map((e) => (
+              <li key={`${e.id}-${e.date}`} style={{ "--c": courseOf(e.courseId)?.color } as React.CSSProperties}>
+                <span className={css.dot} aria-hidden="true" />
+                <button type="button" className={css.rowText} onClick={() => openEvent(e)}>
+                  <strong>{e.title}</strong>
+                  <small>{courseOf(e.courseId)?.code ?? "Personal"} · <time dateTime={e.date}>{new Date(`${e.date}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</time></small>
+                </button>
+                <Chip>{`in ${e.daysAway} days`}</Chip>
+              </li>
+            ))}
           </ul>
         ) : (
           <Empty title="Nothing due this week.">Enjoy the breathing room.</Empty>

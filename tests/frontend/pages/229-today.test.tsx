@@ -151,3 +151,11 @@ await test("12. Text on the spread is under 4.5:1 in a dark scheme or a custom t
   html.removeAttribute("style");
   expect(bad).toEqual([]);
 });
+await test("13. The next exam past this week is missing from Today or lacks its date and \"in N days\"", "src/features/dashboard.tsx → Dashboard (later)", async () => {
+  const d = new Date(`${today}T12:00:00`); d.setDate(d.getDate() + 10);
+  stubApi(routes({ events: { events: [event("x1", dateKey(d), "10:00", "exam")] } }));
+  const root = mount(at());
+  await waitFor(() => byRole("heading", "Due"));
+  const text = byRole("heading", "Due")!.closest("section")!.textContent ?? "";
+  expect([text.includes("Event x1"), text.includes("in 10 days")]).toEqual([true, true]);
+});
