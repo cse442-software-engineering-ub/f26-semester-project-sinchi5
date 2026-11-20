@@ -1,6 +1,7 @@
-/* Card 210: the log in form leads; "Create account" sits quietly below it. */
+/* Cards 210, 256: the signed-out landing is one sheet on the scheme ground. The log in (or sign up, or recovery) page comes first;
+   beside it, on wide screens, sits a static sample Today spread. Under 720 px of the sheet the pages stack, the form first. */
 .enter {
-  animation: rise 180ms var(--ease-out) both;
+  animation: rise var(--motion-base) var(--ease-out) both;
 }
 @keyframes rise {
   from { opacity: 0; transform: translateY(8px); }
@@ -9,31 +10,121 @@
 @media (prefers-reduced-motion: reduce) {
   .enter { animation: none; }
 }
+.onboarding {
+  min-height: 100dvh;
+  display: flex;
+}
+.onboardingMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: clamp(var(--space-4), 4vw, var(--space-7)) var(--space-gutter);
+}
+.landing {
+  width: 100%;
+  max-width: 1480px;
+}
+/* Each page centres its content, so the shorter page never leaves an empty bottom. */
+.landing [data-page] {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.onboardingContent {
+  width: 100%;
+  max-width: 26rem;
+  margin-inline: auto;
+  padding: 0;
+}
+.onboardingContent h1 {
+  font-size: var(--fs-display);
+  line-height: var(--lh-display);
+  letter-spacing: var(--ls-display);
+  font-weight: 600;
+  margin: var(--space-4) 0 var(--space-2);
+  text-wrap: balance;
+}
+.onboardingContent > .muted {
+  display: block;
+  margin-bottom: var(--space-5);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+.eyebrow {
+  color: var(--muted);
+}
+.muted {
+  color: var(--muted);
+}
+.notice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-5) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--ground);
+  box-shadow: inset 0 0 0 1px var(--spine);
+  font-weight: 600;
+}
+.notice::before {
+  content: "";
+  width: 8px;
+  height: 14px;
+  background: var(--ribbon);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%);
+}
+.notice + h1 {
+  margin-top: var(--space-3);
+}
+.form {
+  gap: var(--space-3);
+}
+.form > .primary,
+.form > .secondary {
+  width: 100%;
+}
+.form > .textLink {
+  justify-content: center;
+}
+.primary {
+  width: 100%;
+}
+.textLink {
+  align-self: center;
+}
+.onboardingContent > .textLink {
+  margin: var(--space-2) auto 0;
+  display: flex;
+  justify-content: center;
+}
 .switch {
-  margin: 8px 0 0;
-  padding-top: 18px;
-  border-top: 1px solid var(--line);
+  margin: var(--space-2) 0 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--rule);
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   justify-content: center;
-  gap: 4px 8px;
-  font-size: 0.8rem;
+  gap: var(--space-1) var(--space-2);
+  font-size: var(--fs-body);
   color: var(--muted);
 }
 .switch > button {
   margin: 0;
-  font-size: 0.8rem;
 }
-
 .logo {
   display: flex;
-  gap: 10px;
+  gap: var(--space-2);
   align-items: center;
-  font-size: 1.65rem;
+  font-size: var(--fs-title);
+  line-height: var(--lh-title);
   font-weight: 650;
-  letter-spacing: -0.065em;
-  margin-bottom: 31px;
+  letter-spacing: var(--ls-title);
 }
 .logo > span {
   height: 36px;
@@ -41,7 +132,7 @@
   display: grid;
   place-items: center;
   background: var(--sage);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   color: var(--logo-ink);
 }
 .logo i {
@@ -51,212 +142,177 @@
   margin-left: -4px;
   align-self: flex-start;
 }
-.onboarding {
-  min-height: 100dvh;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-.onboardingArt {
-  background: var(--art-bg);
-  color: var(--art-ink);
-  padding: 48px 58px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-height: 100dvh;
-  overflow: hidden;
-}
-.onboardingArt > .logo {
-  margin-bottom: 50px;
-}
-.onboardingArt h1 {
-  font-size: clamp(2.1rem, 3.2vw, 3.5rem);
-  line-height: 1.15;
-  font-weight: 500;
-  letter-spacing: -0.06em;
-  margin: 18px 0;
-}
-.onboardingArt h1 em {
-  font-style: normal;
-  color: var(--art-accent);
-}
-.onboardingArt p {
-  color: var(--art-muted);
-  font-size: 0.85rem;
-  line-height: 1.8;
-}
-.onboardingArt > small {
-  font-size: 0.65rem;
-  color: var(--art-muted);
-}
-.onboardingArt .eyebrow {
-  color: var(--art-muted);
-}
-.paperStack {
-  height: 300px;
-  position: relative;
-  max-width: 360px;
-  margin: 20px auto;
-}
-.paperStack > div {
-  position: absolute;
-  width: 205px;
-  height: 250px;
-  border-radius: 8px;
-  background: var(--art-1);
-  left: 70px;
-  top: 34px;
-  transform: rotate(13deg);
-}
-.paperStack > div:nth-child(2) {
-  background: var(--art-2);
-  transform: rotate(-14deg);
-  left: 43px;
-  top: 22px;
-}
-.paperStack article {
-  position: absolute;
-  width: 205px;
-  height: 250px;
-  border-radius: 8px;
-  background: var(--art-paper);
-  left: 60px;
-  top: 20px;
-  transform: rotate(-4deg);
-  padding: 22px;
-  box-shadow: var(--shadow-paper);
-}
-.paperStack article > span {
-  display: block;
-  font-size: 0.45rem;
-  letter-spacing: 0.12em;
-  margin: 12px 0;
-}
-.paperStack h3 {
-  font-size: 1.4rem;
-  line-height: 1.2;
-  font-weight: 500;
-  margin-bottom: 22px;
-}
-.paperStack i {
-  display: block;
-  width: 100%;
-  border-bottom: 1px solid var(--art-rule);
-  margin: 10px 0;
-}
-.paperStack i:nth-of-type(2) {
-  width: 75%;
-}
-.paperStack small {
-  font-size: 0.48rem;
-}
-.onboardingMain {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 48px 32px;
-  position: relative;
-}
-.onboardingContent {
-  width: 100%;
-  max-width: 390px;
-  padding: 24px 0 60px;
-}
-.onboardingContent h2 {
-  font-size: 2rem;
-  font-weight: 500;
-  letter-spacing: -0.05em;
-  margin: 15px 0;
-}
-.onboardingContent > .muted {
-  font-size: 0.83rem;
-  display: block;
-  line-height: 1.8;
-  margin-bottom: 28px;
-}
-.onboardingContent > .primary {
-  margin-top: 20px;
-  display: flex;
-  width: 100%;
-}
-.onboardingContent > .textLink {
-  margin: 10px auto;
-  display: flex;
-  justify-content: center;
-}
-.onboardingContent .form > .primary,
-.onboardingContent .form > .secondary {
-  width: 100%;
-}
-.onboardingContent .form > .textLink {
-  justify-content: center;
-}
 .onboardingMain footer {
-  position: absolute;
-  bottom: 24px;
-  font-size: 0.6rem;
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  text-align: center;
+}
+
+/* The sample page: the tagline, then a small Today spread made of invented sample data. */
+.sample {
+  width: 100%;
+  max-width: 40rem;
+  margin-inline: auto;
+  display: grid;
+  gap: var(--space-4);
+}
+.sample h2 {
+  font-size: var(--fs-heading);
+  line-height: var(--lh-heading);
+  letter-spacing: var(--ls-heading);
+  font-weight: 600;
+  text-wrap: balance;
+}
+.sample h2 em {
+  font-style: normal;
   color: var(--muted);
 }
-@media (max-width: 1250px) {
-  .onboardingArt {
-      padding: 38px;
-    }
+.sampleLead {
+  margin: 0;
+  max-width: var(--measure-read);
+  color: var(--muted);
 }
-@media (max-width: 1023px) {
-  .onboardingArt h1 {
-      font-size: 2.2rem;
-    }
-  .onboardingArt {
-      padding: 30px;
-    }
-  .paperStack {
-      transform: scale(0.85);
-      transform-origin: left center;
-    }
-  .onboardingContent h2 {
-      font-size: 1.7rem;
-    }
+.day {
+  container-type: inline-size;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  padding: var(--space-5);
+  padding-top: var(--space-7);
+  border-radius: var(--radius-card);
+  background: var(--ground);
+  box-shadow: inset 0 0 0 1px var(--spine);
 }
-@media (max-width: 767px) {
-  .onboarding {
-      grid-template-columns: 1fr;
-    }
-  .onboardingArt {
-      min-height: 0;
-      padding: 25px 26px 28px;
-    }
-  .onboardingArt > .logo {
-      margin-bottom: 28px;
-      font-size: 1.45rem;
-    }
-  .onboardingArt h1 {
-      font-size: 2rem;
-    }
-  .onboardingArt .eyebrow {
-      font-size: 0.6rem;
-    }
-  .onboardingArt p {
-      font-size: 0.75rem;
-    }
-  .paperStack,
-  .onboardingArt > small {
-      display: none;
-    }
+.dayTag {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-5);
+  color: var(--muted);
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.dayRail > b {
+  display: block;
+  font-size: var(--fs-heading);
+  line-height: var(--lh-heading);
+  letter-spacing: var(--ls-heading);
+  font-weight: 600;
+}
+.dayRail > small {
+  display: block;
+  margin-bottom: var(--space-3);
+  color: var(--muted);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+.hours {
+  position: relative;
+  height: 11rem;
+}
+.hours > span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  padding-top: 2px;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  font-variant-numeric: tabular-nums;
+}
+.event {
+  position: absolute;
+  left: 3.25rem;
+  right: 0;
+  display: grid;
+  align-content: center;
+  padding: 0 var(--space-3);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+.event > b {
+  font-weight: 600;
+}
+.event > small {
+  color: var(--text);
+  opacity: 0.8;
+}
+.eventA {
+  background: var(--tint-a);
+  box-shadow: inset 3px 0 0 var(--tint-a-ink);
+}
+.eventB {
+  background: var(--tint-c);
+  box-shadow: inset 3px 0 0 var(--tint-c-ink);
+}
+.now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--ribbon);
+}
+.dayNotes {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.dayLabel {
+  margin-top: var(--space-2);
+  color: var(--muted);
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.dayLabel:first-child {
+  margin-top: 0;
+}
+.dayNote {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--sheet);
+  box-shadow: inset 0 0 0 1px var(--sheet-edge);
+}
+.dayNote small,
+.dayDue small {
+  display: block;
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+.dayDue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--rule);
+  font-size: var(--fs-body);
+}
+.dayDue b {
+  display: block;
+  font-weight: 600;
+}
+@container (min-width: 30rem) {
+  .day {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  }
+}
+@media (max-width: 719px) {
   .onboardingMain {
-      padding: 34px 26px 65px;
-      min-height: 400px;
-    }
-  .onboardingContent {
-      padding: 0 0 30px;
-    }
-  .onboardingContent h2 {
-      font-size: 1.7rem;
-    }
-  .onboardingMain footer {
-      bottom: 25px;
-    }
-  .onboardingContent .form {
-      gap: 16px;
-    }
+    justify-content: flex-start;
+  }
 }

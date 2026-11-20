@@ -75,7 +75,7 @@ await test("6. Upload syllabus does not open the upload window, or it still show
 await test("7. Settings still lists courses or offers Add course", "src/features/settings.tsx → Settings", async () => {
   stubApi(routes([cse442]));
   const root = mount(ui("/settings"));
-  await waitFor(() => byRole("heading", "Appearance"));
+  await waitFor(() => byRole("heading", "Account"));
   expect(byRole("heading", "Courses") === null).toBe(true);
   expect(inMain(root, "Add course") === null).toBe(true);
   expect(byText("Software Engineering") === null).toBe(true);

@@ -1,79 +1,93 @@
-.settingsGrid {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 760px;
-}
-.settingsGrid .panel {
-  padding: 24px;
-}
-.courseEmpty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  text-align: center;
-  padding: 28px 20px;
-  margin-bottom: 12px;
-  border: 1px dashed var(--line);
-  border-radius: 10px;
-  background: var(--surface-soft);
-  color: var(--muted);
-  font-size: 0.7rem;
-}
-.courseEmpty strong {
-  color: var(--text);
-  font-size: 0.8rem;
-}
-/* Card 154: a long name or email with no spaces wraps instead of widening the page. */
-.friendName {
-  overflow-wrap: anywhere;
-}
-/* Card 233: Friends fills the page area. The page is a container; from ~880px the add form and the
-   requests sit beside a multi-column grid of friend cards, below that everything stacks in one column. */
+/* Cards 233, 256: Friends is a spread. The left page is ruled lists (add a classmate, requests for you, sent requests);
+   the right page is an aligned grid of friend cards. Below 720 px of the sheet the pages stack. */
 .friends {
   container-type: inline-size;
-  container-name: friends;
   min-width: 0;
 }
+/* Two sheets side by side from 880 px: the left one is content height and stays in view while the right one scrolls. */
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: clamp(16px, 2.2vw, 32px);
-  align-items: start;
+  gap: var(--space-4);
 }
-.side {
+.layout > * {
+  min-width: 0;
+}
+@container (min-width: 880px) {
+  .layout {
+    grid-template-columns: minmax(22rem, 28rem) minmax(0, 1fr);
+    align-items: start;
+  }
+  .side {
+    position: sticky;
+    top: var(--space-4);
+  }
+}
+/* With few friends the grid ends in a quiet invitation, so the page is never an empty sheet. */
+.hint {
   display: grid;
-  gap: clamp(16px, 2vw, 24px);
+  align-content: center;
+  justify-items: start;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--ground);
+  box-shadow: inset 0 0 0 1px var(--spine);
+  color: var(--muted);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+.hint strong {
+  color: var(--text);
+}
+.hint .quiet {
+  margin-inline-start: calc(var(--space-3) * -1);
+  color: var(--text);
+}
+.group {
   min-width: 0;
 }
-.card {
-  min-width: 0;
-  padding: clamp(16px, 1.6vw, 28px);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
+/* A second group on the same page is set off by space above its heading; its list carries the rules. */
+.group + .group {
+  margin-top: var(--space-6);
 }
 .head {
-  margin-bottom: clamp(12px, 1.2vw, 18px);
+  margin-bottom: var(--space-4);
 }
 .head h2 {
-  font-size: clamp(1rem, 0.94rem + 0.3vw, 1.3rem);
-  font-weight: 550;
-  letter-spacing: -0.03em;
+  font-size: var(--fs-title);
+  line-height: var(--lh-title);
+  letter-spacing: var(--ls-title);
+  font-weight: 600;
 }
 .head p {
-  margin-top: 4px;
+  margin-top: var(--space-1);
   color: var(--muted);
-  font-size: clamp(0.76rem, 0.72rem + 0.15vw, 0.9rem);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  max-width: var(--measure-read);
 }
 .none {
   margin: 0;
+  padding: var(--space-3) 0;
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  border-top: 1px solid var(--rule);
 }
-.tall {
-  min-height: 44px;
+.addForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  max-width: 34rem;
+}
+.addForm > .primary {
+  margin-top: var(--space-2);
+  justify-self: start;
+}
+.addForm > p {
+  margin: 0;
 }
 .rows {
   list-style: none;
@@ -85,88 +99,100 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 8px 12px;
-  padding: 12px 0;
-  border-top: 1px solid var(--line);
-}
-.rows > li:first-child {
-  border-top: 0;
-  padding-top: 0;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--rule);
 }
 .rows > li:last-child {
-  padding-bottom: 0;
+  border-bottom: 1px solid var(--rule);
 }
 .rowActions {
   grid-column: 1 / -1;
 }
 .rowActions > button {
   flex: 1 1 100px;
-  min-height: 44px;
 }
 .pending {
   grid-column: 1 / -1;
   color: var(--muted);
-  font-size: 0.76rem;
+  font-size: var(--fs-small);
+  font-weight: 600;
 }
 .avatar {
   width: 40px;
   height: 40px;
 }
-.friends .friendName {
+/* Card 154: a long name or email with no spaces wraps instead of widening the page. */
+.friendName {
   display: grid;
   min-width: 0;
+  overflow-wrap: anywhere;
+}
+.friendName strong {
+  font-weight: 600;
 }
 .friendName small {
   color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
 }
 .friendGrid {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
-  gap: clamp(10px, 1.2vw, 18px);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr));
+  gap: var(--space-3);
 }
 .friendCard {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 14px;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: var(--space-3);
   min-width: 0;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface-soft);
-  transition: transform 160ms ease-out, box-shadow 160ms ease-out;
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--sheet);
+  box-shadow: inset 0 0 0 1px var(--sheet-edge);
+  transition: transform var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
 }
 .friendCard:hover {
-  border-color: var(--hover-line);
-  box-shadow: var(--shadow-card-hover);
-  transform: translateY(-2px);
+  box-shadow: inset 0 0 0 1px var(--hover-line), var(--shadow-card-hover);
+  transform: translateY(-1px);
 }
+/* Avatar above the name inside a friend card, so every card has the same shape. */
 .who {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: start;
+  align-content: start;
+  gap: var(--space-3);
+}
+.friendCard .avatar {
+  width: 48px;
+  height: 48px;
+  font-size: var(--fs-lead);
+}
+.remove {
+  justify-self: start;
+  margin-inline-start: calc(var(--space-3) * -1);
+  color: var(--muted);
+}
+.remove:hover {
+  color: var(--danger);
+}
+.courseEmpty {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
-}
-.friendCard > button {
-  min-height: 44px;
-}
-@container friends (min-width: 880px) {
-  .layout {
-    grid-template-columns: minmax(280px, 26rem) minmax(0, 1fr);
-  }
-  .rows > li {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
-  .rowActions,
-  .pending {
-    grid-column: auto;
-  }
-  .rowActions > button {
-    flex: 0 0 auto;
-  }
+  gap: var(--space-2);
+  text-align: center;
+  padding: var(--space-7) var(--space-5);
+  border: 1px dashed var(--spine);
+  border-radius: var(--radius-card);
+  background: var(--ground);
+  color: var(--muted);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
 }
 @media (prefers-reduced-motion: reduce) {
   .friendCard {
@@ -179,17 +205,13 @@
 /* Card 157: one checkbox row per friend in "Share your … notes". Each row is a 44px tap target. */
 .shareFriends {
   display: grid;
-  gap: 4px;
+  gap: var(--space-1);
   min-width: 0;
-  margin: 0 0 18px;
+  margin: 0 0 var(--space-4);
   padding: 0;
   border: 0;
 }
 .shareFriend {
   align-items: center;
   min-height: 44px;
-}
-.shareFriend .friendName {
-  display: grid;
-  min-width: 0;
 }
