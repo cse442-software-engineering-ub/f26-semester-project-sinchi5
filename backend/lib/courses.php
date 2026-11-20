@@ -100,9 +100,9 @@ function courseAction(PDO $db, array $config, array $session, string $route, arr
                     [$code, $name, $color, $term, $start, $end, $id, $user['id']]);
             }
         } catch (PDOException $error) {
-            // Only translate collisions on the owner/code/term index.
+            // Only translate collisions on the owner/code/term index (MySQL 8 prefixes it with the table name).
             if (($error->errorInfo[1] ?? null) === 1062
-                && str_ends_with($error->errorInfo[2] ?? '', "'notely_courses_identity'")) {
+                && str_ends_with($error->errorInfo[2] ?? '', "notely_courses_identity'")) {
                 throw new HttpError(409, 'This course has already been added.');
             }
             throw $error;
