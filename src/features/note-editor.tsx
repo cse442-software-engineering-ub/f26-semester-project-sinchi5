@@ -21,17 +21,15 @@ import {
 import { Menu } from "@base-ui/react/menu";
 import { useApp, useHoldRefresh } from "../app/context";
 import { Empty, Modal, DeleteNoteDialog} from "../shared/ui";
-import { MAX_COMMENT_LENGTH } from "../domain";
 import type {
   Note,
   NoteVersion,
-  Comment,
-  CommentScenario,
   Collaborator,
 } from "../domain";
 import css from "./note-editor.module.css";
 import s from "../shared/ui.module.css";
 import { Collaborators } from "./collaborators";
+import { Comments } from "./comments";
 // Card 241: TipTap is its own chunk, fetched when a note opens.
 const RichEditor = lazy(() => import("./rich-editor"));
 const loadingEditor = <p role="status">Loading the editor…</p>;
@@ -92,18 +90,8 @@ function NoteEditor() {
     query.addEventListener("change", update);
     return () => query.removeEventListener("change", update);
   }, [loaded]);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [commentsLoading, setCommentsLoading] = useState(true);
-  const [commentsError, setCommentsError] = useState("");
-  const [commentScenario, setCommentScenario] = useState<CommentScenario>("success");
-  const [commentsRetry, setCommentsRetry] = useState(0);
   const [versions, setVersions] = useState<NoteVersion[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
-  const [comment, setComment] = useState("");
-  const [posting, setPosting] = useState(false);
-  const postingRef = useRef(false);
-  const [postError, setPostError] = useState("");
-  const [postScenario, setPostScenario] = useState<CommentScenario>("success");
   const [preview, setPreview] = useState<NoteVersion>();
   const [restore, setRestore] = useState(false);
   // The editor's HTML once the writer changes it; null while the body is as saved. editorKey restarts the editor.
@@ -122,8 +110,8 @@ function NoteEditor() {
   const [reminderSaving, setReminderSaving] = useState(false);
   const noteRef = useRef<Note>();
   const dirtyRef = useRef(false);
-  // Card 257: unsaved title, body, details, or comment text keeps the background re-read away.
-  useHoldRefresh(dirty || draftBody !== null || (!!note && titleDraft !== note.title) || comment !== "" || reminderOpen);
+  // Card 257: unsaved title, body, or details keeps the background re-read away.
+  useHoldRefresh(dirty || draftBody !== null || (!!note && titleDraft !== note.title) || reminderOpen);
   const generation = useRef(0);
   // The note as the server last confirmed it, so a failed category save can put the selector back.
   const savedNote = useRef<Note>();
@@ -159,19 +147,6 @@ function NoteEditor() {
       generation.current++;
     };
   }, [id, repo]);
-  useEffect(() => {
-    let active = true;
-    setCommentsLoading(true);
-    setCommentsError("");
-    repo.notes
-      .comments(id, commentScenario)
-      .then((c) => active && setComments(c))
-      .catch((e) => active && setCommentsError((e as Error).message))
-      .finally(() => active && setCommentsLoading(false));
-    return () => {
-      active = false;
-    };
-  }, [id, repo, commentScenario, commentsRetry]);
   useEffect(() => {
     if (!dirty || !note || saving) return;
     const current = ++generation.current;
@@ -649,7 +624,9 @@ function NoteEditor() {
             key={`${note.id}:${state.user?.id || ""}`}
             noteId={note.id}
             isOwner={isOwner}
+            userId={state.user?.id ?? ""}
             repository={repo.notes}
+            onLeft={() => navigate("/notes")}
           />
           <div className={both.segment}>
             <button
@@ -673,112 +650,7 @@ function NoteEditor() {
             ) : (
               <>
                 <h3>Better, together.</h3>
-                <details className={s.demoDetails}>
-                  <summary>Prototype preview options</summary>
-                  <p>Comments load from this device. Choose how the load behaves.</p>
-                  <label>
-                    Comment loading
-                    <select
-                      value={commentScenario}
-                      onChange={(e) =>
-                        setCommentScenario(e.target.value as CommentScenario)
-                      }
-                    >
-                      <option value="success">Loads normally</option>
-                      <option value="slow">Loads slowly</option>
-                      <option value="failure">Fails to load</option>
-                    </select>
-                  </label>
-                  <label>
-                    Comment posting
-                    <select
-                      value={postScenario}
-                      onChange={(e) =>
-                        setPostScenario(e.target.value as CommentScenario)
-                      }
-                    >
-                      <option value="success">Posts normally</option>
-                      <option value="slow">Posts slowly</option>
-                      <option value="failure">Fails to post</option>
-                    </select>
-                  </label>
-                </details>
-                {commentsLoading ? (
-                  <p role="status">Loading comments…</p>
-                ) : commentsError ? (
-                  <div role="alert" className={s.error}>
-                    {commentsError}
-                    <button
-                      className={s.secondary}
-                      onClick={() => setCommentsRetry((n) => n + 1)}
-                    >
-                      Retry
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    {comments.map((c) => (
-                      <article key={c.id} className={css.comment}>
-                        <strong>{c.author}</strong>
-                        <small>{new Date(c.createdAt).toLocaleDateString()}</small>
-                        <p>{c.body}</p>
-                      </article>
-                    ))}
-                    {!comments.length && (
-                      <p className={both.muted}>Be the first to add a thought.</p>
-                    )}
-                  </>
-                )}
-                <form
-                  className={s.form}
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (postingRef.current || note.visibility !== "shared")
-                      return;
-                    postingRef.current = true;
-                    setPosting(true);
-                    setPostError("");
-                    try {
-                      await repo.notes.comment(id, comment, postScenario);
-                      setComment("");
-                      setCommentsRetry((n) => n + 1);
-                    } catch (e) {
-                      setPostError((e as Error).message);
-                    } finally {
-                      postingRef.current = false;
-                      setPosting(false);
-                    }
-                  }}
-                >
-                  <label>
-                    Add a comment
-                    <textarea
-                      required
-                      rows={3}
-                      placeholder="Share a thought…"
-                      value={comment}
-                      onChange={(e) => setComment(e.target.value)}
-                    />
-                  </label>
-                  <small className={both.muted}>
-                    {comment.length.toLocaleString()} / {MAX_COMMENT_LENGTH.toLocaleString()}
-                  </small>
-                  {postError && (
-                    <p role="alert" className={s.error}>
-                      {postError}
-                    </p>
-                  )}
-                  <button
-                    disabled={
-                      !comment.trim() ||
-                      comment.length > MAX_COMMENT_LENGTH ||
-                      posting
-                    }
-                    className={s.primary}
-                  >
-                    {posting ? "Posting…" : "Post comment"}
-                  </button>
-                </form>
+                <Comments noteId={note.id} isOwner={isOwner} userId={state.user?.id ?? ""} repository={repo.notes} />
               </>
             )
           ) : (
