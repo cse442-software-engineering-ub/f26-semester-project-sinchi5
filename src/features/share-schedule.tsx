@@ -5,6 +5,7 @@ import { Avatar, Modal } from "../shared/ui";
 import { FieldError } from "./account";
 import s from "../shared/ui.module.css";
 import css from "./friends.module.css";
+import own from "./share-schedule.module.css";
 
 // Card 144: the owner shares one course's schedule, view only, with a classmate by email (routes from card 143).
 export function ShareScheduleDialog({ course, onClose }: { course: Course; onClose: () => void }) {
@@ -61,7 +62,7 @@ export function ShareScheduleDialog({ course, onClose }: { course: Course; onClo
         <FieldError id="schedule-share-email-error" message={emailError} />
         <button type="submit" className={`${s.primary} ${css.tall}`} disabled={busy}>Share</button>
       </form>
-      <section aria-labelledby="schedule-shared-with">
+      <section className={own.sharedWith} aria-labelledby="schedule-shared-with">
         <h3 id="schedule-shared-with">Shared with</h3>
         {listError && <p className={s.error} role="alert">{listError}</p>}
         {!shares ? (
@@ -71,7 +72,7 @@ export function ShareScheduleDialog({ course, onClose }: { course: Course; onClo
             {shares.map((share) => (
               <li key={share.userId}>
                 <Avatar user={{ id: share.userId, name: share.name, email: share.email, hasPhoto: false }} className={css.avatar} />
-                <span className={css.friendName}>
+                <span className={`${css.friendName} ${own.person}`}>
                   <strong>{share.name}</strong>
                   <small>{share.email}</small>
                 </span>

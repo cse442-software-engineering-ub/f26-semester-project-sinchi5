@@ -123,10 +123,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Wraps instead of cutting off, so the whole name shows. */
 .courseShared {
   display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
   color: var(--muted);
   font-size: var(--fs-small);
   font-weight: 400;

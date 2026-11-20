@@ -485,6 +485,10 @@
   color: var(--muted);
   text-transform: capitalize;
 }
+/* Card 144: a name keeps its own capitals inside the capitalized line. */
+.eventText small .asWritten {
+  text-transform: none;
+}
 .eventRow > svg {
   color: var(--muted);
   width: 14px;
