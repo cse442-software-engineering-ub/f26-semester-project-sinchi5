@@ -34,6 +34,11 @@
   margin: 0;
   font-size: 1.05rem;
 }
+/* The phone "More actions" menu sits above the formatting toolbar (z-index 5), so every item can be tapped. */
+.menuLayer {
+  z-index: 30;
+}
+
 .menu {
   min-width: 200px;
   padding: 6px;

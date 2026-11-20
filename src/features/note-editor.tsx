@@ -500,7 +500,7 @@ function NoteEditor() {
               <MoreHorizontal size={18} aria-hidden="true" />
             </Menu.Trigger>
             <Menu.Portal>
-              <Menu.Positioner side="bottom" align="end" sideOffset={8}>
+              <Menu.Positioner className={css.menuLayer} side="bottom" align="end" sideOffset={8}>
                 <Menu.Popup className={css.menu}>
                   <Menu.Item className={css.menuItem} onClick={() => { setPanel("history"); setPeopleOpen(true); }}>
                     <History size={18} aria-hidden="true" /> History

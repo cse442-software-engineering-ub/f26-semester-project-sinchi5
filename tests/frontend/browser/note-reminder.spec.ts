@@ -5,6 +5,21 @@ const password = "Sample river password 42!";
 const summary = (page: Page) => page.getByText(/^Reminder: /);
 const dialog = (page: Page) => page.getByRole("dialog", { name: "Reminder" });
 
+// Phones keep Reminder in the note's "More actions" menu (card 242); wider screens show the button.
+// Clicking (not forcing) the control proves nothing covers it.
+async function reminderControl(page: Page) {
+  const more = page.getByRole("button", { name: "More actions" });
+  if (await more.isVisible()) {
+    await more.click();
+    return page.getByRole("menuitem", { name: "Reminder" });
+  }
+  return page.getByRole("button", { name: "Reminder", exact: true });
+}
+
+async function openReminder(page: Page) {
+  await (await reminderControl(page)).click();
+}
+
 async function openNote(page: Page) {
   await page.goto("/");
   await page.getByRole("button", { name: "Create account" }).click();
@@ -25,7 +40,7 @@ async function openNote(page: Page) {
 }
 
 async function choose(page: Page, date: string, time: string) {
-  await page.getByRole("button", { name: "Reminder", exact: true }).click();
+  await openReminder(page);
   await dialog(page).getByLabel("Date").fill(date);
   await dialog(page).getByLabel("Time").fill(time);
   await dialog(page).getByRole("button", { name: "Set reminder" }).click();
@@ -49,7 +64,7 @@ test("Card 76: set, change, and remove a reminder across reload", async ({ page 
   await expect(summary(page)).toContainText(`${day} at 10:30 AM`);
   await page.reload();
   await expect(summary(page)).toContainText(`${day} at 10:30 AM`);
-  await page.getByRole("button", { name: "Reminder", exact: true }).click();
+  await openReminder(page);
   await expect(dialog(page).getByLabel("Time")).toHaveValue("10:30");
   await dialog(page).getByRole("button", { name: "Remove reminder" }).click();
   await expect(summary(page)).toHaveCount(0);
@@ -62,7 +77,7 @@ test("Story 18: a past time is rejected without changing the saved reminder", as
   const tomorrow = localFields(new Date(Date.now() + 86_400_000));
   await choose(page, tomorrow.day, "09:00");
   const before = await summary(page).innerText();
-  await page.getByRole("button", { name: "Reminder", exact: true }).click();
+  await openReminder(page);
   await dialog(page).getByLabel("Date").fill(localFields(new Date(Date.now() - 86_400_000)).day);
   await dialog(page).getByRole("button", { name: "Set reminder" }).click();
   await expect(dialog(page).getByRole("alert")).toHaveText("Choose a time in the future.");
@@ -94,7 +109,7 @@ test("Story 18: due notification uses the note title and removing cancels it", a
 
   const second = localFields(new Date(Date.now() + 10 * 60_000));
   await choose(page, second.day, second.time);
-  await page.getByRole("button", { name: "Reminder", exact: true }).click();
+  await openReminder(page);
   await dialog(page).getByRole("button", { name: "Remove reminder" }).click();
   await expect(summary(page)).toHaveCount(0);
   await page.clock.fastForward(11 * 60_000);
@@ -104,9 +119,9 @@ test("Story 18: due notification uses the note title and removing cancels it", a
 
 test("Card 76: reminder controls fit and remain usable on a phone", async ({ page }) => {
   await openNote(page);
-  const button = page.getByRole("button", { name: "Reminder", exact: true });
-  await expect(button).toBeInViewport();
-  await button.click();
+  const control = await reminderControl(page);
+  await expect(control).toBeInViewport();
+  await control.click();
   await expect(dialog(page).getByLabel("Date")).toBeInViewport();
   await expect(dialog(page).getByLabel("Time")).toBeInViewport();
   await expect(dialog(page).getByRole("button", { name: "Set reminder" })).toBeInViewport();
