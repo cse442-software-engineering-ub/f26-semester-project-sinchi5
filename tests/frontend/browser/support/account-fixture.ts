@@ -181,6 +181,12 @@ export const test = base.extend<{ accountApi: void }>({
     const jobTexts = new Map<string, string>();
     let savedEvents: Record<string, string>[] = [];
     let savedCourses: Record<string, string>[] = [];
+    // Card 143 schedule shares, following the PHP rules: the course's owner shares it view only by email.
+    let scheduleShares: { owner: string; courseId: string; viewer: string }[] = [];
+    const ownerOf = (id: string) => [...accounts.values()].find((a) => a.id === id)!;
+    const sharedWithMe = (courseId: string) => scheduleShares.find((x) => x.courseId === courseId && x.viewer === user!.id);
+    const withSharedBy = <T extends Record<string, string>>({ ownerId, ...row }: T) =>
+      ownerId === user!.id ? row : { ...row, sharedBy: { id: ownerId, name: ownerOf(ownerId).name } };
     function importRoute(action: string, query: URLSearchParams, body: Record<string, unknown>) {
       if (!user) throw new ApiError(401, "Sign in to continue.");
       if (action === "syllabus-upload") {
@@ -243,13 +249,16 @@ export const test = base.extend<{ accountApi: void }>({
         for (const note of [...notes.values()]) if (note.ownerId === user.id) removeNote(note.id);
         savedCourses = savedCourses.filter((c) => c.ownerId !== user!.id);
         savedEvents = savedEvents.filter((e) => e.ownerId !== user!.id);
+        scheduleShares = scheduleShares.filter((x) => x.owner !== user!.id);
         return { cleared: true };
       }
-      if (action === "events") {
-        return { events: savedEvents.filter((e) => e.ownerId === user!.id).map(({ ownerId: _owner, ...e }) => e) };
-      }
+      // Card 143: the student's own, then what classmates shared with them (with sharedBy).
+      const visible = (row: Record<string, string>) => row.ownerId === user!.id
+        || scheduleShares.some((x) => x.owner === row.ownerId && x.courseId === (row.courseId ?? row.id) && x.viewer === user!.id);
+      const ownFirst = (a: Record<string, string>, b: Record<string, string>) => Number(a.ownerId !== user!.id) - Number(b.ownerId !== user!.id);
+      if (action === "events") return { events: savedEvents.filter(visible).sort(ownFirst).map(withSharedBy) };
       // Card 141 courses and hand-made events, kept in memory like the PHP routes.
-      if (action === "courses") return { courses: savedCourses.filter((c) => c.ownerId === user!.id).map(({ ownerId: _owner, ...c }) => c) };
+      if (action === "courses") return { courses: savedCourses.filter(visible).sort(ownFirst).map(withSharedBy) };
       if (action === "course-save") {
         const { id, code, name, color, term, classesStart, classesEnd } = body as Record<string, string>;
         const own = savedCourses.find((c) => c.id === id);
@@ -265,11 +274,13 @@ export const test = base.extend<{ accountApi: void }>({
         if (!savedCourses.some((c) => c.id === String(body.id) && c.ownerId === user!.id)) throw new ApiError(404, "This course could not be found.");
         savedCourses = savedCourses.filter((c) => c.id !== String(body.id));
         savedEvents = savedEvents.filter((e) => e.courseId !== String(body.id) || e.ownerId !== user!.id);
+        scheduleShares = scheduleShares.filter((x) => x.courseId !== String(body.id));
         return { deleted: true };
       }
       if (action === "event-save") {
         if (!/^[A-Za-z0-9_-]{1,64}$/.test(String(body.courseId ?? ""))) throw new ApiError(422, "Choose a course for this event.");
         if (body.id !== undefined && !/^\d+$/.test(String(body.id))) throw new ApiError(422, "Choose a valid event.");
+        if (sharedWithMe(String(body.courseId))) throw new ApiError(403, "You do not have permission to edit this schedule.");
         const old = body.id === undefined ? undefined : savedEvents.find((e) => e.id === String(body.id) && e.ownerId === user!.id);
         if (body.id !== undefined && !old) throw new ApiError(404, "This event could not be found.");
         const { repeat, ...fields } = body as Record<string, string>;
@@ -397,10 +408,46 @@ export const test = base.extend<{ accountApi: void }>({
       for (const friend of new Set(ids as string[])) courseShares.push({ owner: me, courseId, courseCode: body.courseCode.trim(), friend });
       return { shares: list() };
     }
+    function scheduleRoute(action: string, query: URLSearchParams, body: Record<string, unknown>) {
+      if (!user) throw new ApiError(401, "Sign in to continue.");
+      const me = user.id;
+      const courseId = String((action === "schedule-shares" ? query.get("courseId") : body.courseId) ?? "");
+      if (!savedCourses.some((c) => c.id === courseId && c.ownerId === me)) throw new ApiError(422, "Choose a valid course.");
+      const view = (a: Account) => ({ userId: a.id, name: a.name, email: a.email, permission: "view" });
+      const list = () => scheduleShares.filter((x) => x.owner === me && x.courseId === courseId)
+        .map((x) => ownerOf(x.viewer)).sort((a, b) => a.name.localeCompare(b.name)).map(view);
+      if (action === "schedule-shares") return { status: 200, json: { shares: list() } };
+      if (action === "schedule-unshare") {
+        scheduleShares = scheduleShares.filter((x) => !(x.owner === me && x.courseId === courseId && x.viewer === String(body.userId)));
+        return { status: 200, json: { shares: list() } };
+      }
+      // The common validEmail() messages from backend/lib/security.php.
+      const email = String(body.email ?? "").trim().toLowerCase();
+      if (!email) throw new ApiError(422, "Enter your email address.");
+      if (/\s/.test(email)) throw new ApiError(422, "Email addresses can’t contain spaces.");
+      if (email.split("@").length !== 2) throw new ApiError(422, "Email addresses need exactly one @, like name@university.edu.");
+      if (!/^[^@]+@[^@]+\.[^@]+$/.test(email)) throw new ApiError(422, "Enter a complete email address, like name@university.edu.");
+      const them = accounts.get(email);
+      if (!them) throw new ApiError(404, "No registered account was found for this email.");
+      if (them.id === me) throw new ApiError(422, "You can’t share a schedule with yourself.");
+      if (scheduleShares.some((x) => x.owner === me && x.courseId === courseId && x.viewer === them.id)) {
+        throw new ApiError(409, "This schedule is already shared with that person.");
+      }
+      scheduleShares.push({ owner: me, courseId, viewer: them.id });
+      return { status: 201, json: { share: view(them) } };
+    }
     await context.route("**/api/index.php?route=*", async route => {
       const query = new URL(route.request().url()).searchParams;
       const action = query.get("route")!;
       const body = route.request().postDataJSON() || {};
+      if (["schedule-share", "schedule-shares", "schedule-unshare"].includes(action)) {
+        try {
+          await route.fulfill(scheduleRoute(action, query, body));
+        } catch (e) {
+          await route.fulfill({ status: (e as ApiError).status ?? 500, json: { error: (e as Error).message } });
+        }
+        return;
+      }
       if (["course-notes-share", "course-notes-shares", "shared-notes"].includes(action)) {
         try {
           await route.fulfill({ json: shareRoute(action, query, body) });
@@ -502,6 +549,8 @@ export const test = base.extend<{ accountApi: void }>({
           for (const list of editors.values()) list.delete(user.id);
           friendships = friendships.filter((f) => f.from !== user!.id && f.to !== user!.id);
           courseShares = courseShares.filter((c) => c.owner !== user!.id && c.friend !== user!.id);
+          savedCourses = savedCourses.filter((c) => c.ownerId !== user!.id);
+          scheduleShares = scheduleShares.filter((x) => x.owner !== user!.id && x.viewer !== user!.id);
           accounts.delete(user.email); user = null;
         } else { user.code = "BEEF-5678-BEEF-5678-BEEF-5678-BEEF-5678"; recoveryCode = user.code; }
       } else if (action === "reset-password") {

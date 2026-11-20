@@ -225,7 +225,11 @@ export default function App() {
                   {state.courses.map((c) => (
                     <NavLink key={c.id} to={`/courses/${c.id}`} className={sh.courseItem}>
                       <i className={sh.dot} style={{ background: c.color }} />
-                      <span>{c.code}</span>
+                      {/* Card 144: a classmate's shared course says whose it is. */}
+                      <span>
+                        {c.code}
+                        {c.sharedBy && <small className={sh.courseShared}>Shared by {c.sharedBy.name}</small>}
+                      </span>
                     </NavLink>
                   ))}
                 </div>

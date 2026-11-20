@@ -48,6 +48,7 @@ export function Courses({ onAddCourse }: { onAddCourse: () => void }) {
                   <strong>{course.code}</strong>
                   <span>{course.name}</span>
                   <span>{course.term}</span>
+                  {course.sharedBy && <span>Shared by {course.sharedBy.name}</span>}
                   {next && <span>Next: {next.title} · {next.date}</span>}
                   <span>{notes === 1 ? "1 note" : `${notes} notes`}</span>
                 </Link>
