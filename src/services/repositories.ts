@@ -52,6 +52,7 @@ export function createRepositories(server: {
 }): Omit<Repositories, "auth" | "reset"> {
   const repo: Omit<Repositories, "auth" | "reset"> = {
     courses: {
+      remove: server.courses.delete,
       async list() {
         return server.courses.list();
       },

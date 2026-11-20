@@ -60,11 +60,16 @@ await test("6. A course saved with an unknown id is refused instead of created w
   expect((await api("courses")).body.courses.length).toBe(2);
 });
 await test("7. Saving a course with its own id adds a second copy instead of updating it", `${COURSES} (the update branch)`, async () => {
-  const r = await api("course-save", { ...course, id: "t141-c1", name: "Algorithms", color: "#ABCDEF" });
+  const r = await api("course-save", { ...course, id: "t141-c1", code: "CSE 250", name: "Algorithms", color: "#ABCDEF" });
   expect(r.body.course.name).toBe("Algorithms");
   expect(r.body.course.color).toBe("#ABCDEF");
   expect(r.body.course.classesStart).toBe(undefined); // saved without dates: they are cleared
   expect((await api("courses")).body.courses.length).toBe(2);
+});
+await test("7b. Editing a course can duplicate another course in the same term", COURSES, async () => {
+  const before = (await api("courses")).body.courses;
+  expect(await api("course-save", { ...course, id: "t141-c1" })).toEqual(409, { error: "This course has already been added." });
+  expect((await api("courses")).body.courses).toEqual(before);
 });
 await test("8. Each course rule is not enforced", `${COURSES} (the course-save checks)`, async () => {
   const cases = [

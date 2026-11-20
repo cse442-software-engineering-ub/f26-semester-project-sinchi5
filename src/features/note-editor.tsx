@@ -30,6 +30,7 @@ import css from "./note-editor.module.css";
 import s from "../shared/ui.module.css";
 import { Collaborators } from "./collaborators";
 import { Comments } from "./comments";
+import { LinkControls } from "./link-event";
 // Card 241: TipTap is its own chunk, fetched when a note opens.
 const RichEditor = lazy(() => import("./rich-editor"));
 const loadingEditor = <p role="status">Loading the editor…</p>;
@@ -601,7 +602,17 @@ function NoteEditor() {
                 }
               />
             </label>
-            {/* A future "Linked event" row goes here. */}
+            <div className={css.linkedEvent}>
+              Linked event
+              <LinkControls note={note} canLink={isOwner && !saving} onLinked={(n) => {
+                // The server changed only the link, course and lecture date; keep any unsaved edits.
+                const merged = (c: Note): Note => ({ ...c, eventId: n.eventId, eventDate: n.eventDate, courseId: n.courseId, lectureDate: n.lectureDate });
+                setNote(merged(note));
+                if (noteRef.current) noteRef.current = merged(noteRef.current);
+                if (savedNote.current) savedNote.current = merged(savedNote.current);
+                void refresh();
+              }} />
+            </div>
           </div>
         </div>
       </div>
