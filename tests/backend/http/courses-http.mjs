@@ -1,5 +1,5 @@
 // Card 141: real HTTP tests for courses and hand-made events. Needs a disposable local database with
-// migrations 001-016: NOTELY_TEST_ISOLATED=1 NOTELY_TEST_URL=http://127.0.0.1:8141/api/index.php node tests/backend/http/courses-http.mjs
+// migrations through 023: NOTELY_TEST_ISOLATED=1 NOTELY_TEST_URL=http://127.0.0.1:8141/api/index.php node tests/backend/http/courses-http.mjs
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
@@ -7,13 +7,16 @@ const url = new URL(process.env.NOTELY_TEST_URL || "http://127.0.0.1:8080/api/in
 assert(["localhost", "127.0.0.1", "[::1]"].includes(url.hostname), "Use a local disposable DEV/TEST API only.");
 assert.equal(process.env.NOTELY_TEST_ISOLATED, "1", "Set NOTELY_TEST_ISOLATED=1 once the API uses a disposable database.");
 const origin = process.env.NOTELY_TEST_ORIGIN || url.origin;
+// For single-worker PHP dev servers, start a second worker on another local port.
+const peer = new URL(process.env.NOTELY_TEST_PEER_URL || url);
+assert.equal(peer.hostname, url.hostname);
 const password = `Course meadow ${randomUUID()}!`;
 
 function client() {
   return {
     cookie: "", csrf: "", email: `notely-courses-${randomUUID()}@example.edu`,
-    async call(route, body, { raw, method, query = "" } = {}) {
-      const target = new URL(url);
+    async call(route, body, { raw, method, query = "", endpoint = url } = {}) {
+      const target = new URL(endpoint);
       target.search = `?route=${route}${query}`;
       const post = body !== undefined;
       const response = await fetch(target, {
@@ -63,10 +66,48 @@ try {
   const adopted = await a.call("course-save", { ...course, id: "c-1", code: "CSE 250", classesStart: "2026-08-31", classesEnd: "2026-12-11" });
   assert.deepEqual(adopted.data.course, { id: "c-1", ...course, code: "CSE 250", classesStart: "2026-08-31", classesEnd: "2026-12-11" });
   assert.equal((await a.call("courses")).data.courses.length, 2);
-  const edited = await a.call("course-save", { ...course, id: "c-1", name: "Algorithms", color: "#ABCDEF" });
+  const edited = await a.call("course-save", { ...course, id: "c-1", code: "CSE 250", name: "Algorithms", color: "#ABCDEF" });
   assert.deepEqual([edited.data.course.name, edited.data.course.color, edited.data.course.classesStart], ["Algorithms", "#ABCDEF", undefined]);
   assert.equal((await a.call("courses")).data.courses.length, 2);
   pass("courses: empty, 1, 2; server-made id; adopted id; update in place");
+
+  const listCourses = async (account) => (await account.call("courses")).data.courses;
+  const before = await listCourses(a);
+  const duplicate = (response) => err(response, 409, "This course has already been added.");
+  const qa = { ...course, code: "QA442" };
+  const original = await a.call("course-save", qa);
+  assert.equal(original.status, 200);
+  duplicate(await a.call("course-save", qa));
+  duplicate(await a.call("course-save", { ...qa, name: "Different", classesEnd: "2026-12-20", color: "#123456" }));
+  assert.deepEqual((await listCourses(a)).filter(c => c.code === qa.code), [original.data.course]);
+  pass("exact duplicates and different display fields leave one unchanged original");
+  duplicate(await a.call("course-save", { ...course, code: "cse 442", term: "fall 2026" }));
+  pass("case-insensitive code and term");
+  duplicate(await a.call("course-save", { ...course, code: "  CSE 442\u00a0", term: "\u2003Fall 2026 " }));
+  pass("Unicode and ASCII edge whitespace");
+  const spring = await a.call("course-save", { ...course, term: "Spring 2027" });
+  assert.equal(spring.status, 200);
+  assert.notEqual(spring.data.course.id, made.data.course.id);
+  pass("another term creates a separate course");
+  const other = await b.call("course-save", course);
+  assert.equal(other.status, 200);
+  assert.deepEqual(await listCourses(b), [other.data.course]);
+  assert.ok(!(await listCourses(a)).some(c => c.id === other.data.course.id));
+  pass("another account independently owns the same identity");
+  const prior = await listCourses(a);
+  duplicate(await a.call("course-save", { ...course, id: "c-1", name: "Rejected" }));
+  assert.deepEqual(await listCourses(a), prior);
+  pass("conflicting updates preserve both courses");
+  const race = { ...course, code: "Concurrent" };
+  const results = await Promise.all([a.call("course-save", race), a.call("course-save", race, { endpoint: peer })]);
+  results.sort((left, right) => left.status - right.status);
+  assert.equal(results[0].status, 200);
+  duplicate(results[1]);
+  assert.deepEqual((await listCourses(a)).filter(c => c.code === race.code), [results[0].data.course]);
+  pass("two simultaneous creates produce one saved course and one controlled conflict");
+  for (const saved of [original, spring, results[0]]) assert.equal((await a.call("course-delete", { id: saved.data.course.id })).status, 200);
+  assert.equal((await b.call("course-delete", { id: other.data.course.id })).status, 200);
+  assert.deepEqual(await listCourses(a), before);
 
   // Another student.
   assert.deepEqual((await b.call("courses")).data, { courses: [] });
@@ -77,6 +118,7 @@ try {
 
   // Validation.
   const bad = async (patch, message) => err(await a.call("course-save", { ...course, ...patch }), 422, message);
+  await bad({ code: undefined }, "Enter a course code of 1 to 64 visible characters.");
   await bad({ code: "" }, "Enter a course code of 1 to 64 visible characters.");
   await bad({ code: "x".repeat(65) }, "Enter a course code of 1 to 64 visible characters.");
   await bad({ name: "   " }, "Enter a course name of 1 to 255 visible characters.");
@@ -159,6 +201,13 @@ try {
   // course-delete removes events, detaches notes, keeps the others.
   const note = await a.call("note-create", { title: "Lecture", body: "text", courseId: "c-1" });
   assert.equal(note.status, 201);
+  const eventsBeforeEdit = (await a.call("events")).data.events;
+  const secondEdit = await a.call("course-save", { ...edited.data.course, name: "Updated", color: "#123456" });
+  assert.deepEqual(secondEdit.data.course, { ...edited.data.course, name: "Updated", color: "#123456" });
+  assert.equal((await listCourses(a)).length, 2);
+  assert.deepEqual((await a.call("events")).data.events, eventsBeforeEdit);
+  assert.equal((await a.call("note", undefined, { query: `&id=${note.data.note.id}` })).data.note.courseId, "c-1");
+  pass("same-ID edit preserves linked events and note");
   assert.deepEqual((await a.call("course-delete", { id: "c-1" })).data, { deleted: true });
   assert.deepEqual((await a.call("events")).data.events, []);
   const kept = (await a.call("note", undefined, { query: `&id=${note.data.note.id}` })).data.note;
@@ -179,6 +228,6 @@ try {
   assert.equal((await a.call("events", undefined, { query: "&courseId=nothing" })).data.events.length, 0);
   pass("at most 500 hand-made events; the list of 500 comes back");
 } finally {
-  for (const p of [a, b]) await p.call("delete", { password }).catch(() => {});
+  for (const p of [a, b]) await p.call("delete", { currentPassword: password }).catch(() => {});
 }
 console.log(`courses-http: ${passed} groups passed`);
