@@ -192,3 +192,23 @@
   display: inline;
   font-weight: 400;
 }
+
+/* Card 144: a shared event's details, read only. */
+.sharedDetails {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+}
+.sharedDetails > div {
+  display: grid;
+  gap: 2px;
+}
+.sharedDetails dt {
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+.sharedDetails dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

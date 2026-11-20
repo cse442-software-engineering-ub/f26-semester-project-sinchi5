@@ -23,6 +23,7 @@ import {
 import { dateKey } from "../services/fixtures";
 import {
   isClass,
+  ownCourses,
   type CourseEvent,
   type EventKind,
 } from "../domain";
@@ -98,7 +99,7 @@ export function EventDialog({
     event || {
       id: "",
       title: "",
-      courseId: state.courses[0]?.id || "",
+      courseId: ownCourses(state.courses)[0]?.id || "",
       kind: "lecture",
       date: date || dateKey(),
       time: "10:00",
@@ -164,6 +165,9 @@ export function EventDialog({
       },
     });
   }
+
+  // Card 144: an event in a classmate's shared course is shown, never edited or deleted.
+  if (event?.sharedBy) return <SharedEventDetails event={event} onClose={onClose} />;
 
   return (
     <Modal
@@ -254,7 +258,8 @@ export function EventDialog({
                 Personal
               </option>
 
-              {state.courses.map(
+              {/* Card 144: a classmate's shared course is view only, so it isn't a choice. */}
+              {ownCourses(state.courses).map(
                 (c) => (
                   <option
                     key={c.id}
@@ -530,6 +535,47 @@ export function EventDialog({
           }
         />
       )}
+    </Modal>
+  );
+}
+
+// Card 144: what a classmate sees for an event in a course shared with them (card 143): its details, read only.
+function SharedEventDetails({
+  event,
+  onClose,
+}: {
+  event: CourseEvent;
+  onClose: () => void;
+}) {
+  const { state } = useApp();
+  const course = state.courses.find((c) => c.id === event.courseId);
+  const when = new Date(`${event.date}T12:00:00`).toLocaleDateString("en-US", {
+    weekday: "long", month: "long", day: "numeric", year: "numeric",
+  });
+  const rows: [string, string][] = [
+    ["Title", event.title],
+    ["Course", course?.code ?? ""],
+    ["Event type", event.kind],
+    ["Date", when],
+    ["Time", event.time ? formatEventTime(event.time) : "All day"],
+    ["Location", event.location],
+    ["Description", event.description],
+  ];
+  return (
+    <Modal
+      title="Event details"
+      description={`Shared by ${event.sharedBy!.name}. You can view this event.`}
+      onClose={onClose}
+    >
+      {event.repeat && <p className={s.notice}>{repeatSummary(event)}</p>}
+      <dl className={css.sharedDetails}>
+        {rows.filter(([, value]) => value).map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
     </Modal>
   );
 }

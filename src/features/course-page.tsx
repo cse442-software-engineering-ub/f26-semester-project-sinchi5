@@ -5,6 +5,7 @@ import {
   Link,
 } from "react-router-dom";
 import {
+  CalendarDays,
   Users,
 } from "lucide-react";
 import { useApp } from "../app/context";
@@ -18,26 +19,31 @@ import css from "./course-page.module.css";
 import { createHttpNoteShares } from "../services/note-shares-http";
 import { ShareNotesDialog, sharedLabel } from "./share-notes";
 import { ImportDialog } from "./imports";
+import { ShareScheduleDialog } from "./share-schedule";
 
 export function CoursePage() {
   const { id = "" } = useParams();
   const { state, repo } = useApp();
   const [params] = useSearchParams();
   const course = state.courses.find((c) => c.id === id);
+  // Card 144: a classmate's shared course is view only, so its owner's sharing and upload controls are left out.
+  const owned = !!course && !course.sharedBy;
   const [folders, setFolders] = useState<Record<string, Note[]>>({});
   // Card 157: who this course's notes are shared with (card 156).
   const [shares, setShares] = useState<CourseShare[]>();
   const [shareError, setShareError] = useState("");
   const [sharing, setSharing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [sharingSchedule, setSharingSchedule] = useState(false);
   useEffect(() => {
     void repo.courses.folders(id).then(setFolders);
   }, [id, state.notes]);
   useEffect(() => {
     setShares(undefined);
     setShareError("");
+    if (!owned) return;
     createHttpNoteShares().shares(id).then(setShares, (e: Error) => setShareError(e.message));
-  }, [id]);
+  }, [id, owned]);
   if (!course)
     return (
       <Empty title="Course not found">
@@ -53,12 +59,19 @@ export function CoursePage() {
         description="Your lectures, notes, and next steps."
         actions={
           <>
-            <button className={s.secondary} onClick={() => setUploading(true)}>
-              Upload syllabus
-            </button>
-            <button className={s.secondary} onClick={() => setSharing(true)}>
-              <Users size={17} aria-hidden="true" /> Share notes with friends
-            </button>
+            {owned && (
+              <>
+                <button className={s.secondary} onClick={() => setUploading(true)}>
+                  Upload syllabus
+                </button>
+                <button className={s.secondary} onClick={() => setSharingSchedule(true)}>
+                  <CalendarDays size={17} aria-hidden="true" /> Share schedule
+                </button>
+                <button className={s.secondary} onClick={() => setSharing(true)}>
+                  <Users size={17} aria-hidden="true" /> Share notes with friends
+                </button>
+              </>
+            )}
             <Link className={s.secondary} to={`/notes?course=${id}`}>
               All course notes
             </Link>
@@ -66,8 +79,11 @@ export function CoursePage() {
         }
       />
       <p className={`${s.muted} ${css.shareStatus}`} role="status">
-        {shareError || (shares && sharedLabel(shares))}
+        {course.sharedBy
+          ? `Shared by ${course.sharedBy.name}. You can view its schedule.`
+          : shareError || (shares && sharedLabel(shares))}
       </p>
+      {sharingSchedule && <ShareScheduleDialog course={course} onClose={() => setSharingSchedule(false)} />}
       {uploading && <ImportDialog kind="syllabus" startingCourseId={id} onClose={() => setUploading(false)} />}
       {sharing && (
         <ShareNotesDialog course={course} shares={shares ?? []} onClose={() => setSharing(false)}

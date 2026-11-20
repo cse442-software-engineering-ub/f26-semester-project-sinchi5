@@ -14,7 +14,7 @@ import { useApp, useHoldRefresh } from "../app/context";
 import { fileTypeProblem } from "../services/syllabus-file";
 import { applyPlacement, checkMeeting, needsSectionPick, placementContext, sectionQuestions, type SectionAnswers } from "../services/syllabus";
 import { formatEventTime, Modal } from "../shared/ui";
-import { CLASS_KINDS, type DetectedEvent, type DetectedMeeting, type EventKind, type UploadKind, type UploadJob } from "../domain";
+import { CLASS_KINDS, ownCourses, type DetectedEvent, type DetectedMeeting, type EventKind, type UploadKind, type UploadJob } from "../domain";
 import css from "./imports.module.css";
 import s from "../shared/ui.module.css";
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -181,7 +181,7 @@ export function ImportDialog({
   const [answers, setAnswers] = useState<SectionAnswers>({});
   const [saved, setSaved] = useState({ created: 0, skipped: 0, first: "" });
   const [courseId, setCourseId] = useState(
-    startingCourseId ?? state.courses[0]?.id ?? "",
+    startingCourseId ?? ownCourses(state.courses)[0]?.id ?? "",
   );
   // A slow upload must not update the window after it closes. Setting it on every mount matters:
   // React's development mode mounts, unmounts, and mounts again.
@@ -349,12 +349,12 @@ export function ImportDialog({
             </p>
           )}
           {kind === "syllabus" &&
-            (state.courses.length ? (
+            (ownCourses(state.courses).length ? (
               <div className={s.form}>
                 <label>
                   Course
                   <select value={courseId} aria-describedby="syllabus-course-hint" onChange={(e) => setCourseId(e.target.value)}>
-                    {state.courses.map((c) => (
+                    {ownCourses(state.courses).map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.code}
                       </option>
@@ -577,7 +577,7 @@ export function ImportDialog({
                 }
               >
                 {kind !== "syllabus" && <option value="">Not detected</option>}
-                {state.courses.map((c) => (
+                {ownCourses(state.courses).map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.code}
                   </option>

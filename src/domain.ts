@@ -25,6 +25,13 @@ export interface Course {
   // First and last day of classes, when the student gave them (card 46). A syllabus's own dates come first.
   classesStart?: string;
   classesEnd?: string;
+  // Card 144: a course a classmate shared with this student (card 143). Its schedule is view only.
+  sharedBy?: SharedBy;
+}
+// Card 144: who shared a course's schedule.
+export interface SharedBy {
+  id: string;
+  name: string;
 }
 export interface Category {
   id: string;
@@ -95,6 +102,8 @@ export interface CourseEvent {
   seriesId?: string | null;
   repeat?: RepeatRule;
   repeatOf?: string;
+  // Card 144: an event in a course a classmate shared (card 143); it is view only.
+  sharedBy?: SharedBy;
 }
 export interface DetectedMetadata {
   title: string;
@@ -247,6 +256,15 @@ export interface CourseShare {
   name: string;
   email: string;
 }
+// Card 144: a classmate one course's schedule is shared with (card 143), view only.
+export interface ScheduleShare {
+  userId: string;
+  name: string;
+  email: string;
+  permission: "view";
+}
+// Card 144: courses the student can add events to; a classmate's shared course is view only.
+export const ownCourses = (courses: Course[]) => courses.filter((c) => !c.sharedBy);
 export interface FriendLists {
   friends: Friend[];
   incoming: Friend[];
