@@ -90,11 +90,22 @@ function courseAction(PDO $db, array $config, array $session, string $route, arr
             $count = (int) query($db, 'SELECT COUNT(*) FROM notely_courses WHERE owner_user_id = ?', [$user['id']])->fetchColumn();
             if ($count >= MAX_COURSES) throw new HttpError(422, 'You can have at most ' . MAX_COURSES . ' courses.');
             $id ??= bin2hex(random_bytes(16));
-            query($db, 'INSERT INTO notely_courses (id, owner_user_id, code, name, color, term, classes_start, classes_end) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                [$id, $user['id'], $code, $name, $color, $term, $start, $end]);
-        } else {
-            query($db, 'UPDATE notely_courses SET code = ?, name = ?, color = ?, term = ?, classes_start = ?, classes_end = ? WHERE id = ? AND owner_user_id = ?',
-                [$code, $name, $color, $term, $start, $end, $id, $user['id']]);
+        }
+        try {
+            if ($owner === false) {
+                query($db, 'INSERT INTO notely_courses (id, owner_user_id, code, name, color, term, classes_start, classes_end) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    [$id, $user['id'], $code, $name, $color, $term, $start, $end]);
+            } else {
+                query($db, 'UPDATE notely_courses SET code = ?, name = ?, color = ?, term = ?, classes_start = ?, classes_end = ? WHERE id = ? AND owner_user_id = ?',
+                    [$code, $name, $color, $term, $start, $end, $id, $user['id']]);
+            }
+        } catch (PDOException $error) {
+            // Only translate collisions on the owner/code/term index.
+            if (($error->errorInfo[1] ?? null) === 1062
+                && str_ends_with($error->errorInfo[2] ?? '', "'notely_courses_identity'")) {
+                throw new HttpError(409, 'This course has already been added.');
+            }
+            throw $error;
         }
         $row = query($db, 'SELECT ' . COURSE_COLUMNS . ' FROM notely_courses WHERE id = ?', [$id])->fetch();
         $db->commit();
