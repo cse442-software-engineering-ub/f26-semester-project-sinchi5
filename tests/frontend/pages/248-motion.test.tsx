@@ -46,13 +46,13 @@ await test("3. The burst is missing on an empty day, can be clicked, or never go
 await test("4. The burst repeats on the same day in one session, or shows for someone who asked for reduced motion", "src/features/dashboard.tsx → Dashboard (celebratedDays, calm)", async () => {
   stubApi(routes);
   mount(at());
-  await waitFor(() => byRole("heading", "Your week at a glance"));
+  await waitFor(() => byRole("heading", "Pick up where you left off"));
   expect(burst() === null).toBe(true);
   celebratedDays.clear();
   window.matchMedia = ((q: string) => ({ matches: q.includes("reduce"), media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
   try {
     mount(at());
-    await waitFor(() => byRole("heading", "Your week at a glance"));
+    await waitFor(() => byRole("heading", "Pick up where you left off"));
     expect(burst() === null).toBe(true);
   } finally { window.matchMedia = realMatchMedia; }
 });
@@ -72,7 +72,7 @@ await test("6. The seasonal accent picks the wrong glyph for November, January o
   expect(seasonGlyph(new Date(2026, 6, 1))).toBe(null);
   stubApi(routes);
   mount(at());
-  await waitFor(() => byRole("heading", "Your week at a glance"));
+  await waitFor(() => byRole("heading", "Pick up where you left off"));
   expect(document.querySelector("[data-season]")?.getAttribute("data-season") ?? null).toBe(seasonGlyph(new Date()));
 });
 await test("7. A window no longer opens from Add course, or Escape no longer closes it", "src/shared/ui.tsx → Modal", async () => {
