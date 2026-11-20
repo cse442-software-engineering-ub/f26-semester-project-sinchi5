@@ -36,7 +36,7 @@ test("main screens work across themes, sizes, and engines", async ({
       })),
     ).toEqual([]);
   }
-  await page.goto("/schedule");
+  await page.goto("/schedule?view=month");
   await page.getByRole("button", { name: "Add event", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");

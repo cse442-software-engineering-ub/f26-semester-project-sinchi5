@@ -107,3 +107,32 @@ await test("8. At 1920 px the weeks are one narrow column, or at 375 px they sit
   await waitFor(() => byText("Event e5"));
   expect(new Set(weeks.map((h) => left(byRole("heading", h)))).size).toBe(1);
 });
+await test("9. The current week has no ribbon at its heading, a due-today item has no Today chip, or a past item is not marked Past", "src/features/assignments.tsx → Assignments (holdsToday, eventRow)", async () => {
+  const todayKey = new Date().toLocaleDateString("en-CA");
+  stubApi(routes([event("t1", "c1", todayKey, "23:00"), event("e1", "c1", "2099-01-05", "10:00"), event("p1", "c1", "2020-01-06", "10:00")]));
+  mount(at());
+  await waitFor(() => byText("Event t1"));
+  expect(byText("This week") !== null).toBe(true);
+  expect(byText("This week")!.closest("section")!.contains(byText("Event t1"))).toBe(true);
+  expect(row("Event t1").textContent!.includes("Today")).toBe(true);
+  expect(byText("Event e1")!.closest("section")!.textContent!.includes("This week")).toBe(false);
+  await click(await waitFor(() => byRole("button", "Show past items")));
+  await waitFor(() => byText("Event p1"));
+  expect(row("Event p1").textContent!.includes("Past")).toBe(true);
+});
+await test("10. A week is not a sheet with a ruled list, or its text is unreadable (under 4.5:1) in a dark scheme", "src/features/assignments.module.css (.week, .row)", async () => {
+  const root = document.documentElement;
+  stubApi(routes(many));
+  try {
+    root.dataset.scheme = "fjord"; root.dataset.theme = "dark";
+    mount(at());
+    await waitFor(() => byText("Event e1"));
+    const sheet = byRole("heading", weeks[0])!.closest("section")!;
+    const bg = getComputedStyle(sheet).backgroundColor, fg = getComputedStyle(byText("Event e1")!).color;
+    const lum = (c: string) => { const [r, g, b] = c.match(/\d+/g)!.slice(0, 3).map((n) => { const v = Number(n) / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+    const [hi, lo] = [lum(bg), lum(fg)].sort((a, b) => b - a);
+    expect((hi + 0.05) / (lo + 0.05) >= 4.5).toBe(true);
+    expect(getComputedStyle(sheet).boxShadow !== "none").toBe(true);
+    expect(getComputedStyle(row("Event e2")).borderBottomWidth).toBe("1px");
+  } finally { delete root.dataset.scheme; delete root.dataset.theme; }
+});
