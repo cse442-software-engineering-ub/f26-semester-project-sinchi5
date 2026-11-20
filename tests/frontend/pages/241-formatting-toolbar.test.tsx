@@ -153,7 +153,7 @@ await test("9. A list or Today card shows tags (<p>, <strong>) from a body, or i
   for (const path of ["/notes", "/"]) {
     stubApi({ ...routes(withExcerpt), notes: { notes: [withExcerpt, noExcerpt, attack] } });
     const root = mount(ui(path));
-    await waitFor(() => root.querySelector("main h3"));
+    await waitFor(() => root.querySelector("main h2, main h3"));
     await waitFor(() => (root.querySelector("main")?.textContent ?? "").includes("Plain words")).catch(() => { throw new Error(`${path}: ${root.querySelector("main")?.textContent}`); });
     const main = root.querySelector("main")!;
     const text = main.textContent ?? "";

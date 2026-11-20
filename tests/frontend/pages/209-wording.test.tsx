@@ -49,7 +49,7 @@ await test(`1. A banned word is on the landing form or the create form (${LIST})
 await test(`2. A banned word is on Today or Notes (${LIST})`, "src/features/dashboard.tsx → Dashboard, src/features/notes-list.tsx → Notes", async () => {
   stubApi(routes({ events: { events: [event("e1", today, "09:00")] }, notes: { notes: [note("n1")] } }));
   let root = mount(at("/"));
-  await waitFor(() => byText("TODAY"));
+  await waitFor(() => byRole("heading", "Due"));
   expect(found(root)).toEqual([]);
   root = mount(at("/notes"));
   await waitFor(() => byText(/in your space/));
@@ -86,15 +86,15 @@ await test("6. The Notes page says \"1 notes\" or \"0 note\" (bug 5: 0, 1 and 2 
     await waitFor(() => byText(want));
   }
 });
-await test("7. Today says \"1 events\" or \"2 classes\" for events dated today (bug 5)", "src/features/dashboard.tsx → Dashboard", async () => {
+await test("7. Today says \"1 things\" or \"2 thing\" for the due count (bug 5)", "src/features/dashboard.tsx → Dashboard", async () => {
   const seen: string[] = [];
-  for (const events of [[event("e1", today, "09:00", "class")], [event("e1", today, "09:00", "class"), event("e2", today, "", "assignment")]]) {
+  for (const events of [[event("e1", today, "09:00", "assignment")], [event("e1", today, "09:00", "assignment"), event("e2", today, "", "assignment")]]) {
     stubApi(routes({ events: { events } }));
     const root = mount(at("/"));
-    const head = (await waitFor(() => byText("TODAY"))).parentElement!;
-    seen.push(head.textContent!.replace("TODAY", "").trim());
+    await waitFor(() => byRole("heading", "Due"));
+    seen.push(root.querySelector<HTMLElement>("[class*=dayDate] > span:last-child")?.textContent ?? "");
   }
-  expect(seen).toEqual(["1 event", "2 events"]);
+  expect(seen).toEqual(["1 thing due this week", "2 things due this week"]);
 });
 await test("8. The course page shows \"2026-12-01 · 17:00\" or an empty time (bug 7)", "src/features/course-page.tsx → CoursePage, src/shared/ui.tsx → formatEventWhen", async () => {
   stubApi(routes({ events: { events: [event("e1", "2026-12-01", "17:00", "exam"), event("e2", "2026-12-01", "")] } }));
@@ -110,10 +110,10 @@ await test("9. The window is called \"Add a course\" instead of \"Add course\"",
   await waitFor(() => byRole("dialog", "Add course"));
   expect(byRole("dialog", "Add a course")).toBe(null);
 });
-await test("10. The calendar's today chip keeps the same green in every color scheme", "src/features/dashboard.module.css → .miniWeek .weekToday", async () => {
+await test("10. The week strip's today disc keeps the same color in every color scheme", "src/shared/ui.module.css → .weekDay[aria-current] (--ribbon)", async () => {
   stubApi(routes());
   const root = mount(at("/"));
-  const chip = () => document.querySelector<HTMLElement>('[class*="weekToday"]')!;
+  const chip = () => document.querySelector<HTMLElement>('[aria-current="date"] [data-date]')!;
   await waitFor(() => chip());
   const colors: string[] = [];
   for (const scheme of ["sage", "fjord"]) {

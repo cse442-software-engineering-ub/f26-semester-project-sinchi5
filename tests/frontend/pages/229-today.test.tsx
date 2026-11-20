@@ -10,6 +10,7 @@ import { mount, stubApi, byRole, byText, waitFor, pageScrollWidth } from "../har
 import { Provider } from "../../../src/app/context";
 import App from "../../../src/app/App";
 import { dateKey } from "../../../src/services/fixtures";
+import { buildPalette } from "../../../src/services/palette";
 
 page({ card: "229", title: "Frontend: Today page on the new design", kind: "frontend" });
 
@@ -25,23 +26,23 @@ const routes = (extra: Record<string, unknown> = {}) => ({
   "shared-notes": { notes: [] }, friends: { friends: [], incoming: [], outgoing: [] }, ...extra,
 });
 const at = () => <MemoryRouter initialEntries={["/"]}><Provider><App /></Provider></MemoryRouter>;
-const full = routes({ notes: { notes: [note("1"), note("2"), note("3")] }, events: { events: [event("e1", today, "09:00", "class"), event("e2", today, "", "assignment")] } });
+const full = routes({ notes: { notes: [note("1"), note("2"), note("3")] }, events: { events: [event("e1", today, "09:00", "lecture"), event("e2", today, "", "assignment")] } });
 const left = (el: Element | null | undefined) => Math.round(el?.getBoundingClientRect().left ?? -1);
 
 await test("1. Today stays on the loading message forever, or shows content before the server answered", PAGE, async () => {
   stubApi({ ...full, events: { status: 200, body: { events: [] }, delay: 300 } });
   const root = mount(at());
   await waitFor(() => byRole("status"));
-  expect(byRole("heading", "Your week at a glance") === null).toBe(true);
-  await waitFor(() => byRole("heading", "Your week at a glance"));
+  expect(byRole("heading", "Pick up where you left off") === null).toBe(true);
+  await waitFor(() => byRole("heading", "Pick up where you left off"));
   expect(root.querySelector("main") !== null).toBe(true);
   expect(byRole("status") === null).toBe(true);
 });
 await test("2. An account with no notes, events or courses shows a blank area, or has no Add course link to Courses", PAGE, async () => {
   stubApi(routes({ courses: { courses: [] } }));
   const root = mount(at());
-  await waitFor(() => byText("No courses yet"));
-  for (const want of ["No notes yet", "Nothing due this week.", "Nothing on the calendar", "No exams or projects coming up."]) expect(byText(want) !== null).toBe(true);
+  await waitFor(() => byText(/No courses yet/));
+  for (const want of ["No notes yet", "Nothing due this week.", "Nothing scheduled today"]) expect(byText(want) !== null).toBe(true);
   const link = [...root.querySelectorAll<HTMLAnchorElement>("main a")].find((a) => (a.textContent ?? "").trim() === "Add course");
   expect(link?.getAttribute("href")).toBe("/courses");
 });
@@ -51,15 +52,15 @@ await test("3. A server error leaves a blank page instead of showing the error",
   await waitFor(() => (root.textContent ?? "").includes("could not load your events"));
   expect((root.textContent ?? "").trim().length > 0).toBe(true);
 });
-await test("4. Today's events or the week card are missing, or the count says \"1 events\" or \"2 event\"", PAGE, async () => {
+await test("4. Today's events or the due list are missing, or the due count is wrong", PAGE, async () => {
   stubApi(full);
   const root = mount(at());
-  const head = (await waitFor(() => byText("TODAY"))).parentElement!;
-  expect(head.textContent!.replace("TODAY", "").trim()).toBe("2 events");
-  const week = byRole("heading", "Your week at a glance")!.closest("section")!;
-  expect((week.textContent ?? "").includes("2 things due this week")).toBe(true);
-  expect((week.textContent ?? "").includes("Event e2")).toBe(true);
-  expect((root.querySelector("main")?.textContent ?? "").includes("Event e1")).toBe(true);
+  await waitFor(() => byRole("heading", "Due"));
+  const main = root.querySelector("main")!;
+  expect((main.textContent ?? "").includes("1 thing due this week")).toBe(true);
+  expect(main.querySelector("[data-block]")?.textContent?.includes("Event e1")).toBe(true);
+  expect((byRole("heading", "Due")!.closest("section")!.textContent ?? "").includes("Event e2")).toBe(true);
+  expect((byRole("heading", "Due")!.closest("section")!.textContent ?? "").includes("Due tonight")).toBe(true);
 });
 await test("5. A recent note on Today does not link to its note page", PAGE, async () => {
   stubApi(full);
@@ -86,16 +87,75 @@ await test("7. The Today page scrolls sideways on a 320 px phone", "src/features
   expect(pageScrollWidth() <= 320).toBe(true);
   expect(root.ownerDocument.querySelector("main")!.scrollWidth <= 320).toBe(true);
 });
-await test("8. On a 1920 px screen Today is still one narrow column: fewer than three columns, or the content fills under 85% of the page area", "src/features/dashboard.module.css (.grid container queries)", async () => {
+await test("8. On a 1920 px screen the two pages do not sit side by side filling the page area", "src/features/dashboard.module.css (.spread, Spread)", async () => {
   stubApi(full);
   const root = mount(at(), { width: 1920 });
   await waitFor(() => byRole("heading", "Pick up where you left off"));
   const doc = root.ownerDocument;
   doc.body.style.cssText = "margin:0;padding:0;max-width:none"; // the runner page's 60rem reading column is not part of the app
-  const week = doc.querySelector('section[aria-labelledby="week-heading"]');
-  const picks = [...doc.querySelectorAll("h2")].find((h) => h.textContent === "Pick up where you left off")?.closest("section");
-  const aside = doc.querySelector("main aside");
-  expect(new Set([left(week), left(picks), left(aside)]).size).toBe(3);
-  const content = week!.parentElement!.getBoundingClientRect();
-  expect(content.width / doc.querySelector("main")!.getBoundingClientRect().width >= 0.85).toBe(true);
+  const [a, b] = [...doc.querySelectorAll("[data-page]")];
+  expect(left(b) > left(a) + 400).toBe(true);
+  const sheet = a.closest("section")!.getBoundingClientRect();
+  expect(sheet.width / doc.querySelector("main")!.getBoundingClientRect().width >= 0.85).toBe(true);
+});
+await test("9. The left page lacks the day name, the hour rail or the Now ribbon, or the ribbon label is not the clock", "src/features/dashboard.tsx → Dashboard (rail, ribbon)", async () => {
+  stubApi(full);
+  const root = mount(at());
+  await waitFor(() => root.querySelector("[data-ribbon]"));
+  const name = new Date().toLocaleDateString("en-US", { weekday: "long" });
+  expect(byRole("heading", name) !== null).toBe(true);
+  expect(root.querySelectorAll("[data-rail] > div > div").length > 9).toBe(true);
+  expect(/^Now · \d{1,2}:\d{2}$/.test(root.querySelector("[data-ribbon]")!.textContent ?? "")).toBe(true);
+  expect(root.querySelectorAll("[data-day]").length).toBe(7);
+});
+await test("10. A class with no note offers no Start a note button, or one with a note does not open it", "src/features/dashboard.tsx → Dashboard (notes for today)", async () => {
+  const withNote = routes({ notes: { notes: [{ ...note("1"), lectureDate: today }] }, events: full.events });
+  stubApi(withNote);
+  const root = mount(at());
+  await waitFor(() => byRole("heading", "Notes for today"));
+  const open = [...root.querySelectorAll<HTMLAnchorElement>("main a")].find((a) => a.getAttribute("aria-label") === "Open note for CSE 442");
+  expect(open?.getAttribute("href")).toBe("/notes/1");
+  stubApi(full);
+  mount(at());
+  await waitFor(() => document.querySelector('button[aria-label="Start a note for CSE 442"]'));
+});
+await test("11. On a 375 px phone the pages stay side by side, or the page scrolls sideways", "src/features/dashboard.module.css (@container)", async () => {
+  stubApi(full);
+  const root = mount(at(), { width: 375 });
+  await waitFor(() => byRole("heading", "Pick up where you left off"));
+  const [a, b] = [...root.ownerDocument.querySelectorAll("[data-page]")];
+  expect(b.getBoundingClientRect().top >= a.getBoundingClientRect().bottom - 1).toBe(true);
+  expect(pageScrollWidth() <= 375).toBe(true);
+});
+await test("12. Text on the spread is under 4.5:1 in a dark scheme or a custom theme", "src/features/dashboard.module.css (colors only through variables)", async () => {
+  const lum = (c: string) => { const [r, g, b] = (c.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const ratio = (a: string, b: string) => { const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+  stubApi(full);
+  const root = mount(at());
+  await waitFor(() => root.querySelector("[data-ribbon]"));
+  const html = document.documentElement;
+  const custom = buildPalette({ accent: "#7a3b8c", background: "#f6f0fa", text: "#2b1d35" }).dark;
+  const modes: [string, () => void][] = [
+    ["dark fjord", () => { html.dataset.scheme = "fjord"; html.dataset.theme = "dark"; }],
+    ["custom", () => { for (const [k, v] of Object.entries(custom)) html.style.setProperty(k, v); }],
+  ];
+  const bad: string[] = [];
+  for (const [name, apply] of modes) {
+    apply();
+    const page = root.querySelector("[data-page]")!;
+    for (const el of [root.querySelector("h2")!, root.querySelector("[data-ribbon] span")!]) {
+      const back = el.closest("[data-ribbon]") ? getComputedStyle(el).backgroundColor : getComputedStyle(page.parentElement!.parentElement!).backgroundColor;
+      if (ratio(getComputedStyle(el).color, back) < 4.5) bad.push(`${name}: ${el.textContent}`);
+    }
+  }
+  html.removeAttribute("style");
+  expect(bad).toEqual([]);
+});
+await test("13. The next exam past this week is missing from Today or lacks its date and \"in N days\"", "src/features/dashboard.tsx → Dashboard (later)", async () => {
+  const d = new Date(`${today}T12:00:00`); d.setDate(d.getDate() + 10);
+  stubApi(routes({ events: { events: [event("x1", dateKey(d), "10:00", "exam")] } }));
+  const root = mount(at());
+  await waitFor(() => byRole("heading", "Due"));
+  const text = byRole("heading", "Due")!.closest("section")!.textContent ?? "";
+  expect([text.includes("Event x1"), text.includes("in 10 days")]).toEqual([true, true]);
 });

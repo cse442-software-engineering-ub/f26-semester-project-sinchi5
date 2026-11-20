@@ -63,9 +63,9 @@ await test("4. The landing artwork keeps one color in every scheme", "src/featur
   mount(<MemoryRouter initialEntries={["/"]}><Provider><Onboarding /></Provider></MemoryRouter>);
   await followsScheme("backgroundColor", () => document.querySelector('[class*="onboardingArt"]'));
 });
-await test("5. A quick-action icon keeps one color in every scheme", "src/features/dashboard.module.css → .quickActions (--tint-b in src/app/tokens.css)", async () => {
+await test("5. The Now ribbon keeps one color in every scheme", "src/features/dashboard.module.css → .ribbon (--ribbon in src/app/tokens.css)", async () => {
   stubApi(routes()); at("/");
-  await followsScheme("backgroundColor", () => document.querySelector('[class*="quickActions"] > button:nth-child(2) > span'));
+  await followsScheme("backgroundColor", () => document.querySelector("[data-ribbon]"));
 });
 await test("6. The avatar keeps one color in every scheme", "src/shared/ui.module.css → .avatar (--tint-a in src/app/tokens.css)", async () => {
   stubApi(routes()); at("/");

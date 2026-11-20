@@ -86,7 +86,7 @@ await test("4. An account left mid-setup still sees the setup pages at log in", 
   await type(await waitFor(() => byLabel("Email address")), "ada@example.edu");
   await type(byLabel("Password"), PASSWORD);
   await click(byRole("button", "Log in"));
-  await waitFor(() => byRole("heading", "Your week at a glance"));
+  await waitFor(() => byRole("heading", "Pick up where you left off"));
   await waitFor(() => onboardingRequests(api).length > 0);
   expect(onboardingRequests(api).length).toBe(1);
   expect(byRole("heading", "What are you learning?")).toBe(null);

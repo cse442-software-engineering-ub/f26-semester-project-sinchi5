@@ -1,491 +1,346 @@
-/* Today: one column on phones, two from a ~620px content width, three from ~1080px.
-   Columns follow the width of the page area (container queries), not the screen, so the sidebar
-   never leaves dead space and nothing ever scrolls sideways. */
+/* Today as a planner spread: the day's hour rail on the left page, notes and due on the right (card 252).
+   Everything follows the width of the spread itself (container queries), so the sidebar never leaves dead space. */
 .today {
-  container-type: inline-size;
-  container-name: today;
-  min-width: 0;
-}
-.grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: clamp(16px, 2.2vw, 40px);
-  align-items: start;
+  gap: var(--space-5);
   min-width: 0;
 }
-.grid > * {
-  min-width: 0;
+.spread {
+  --hour: 4.5rem;
 }
-/* One column: main and aside dissolve so today's calendar and Coming up sit right under the week
-   card (visual order only; DOM order stays week, notes, aside). Two and three columns restore them. */
-.main,
-.dashboardAside {
-  display: contents;
-  gap: clamp(24px, 2.6vw, 44px);
-}
-.dashboardAside {
-  gap: clamp(16px, 2vw, 32px);
-}
-.dashboardAside {
-  grid-template-columns: minmax(0, 1fr);
-}
-.dashboardAside > :nth-child(1) { order: 1; }
-.dashboardAside > :nth-child(2) { order: 2; }
-.main > :nth-child(1) { order: 3; }
-.main > :nth-child(2) { order: 4; }
-.main > :nth-child(3) { order: 5; }
-.dashboardAside > :nth-child(3) { order: 6; }
-.block {
-  min-width: 0;
-  container-type: inline-size;
-  container-name: blk;
-}
-.head {
+.dayPage,
+.notesPage {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: clamp(12px, 1.2vw, 20px);
-}
-.head h2 {
-  font-size: clamp(1.05rem, 0.95rem + 0.4vw, 1.45rem);
-  font-weight: 550;
-  letter-spacing: -0.03em;
-}
-.head p {
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: clamp(0.8rem, 0.76rem + 0.15vw, 0.95rem);
-}
-.card {
-  padding: clamp(18px, 1.8vw, 30px);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
+  flex-direction: column;
+  gap: var(--space-5);
   min-width: 0;
-}
-.dashboardAside .card {
-  margin-bottom: 0;
-}
-.dashboardAside .card h2 {
-  font-size: clamp(1.05rem, 0.95rem + 0.4vw, 1.45rem);
-  font-weight: 550;
-  letter-spacing: -0.03em;
-}
-.dashboardAside .head {
-  margin-bottom: 14px;
-}
-.dashboardAside .head :is(a, button) {
-  min-width: 44px;
-  min-height: 44px;
-}
-.dashboardAside .card > a:last-child {
-  font-size: clamp(0.8rem, 0.76rem + 0.15vw, 0.95rem);
+  height: 100%;
 }
 
-/* Week at a glance */
-.weekCard {
-  padding: clamp(18px, 2.2vw, 36px);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
+/* Left page: the day */
+.dayHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.dayName {
+  font-size: clamp(2rem, 1.6rem + 1.2vw, 3rem);
+  line-height: var(--lh-display);
+  letter-spacing: var(--ls-display);
+  font-weight: 650;
   color: var(--text);
 }
-.weekCard h2 {
-  margin: 0;
-  font-size: clamp(1.3rem, 1.1rem + 0.8vw, 2rem);
-  font-weight: 500;
-  letter-spacing: -0.04em;
-}
-.weekCard > a {
-  margin-top: 8px;
-  font-size: clamp(0.8rem, 0.76rem + 0.15vw, 0.95rem);
-}
-.weekSummary {
-  margin: 8px 0 clamp(16px, 2vw, 28px);
+.dayDate {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
   color: var(--muted);
-  font-size: clamp(0.85rem, 0.8rem + 0.2vw, 1rem);
-}
-.weekDay {
-  margin-bottom: clamp(14px, 1.6vw, 24px);
-}
-.weekDay h3 {
-  margin: 0 0 6px;
-  font-size: clamp(0.8rem, 0.76rem + 0.15vw, 0.95rem);
-  font-weight: 600;
-  color: var(--muted);
-  letter-spacing: 0.01em;
-}
-.weekRow {
-  display: grid;
-  grid-template-columns: clamp(4.5rem, 5vw, 6rem) minmax(0, 1fr) 16px;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 56px;
-  padding: 10px 8px;
-  border-bottom: 1px solid var(--line);
-  border-radius: 8px;
-  color: var(--text);
-  text-align: left;
-  transition: background-color 160ms var(--ease-out);
-}
-.weekRow > svg {
-  color: var(--muted);
-}
-.weekRow:focus-visible,
-.comingUpRow:focus-visible,
-.quickActions > button:focus-visible,
-.courseTiles a:focus-visible,
-.miniWeek > a:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-.weekTime {
-  font-size: clamp(0.8rem, 0.76rem + 0.15vw, 0.92rem);
-  color: var(--muted);
+  font-size: var(--fs-lead);
+  line-height: var(--lh-lead);
   font-variant-numeric: tabular-nums;
 }
-.weekInfo {
-  min-width: 0;
-  overflow-wrap: anywhere;
+.dayDate > span:first-child {
+  color: var(--text);
+  font-weight: 600;
 }
-.weekInfo strong,
-.weekInfo > span {
-  display: block;
-  line-height: 1.5;
+.allDay {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
-.weekInfo strong {
-  font-size: clamp(0.9rem, 0.85rem + 0.2vw, 1.05rem);
-  font-weight: 550;
-}
-.weekInfo > span {
-  color: var(--muted);
-  font-size: clamp(0.8rem, 0.76rem + 0.15vw, 0.92rem);
-}
-
-/* Notes, quick actions, courses */
-.noteGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: clamp(10px, 1.2vw, 18px);
-}
-.noCourses {
-  display: grid;
-  justify-items: center;
-  gap: 4px;
-  padding: 8px 0 20px;
-  border: 1px dashed var(--line);
-  border-radius: 12px;
-}
-.quickActions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: clamp(10px, 1.2vw, 16px);
-}
-.quickActions > button {
-  position: relative;
+.allDay button {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   min-height: 44px;
-  padding: clamp(14px, 1.4vw, 22px);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--c, var(--muted)) 14%, var(--sheet));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c, var(--muted)) 28%, var(--sheet));
+  color: var(--text);
   text-align: left;
-  transition: transform 160ms var(--ease-out), border-color 160ms var(--ease-out);
 }
-.quickActions > button > span {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  margin-bottom: 14px;
-  border-radius: 10px;
-  background: var(--surface-soft);
-  color: var(--glyph-1);
+.allDay strong {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: 600;
 }
-.quickActions > button:nth-child(2) > span {
-  background: var(--tint-b);
-  color: var(--tint-b-ink);
-}
-.quickActions > button:nth-child(3) > span {
-  background: var(--tint-c);
-  color: var(--tint-c-ink);
-}
-.quickActions strong {
-  margin-bottom: 4px;
-  font-size: clamp(0.9rem, 0.85rem + 0.2vw, 1.05rem);
-  font-weight: 550;
-}
-.quickActions small {
+.allDay span {
   color: var(--muted);
-  font-size: clamp(0.78rem, 0.74rem + 0.15vw, 0.9rem);
-  line-height: 1.55;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
 }
-.quickActions > button > svg {
-  position: absolute;
-  top: 16px;
-  right: 14px;
-  color: var(--muted);
-}
-.courseTiles {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
-  gap: clamp(8px, 1vw, 14px);
-}
-.courseTiles a {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  min-height: 56px;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface);
-  transition: transform 160ms var(--ease-out), border-color 160ms var(--ease-out);
-}
-.courseTiles a > div {
+
+/* The hour rail: one hour is --hour tall; hour lines are faint rules, blocks are placed by time. */
+.rail {
   flex: 1;
   min-width: 0;
 }
-.courseTiles strong {
-  display: block;
-  font-size: clamp(0.85rem, 0.8rem + 0.2vw, 1rem);
-  font-weight: 550;
+.railInner {
+  position: relative;
+  height: calc(var(--hours) * var(--hour));
+  min-height: 12rem;
+  margin-left: 3.5rem;
 }
-.courseTiles small {
-  display: block;
-  margin-top: 2px;
-  overflow: hidden;
+.hour {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--rule);
+}
+.hour span {
+  position: absolute;
+  top: -0.6rem;
+  left: -3.5rem;
+  width: 3rem;
   color: var(--muted);
-  font-size: clamp(0.78rem, 0.74rem + 0.15vw, 0.9rem);
-  text-overflow: ellipsis;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.blocks {
+  position: absolute;
+  inset: 0 0 0 var(--space-2);
+}
+.block {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-height: 44px;
+  padding: 6px var(--space-3);
+  overflow: hidden;
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--c, var(--muted)) 16%, var(--sheet));
+  box-shadow: inset 3px 0 0 var(--c, var(--muted));
+  color: var(--text);
+  text-align: left;
+  transition: transform var(--motion-fast) var(--ease-out);
+}
+.block small,
+.block span {
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  font-variant-numeric: tabular-nums;
+}
+.block span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.block strong {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.block:focus-visible,
+.allDay button:focus-visible,
+.rowText:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.railEmpty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-body);
+  pointer-events: none;
+}
+.railEmpty::first-line {
+  background: var(--sheet);
+  padding-inline: var(--space-3);
+}
+
+/* Now ribbon: a band across the rail with a notched tail on the left and the time on a tab. */
+.ribbon {
+  position: absolute;
+  left: -3.5rem;
+  right: 0;
+  height: 2px;
+  background: var(--ribbon);
+  pointer-events: none;
+  z-index: 2;
+}
+.ribbon span {
+  position: absolute;
+  left: 0;
+  top: -11px;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 var(--space-3) 0 var(--space-2);
+  background: var(--ribbon);
+  color: var(--ribbon-text);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 7px) 50%, 100% 100%, 0 100%);
+}
+.ribbon::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 11px;
+  border: 4px solid transparent;
+  border-top-color: var(--ribbon-notch);
+  border-left-color: var(--ribbon-notch);
+}
+/* Outside the rail's hours the band rests on the top or bottom edge. */
+.ribbon[data-parked="bottom"] span {
+  top: -22px;
+}
+
+/* Right page */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.section h2 {
+  font-size: var(--fs-title);
+  line-height: var(--lh-title);
+  letter-spacing: var(--ls-title);
+  font-weight: 650;
+}
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.sectionHead a {
   white-space: nowrap;
 }
-.courseTiles a > svg {
-  color: var(--muted);
+.list {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
-.courseDot {
-  flex-shrink: 0;
+.list > li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--rule);
+}
+.list > li:last-child {
+  border-bottom: 0;
+}
+.dot {
+  flex: none;
   width: 10px;
   height: 10px;
   border-radius: 3px;
+  background: var(--c, var(--muted));
 }
-
-/* Aside: week strip, today, coming up */
-.miniWeek {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(44px, 1fr));
-  gap: 2px;
-  padding: 4px 0 18px;
-  overflow-x: auto;
-}
-.miniWeek > a {
+.rowText {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 8px 4px 6px;
-  border-radius: 8px;
-  color: var(--muted);
-  font-size: clamp(0.72rem, 0.7rem + 0.1vw, 0.82rem);
-}
-.miniWeek strong {
-  color: var(--text);
-  font-size: clamp(0.9rem, 0.85rem + 0.2vw, 1.05rem);
-  font-weight: 500;
-}
-.miniWeek i {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: transparent;
-}
-.miniWeek .weekToday {
-  background: var(--sage);
-}
-.weekToday i {
-  background: var(--primary);
-}
-.smallHeading {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  color: var(--muted);
-  font-size: clamp(0.72rem, 0.7rem + 0.1vw, 0.82rem);
-  letter-spacing: 0.06em;
-}
-.smallHeading > span:last-child {
-  letter-spacing: 0;
-}
-.count {
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: var(--surface-soft);
-  font-size: clamp(0.72rem, 0.7rem + 0.1vw, 0.82rem);
-}
-.comingUpRow {
-  display: flex;
-  gap: 12px;
-  width: 100%;
-  min-height: 44px;
-  padding: 12px 6px;
-  border-bottom: 1px solid var(--line);
-  border-radius: 8px;
-  text-align: left;
-  transition: background-color 160ms var(--ease-out);
-}
-.comingUpRow:last-of-type {
-  border-bottom: 0;
-}
-.comingUpIcon {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  background: var(--surface-soft);
-  color: var(--muted);
-}
-.comingUpInfo {
   min-width: 0;
+  min-height: 44px;
+  justify-content: center;
+  border-radius: var(--radius-control);
+  color: var(--text);
+  text-align: left;
   overflow-wrap: anywhere;
 }
-.comingUpInfo strong {
-  display: block;
-  font-size: clamp(0.9rem, 0.85rem + 0.2vw, 1.05rem);
-  font-weight: 500;
-  line-height: 1.5;
+.rowText strong {
+  font-size: var(--fs-lead);
+  line-height: var(--lh-lead);
+  font-weight: 600;
 }
-.comingUpInfo small,
-.comingUpInfo time {
-  display: block;
-  margin: 2px 0;
+.rowText small {
   color: var(--muted);
-  font-size: clamp(0.78rem, 0.74rem + 0.15vw, 0.9rem);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  font-variant-numeric: tabular-nums;
 }
-.comingUpInfo em {
-  display: block;
-  color: var(--primary);
-  font-size: clamp(0.78rem, 0.74rem + 0.15vw, 0.9rem);
-  font-style: normal;
+.rowText .preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.comingUpEmpty {
+.quietLine {
+  margin: 0;
   color: var(--muted);
-  font-size: clamp(0.85rem, 0.8rem + 0.2vw, 1rem);
-  line-height: 1.6;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  max-width: var(--measure-read);
 }
-.quietNote {
+.failure {
+  margin: 0;
+  color: var(--warn);
+  font-size: var(--fs-body);
+}
+.footer {
   display: flex;
-  gap: 12px;
-  padding: 4px 6px;
-  color: var(--muted);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--rule);
 }
-.quietNote p {
-  font-size: clamp(0.8rem, 0.76rem + 0.15vw, 0.95rem);
-  line-height: 1.7;
-}
-.quietNote strong {
-  font-weight: 450;
-}
-.quietNote > svg {
-  flex-shrink: 0;
-  color: var(--glyph-2);
+.footer .quietLine {
+  flex-basis: 100%;
 }
 
-/* Two columns: week and aside side by side, the notes area full width below. */
-@container today (min-width: 620px) {
-  .weekCard { grid-area: week; }
-  .main { grid-area: main; }
-  .dashboardAside { grid-area: aside; }
-  .main,
-  .dashboardAside {
+/* On a phone the rail scrolls inside its page so the ribbon can sit near the top of the viewport. */
+@container (max-width: 720px) {
+  .rail {
+    max-height: 26rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-block: var(--space-3);
+  }
+}
+/* Wide spreads: taller hours, and the right page lays its recent notes out in columns. */
+@container (min-width: 1200px) {
+  .spread {
+    --hour: 5.25rem;
+  }
+  .recent {
     display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    column-gap: var(--space-5);
   }
-  .main > *,
-  .dashboardAside > * {
-    order: 0;
-  }
-  .grid {
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-    grid-template-areas: "week aside" "main main";
-  }
-}
-/* Three columns: week, notes to pick up, today and coming up. */
-@container today (min-width: 1080px) {
-  .grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
-    grid-template-areas: "week main aside";
-  }
-}
-
-/* Card columns follow the width of their own section; a last card that would sit alone in a
-   two-column row spans the row instead. */
-@container blk (min-width: 30rem) {
-  .noteGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@container blk (min-width: 46rem) {
-  .noteGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@container blk (min-width: 26rem) {
-  .quickActions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@container blk (min-width: 40rem) {
-  .quickActions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@container blk (min-width: 30rem) and (max-width: 45.99rem) {
-  .noteGrid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
-}
-@container blk (min-width: 26rem) and (max-width: 39.99rem) {
-  .quickActions > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .weekRow:hover,
-  .comingUpRow:hover {
-    background: var(--surface-soft);
-  }
-  .quickActions > button:hover,
-  .courseTiles a:hover {
-    border-color: var(--hover-line);
-    box-shadow: var(--shadow-card-hover);
-    transform: translateY(-2px);
+  .block:hover {
+    transform: translateY(-1px);
   }
 }
-
 @media (prefers-reduced-motion: no-preference) {
-  .grid > * {
+  .spread {
     animation: rise 240ms var(--ease-out) backwards;
-  }
-  .main {
-    animation-delay: 60ms;
-  }
-  .dashboardAside {
-    animation-delay: 120ms;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .weekRow,
-  .comingUpRow,
-  .quickActions > button,
-  .courseTiles a {
+  .block {
     transition: none;
   }
-  .quickActions > button:hover,
-  .courseTiles a:hover {
+  .block:hover {
     transform: none;
   }
 }
-.courseTiles a:active,
-.quickActions > button:active {
-  transform: scale(0.985);
-}
+
 .season {
   color: var(--primary);
   display: inline-flex;
