@@ -253,6 +253,7 @@ export function EventRow({
           {event.source === "imported" ? " · Imported" : ""}
           {/* Card 144: an event from a classmate's shared course says whose it is. */}
           {event.sharedBy && <span className={s.asWritten}> · Shared by {event.sharedBy.name}</span>}
+          {event.addedBy && <span className={s.asWritten}> · Added by {event.addedBy.name}</span>}
         </small>
       </span>
       <ArrowUpRight size={16} />

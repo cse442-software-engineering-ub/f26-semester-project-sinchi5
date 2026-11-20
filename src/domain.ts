@@ -27,6 +27,7 @@ export interface Course {
   classesEnd?: string;
   // Card 144: a course a classmate shared with this student (card 143). Its schedule is view only.
   sharedBy?: SharedBy;
+  permission?: CollaboratorPermission;
 }
 // Card 144: who shared a course's schedule.
 export interface SharedBy {
@@ -104,6 +105,8 @@ export interface CourseEvent {
   repeatOf?: string;
   // Card 144: an event in a course a classmate shared (card 143); it is view only.
   sharedBy?: SharedBy;
+  permission?: CollaboratorPermission;
+  addedBy?: SharedBy;
 }
 export interface DetectedMetadata {
   title: string;
@@ -261,10 +264,11 @@ export interface ScheduleShare {
   userId: string;
   name: string;
   email: string;
-  permission: "view";
+  permission: CollaboratorPermission;
 }
 // Card 144: courses the student can add events to; a classmate's shared course is view only.
 export const ownCourses = (courses: Course[]) => courses.filter((c) => !c.sharedBy);
+export const editableCourses = (courses: Course[]) => courses.filter((c) => !c.sharedBy || c.permission === "edit");
 export interface FriendLists {
   friends: Friend[];
   incoming: Friend[];

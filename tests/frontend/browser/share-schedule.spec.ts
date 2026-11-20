@@ -54,7 +54,7 @@ test("Card 144: owner shares a schedule with a classmate by email", async ({ pag
   await expect(shareWindow(page).getByText("Not shared with anyone yet.")).toBeVisible();
   const request = page.waitForRequest((r) => r.url().includes("route=schedule-share") && r.method() === "POST");
   await shareWith(page, CLASSMATE);
-  expect((await request).postDataJSON()).toEqual({ courseId, email: CLASSMATE });
+  expect((await request).postDataJSON()).toEqual({ courseId, email: CLASSMATE, permission: "view" });
   const row = shareWindow(page).getByRole("listitem").filter({ hasText: "Schedule Classmate" });
   await expect(row).toContainText("Can view");
   await expect(shareWindow(page).getByLabel("Classmate's email")).toHaveValue("");
@@ -157,4 +157,55 @@ test("Card 144: the share window fits and stays usable on a phone", async ({ pag
     expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+
+test("Card 147: share with edit access and downgrade to view", async ({ page }) => {
+  const courseId = await setUp(page);
+  await openShareWindow(page);
+  await expect(shareWindow(page).getByLabel("Permission", { exact: true })).toHaveValue("view");
+  await shareWindow(page).getByLabel("Permission", { exact: true }).selectOption("edit");
+  const sent = page.waitForRequest(r => r.url().includes("route=schedule-share") && r.method() === "POST");
+  await shareWith(page, CLASSMATE);
+  expect((await sent).postDataJSON()).toEqual({ courseId, email: CLASSMATE, permission: "edit" });
+  const permission = shareWindow(page).getByLabel("Permission for Schedule Classmate");
+  await expect(permission).toHaveValue("edit");
+  const changed = page.waitForRequest(r => r.url().includes("route=schedule-permission"));
+  await permission.selectOption("view");
+  expect((await changed).postDataJSON()).toMatchObject({ courseId, permission: "view" });
+  await expect(permission).toHaveValue("view");
+  await expect(permission).toBeEnabled();
+  await shareWindow(page).getByRole("button", { name: "Close" }).click();
+  await openShareWindow(page);
+  await expect(shareWindow(page).getByLabel("Permission for Schedule Classmate")).toHaveValue("view");
+});
+
+test("Card 147: editor adds and edits events, owner sees added by, downgrade blocks editing", async ({ page }) => {
+  const courseId = await setUp(page);
+  const { share } = await call(page, "schedule-share", { courseId, email: CLASSMATE, permission: "edit" });
+  await signInAs(page, CLASSMATE);
+  await page.goto('/schedule?date=' + tomorrow());
+  await page.getByRole("button", { name: "Add event", exact: true }).click();
+  let dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("combobox", { name: "Course", exact: true }).locator("option")).toHaveText(["Personal", "CSE 442 (Schedule Owner)"]);
+  await dialog.getByLabel("Title", { exact: true }).fill("Group meeting");
+  await dialog.getByRole("combobox", { name: "Course", exact: true }).selectOption(courseId);
+  await dialog.getByRole("button", { name: "Create event", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await page.getByRole("button", { name: /Group meeting/ }).click();
+  dialog = page.getByRole("dialog", { name: "Event details" });
+  await expect(dialog.getByRole("button", { name: "Delete event", exact: true })).toHaveCount(0);
+  await dialog.getByLabel("Title", { exact: true }).fill("Group meeting (room 101)");
+  await dialog.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await signInAs(page, OWNER);
+  await page.goto('/schedule?date=' + tomorrow());
+  await expect(page.getByRole("button", { name: /Group meeting \(room 101\)/ })).toContainText("Added by Schedule Classmate");
+  await call(page, "schedule-permission", { courseId, userId: share.userId, permission: "view" });
+  await signInAs(page, CLASSMATE);
+  await page.goto('/schedule?date=' + tomorrow());
+  await page.getByRole("button", { name: /Group meeting \(room 101\)/ }).click();
+  dialog = page.getByRole("dialog", { name: "Event details" });
+  await expect(dialog).toHaveAccessibleDescription("Shared by Schedule Owner. You can view this event.");
+  await expect(dialog.getByRole("button", { name: "Save changes" })).toHaveCount(0);
 });

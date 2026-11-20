@@ -72,9 +72,9 @@ try {
   assert.deepEqual((await owner.call("schedule-shares", undefined, `&courseId=${mine.id}`)).data, { shares: [shared.data.share] });
   const ownerId = (await owner.call("session")).data.user.id;
   const sharedBy = { id: ownerId, name: "Share Owner" };
-  assert.deepEqual((await viewer.call("courses")).data.courses, [{ ...mine, sharedBy }]);
+  assert.deepEqual((await viewer.call("courses")).data.courses, [{ ...mine, sharedBy, permission: "view" }]);
   const seen = (await viewer.call("events")).data.events;
-  assert.deepEqual(seen, [{ ...study.data.event, sharedBy }]);
+  assert.deepEqual(seen, [{ ...study.data.event, sharedBy, permission: "view" }]);
   assert.deepEqual((await viewer.call("events", undefined, `&courseId=${mine.id}`)).data.events, seen);
   pass("schedule-share is 201 with permission view; the classmate's courses and events show it with sharedBy");
 
@@ -96,9 +96,9 @@ try {
   err(await viewer.call("course-save", { ...course, id: mine.id, name: "Mine now" }), 404, "This course could not be found.");
   err(await viewer.call("course-delete", { id: mine.id }), 404, "This course could not be found.");
   err(await viewer.call("syllabus-upload", { courseId: mine.id, fileName: "s.txt", content: "" }), 403, "You do not have permission to edit this schedule.");
-  err(await viewer.call("schedule-shares", undefined, `&courseId=${mine.id}`), 422, "Choose a valid course.");
-  err(await viewer.call("schedule-share", { courseId: mine.id, email: other.email }), 422, "Choose a valid course.");
-  err(await viewer.call("schedule-unshare", { courseId: mine.id, userId: viewerId }), 422, "Choose a valid course.");
+  err(await viewer.call("schedule-shares", undefined, `&courseId=${mine.id}`), 403, "You do not have permission to edit this schedule.");
+  err(await viewer.call("schedule-share", { courseId: mine.id, email: other.email }), 403, "You do not have permission to edit this schedule.");
+  err(await viewer.call("schedule-unshare", { courseId: mine.id, userId: viewerId }), 403, "You do not have permission to edit this schedule.");
   const after = (await owner.call("events")).data.events;
   assert.deepEqual(after.map((e) => [e.title, e.date]), [["Study session", "2026-11-20"], ["Lab report", "2026-11-23"]]);
   assert.deepEqual((await owner.call("courses")).data.courses, [mine]);
@@ -119,6 +119,24 @@ try {
   await bad({ courseId: otherCourse.id, email: viewer.email }, 422, "Choose a valid course.");
   assert.deepEqual((await owner.call("schedule-shares", undefined, `&courseId=${mine.id}`)).data.shares.map((s) => s.name), ["Share Viewer"]);
   pass("unknown, own, duplicate, malformed emails and someone else's course are refused; the classmate is listed once");
+
+  // Edit access is returned on reads, preserves ownership, and can be revoked.
+  err(await owner.call("schedule-permission", { courseId: mine.id, userId: viewerId, permission: "admin" }), 422, "Choose view or edit permission.");
+  assert.equal((await owner.call("schedule-permission", { courseId: mine.id, userId: viewerId, permission: "edit" })).data.share.permission, "edit");
+  assert.equal((await viewer.call("courses")).data.courses[0].permission, "edit");
+  assert.equal((await viewer.call("events")).data.events[0].permission, "edit");
+  const created = await viewer.call("event-save", { ...base, title: "Editor meeting" });
+  assert.equal(created.status, 201);
+  const editorEvent = (await owner.call("events")).data.events.find(e => e.id === created.data.event.id);
+  assert.deepEqual(editorEvent.addedBy, { id: viewerId, name: "Share Viewer" });
+  assert.equal((await viewer.call("event-save", { ...base, id: created.data.event.id, title: "Updated meeting" })).status, 200);
+  assert.equal((await owner.call("events")).data.events.find(e => e.id === created.data.event.id).title, "Updated meeting");
+  err(await viewer.call("event-delete", { id: created.data.event.id }), 404, "This event could not be found.");
+  err(await viewer.call("schedule-permission", { courseId: mine.id, userId: viewerId, permission: "view" }), 403, "You do not have permission to edit this schedule.");
+  await owner.call("schedule-permission", { courseId: mine.id, userId: viewerId, permission: "view" });
+  err(await viewer.call("event-save", { ...base, id: created.data.event.id }), 403, "You do not have permission to edit this schedule.");
+  await owner.call("event-delete", { id: created.data.event.id });
+  pass("edit access allows adding and editing, keeps owner-only controls, and downgrade takes effect");
 
   // Task test 4: unsharing removes access, and a repeat changes nothing.
   err(await owner.call("schedule-unshare", { courseId: mine.id, userId: "abc" }), 422, "Choose a valid classmate.");
@@ -144,7 +162,7 @@ try {
   owner.registered = false;
   assert.deepEqual((await viewer.call("courses")).data, { courses: [] });
   pass("deleting the owner's account stops sharing");
-  console.log("PASS: course schedules are shared view only by email, refused when invalid, and unshared");
+  console.log("PASS: course schedules support view/edit sharing, owner-only controls, downgrade, and unsharing");
 } finally {
   for (const c of [owner, viewer, other]) if (c.registered) await c.call("delete", { currentPassword: password }).catch(() => {});
 }

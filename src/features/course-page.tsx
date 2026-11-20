@@ -80,7 +80,7 @@ export function CoursePage() {
       />
       <p className={`${s.muted} ${css.shareStatus}`} role="status">
         {course.sharedBy
-          ? `Shared by ${course.sharedBy.name}. You can view its schedule.`
+          ? `Shared by ${course.sharedBy.name}. You can ${course.permission === "edit" ? "edit" : "view"} its schedule.`
           : shareError || (shares && sharedLabel(shares))}
       </p>
       {sharingSchedule && <ShareScheduleDialog course={course} onClose={() => setSharingSchedule(false)} />}

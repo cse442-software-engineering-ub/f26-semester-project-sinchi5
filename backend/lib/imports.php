@@ -191,7 +191,7 @@ function reviewedEvents(mixed $events): array
 
 function eventJson(array $row): array
 {
-    return [
+    $event = [
         'id' => (string) $row['id'],
         'courseId' => $row['course_id'],
         'title' => $row['title'],
@@ -203,7 +203,25 @@ function eventJson(array $row): array
         'source' => $row['source'],
         'importJobId' => $row['import_job_id'] === null ? null : (string) $row['import_job_id'],
         'seriesId' => $row['series_id'],
-    ] + ($row['repeat_rule'] === null ? [] : ['repeat' => json_decode($row['repeat_rule'], true, 8, JSON_THROW_ON_ERROR)]);
+    ];
+
+    if (($row['added_by_id'] ?? null) !== null && ($row['added_by_name'] ?? null) !== null) {
+        $event['addedBy'] = [
+            'id' => (string) $row['added_by_id'],
+            'name' => $row['added_by_name'],
+        ];
+    }
+
+    if ($row['repeat_rule'] !== null) {
+        $event['repeat'] = json_decode(
+            $row['repeat_rule'],
+            true,
+            8,
+            JSON_THROW_ON_ERROR,
+        );
+    }
+
+    return $event;
 }
 
 // A weekly repeat: every 1 or 2 weeks on the chosen days (0 is Sunday) until a date within a year of the start.
@@ -329,42 +347,280 @@ function importAction(PDO $db, array $config, array $session, string $route, arr
     }
     if ($route === 'events') {
         $course = $_GET['courseId'] ?? '';
-        $filter = $course === '' ? '' : ' AND course_id = ?';
-        $values = $course === '' ? [$user['id']] : [$user['id'], courseId($course, 'Choose a valid course.')];
-        $rows = query($db, 'SELECT ' . EVENT_COLUMNS . ' FROM notely_events
-            WHERE owner_user_id = ?' . $filter . ' ORDER BY event_date, event_time, id', $values)->fetchAll();
-        // Card 143: then the events of courses classmates shared with this student, each with sharedBy.
-        return ['events' => [...array_map('eventJson', $rows), ...sharedEvents($db, (string) $user['id'], $course === '' ? '' : $values[1])]];
+        $filter = $course === '' ? '' : ' AND e.course_id = ?';
+        $values = $course === ''
+            ? [$user['id']]
+            : [$user['id'], courseId($course, 'Choose a valid course.')];
+
+        $columns = implode(
+            ', ',
+            array_map(
+                fn ($c) => 'e.' . trim($c),
+                explode(',', EVENT_COLUMNS),
+            ),
+        );
+
+        $rows = query(
+            $db,
+            "SELECT $columns,
+                    added.id AS added_by_id,
+                    added.name AS added_by_name
+            FROM notely_events e
+            LEFT JOIN notely_users added
+            ON added.id = e.created_by_user_id
+            AND e.created_by_user_id <> e.owner_user_id
+            WHERE e.owner_user_id = ?" .
+                $filter .
+                ' ORDER BY e.event_date, e.event_time, e.id',
+            $values,
+        )->fetchAll();
+
+        return [
+            'events' => [
+                ...array_map('eventJson', $rows),
+                ...sharedEvents(
+                    $db,
+                    (string) $user['id'],
+                    $course === '' ? '' : $values[1],
+                ),
+            ],
+        ];
     }
     if ($route === 'event-save') {
-        $course = courseId($input['courseId'] ?? null, 'Choose a course for this event.');
-        [$title, $kind, $date, $time, $location] = reviewedEvents([$input])[0];
+        $course = courseId(
+            $input['courseId'] ?? null,
+            'Choose a course for this event.',
+        );
+
+        [$title, $kind, $date, $time, $location] =
+            reviewedEvents([$input])[0];
+
         $description = $input['description'] ?? '';
-        if (!is_string($description) || !preg_match('//u', $description) || characterCount($description) > 2000 || preg_match(INVISIBLE_PATTERN, preg_replace('/[\r\n\t]/', '', $description))) {
-            throw new HttpError(422, 'Keep each description to 2000 visible characters.');
+
+        if (
+            !is_string($description)
+            || !preg_match('//u', $description)
+            || characterCount($description) > 2000
+            || preg_match(
+                INVISIBLE_PATTERN,
+                preg_replace('/[\r\n\t]/', '', $description),
+            )
+        ) {
+            throw new HttpError(
+                422,
+                'Keep each description to 2000 visible characters.',
+            );
         }
-        $repeat = repeatRule($input['repeat'] ?? null, $date);
-        $id = isset($input['id']) ? recordId($input['id'], 'Choose a valid event.') : null;
-        rateLimit($db, $config, 'data-write', (string) $session['user_id'], 1000);
+
+        $repeat = repeatRule(
+            $input['repeat'] ?? null,
+            $date,
+        );
+
+        $id = isset($input['id'])
+            ? recordId(
+                $input['id'],
+                'Choose a valid event.',
+            )
+            : null;
+
+        rateLimit(
+            $db,
+            $config,
+            'data-write',
+            (string) $session['user_id'],
+            1000,
+        );
+
         $db->beginTransaction();
-        $user = requireUser($db, $session, true);
-        refuseSharedCourse($db, (string) $user['id'], $course);
+
+        $user = requireUser(
+            $db,
+            $session,
+            true,
+        );
+
+        $me = (string) $user['id'];
+
+        // Own courses return null. A shared course only returns its owner
+        // when this classmate has edit access; viewers get 403.
+        $sharedOwner = refuseSharedCourse(
+            $db,
+            $me,
+            $course,
+            true,
+        );
+
+        $ownerId = $sharedOwner ?? $me;
+
         if ($id === null) {
-            $count = (int) query($db, "SELECT COUNT(*) FROM notely_events WHERE owner_user_id = ? AND source = 'manual'", [$user['id']])->fetchColumn();
-            if ($count >= MAX_MANUAL_EVENTS) throw new HttpError(422, 'You can add at most ' . MAX_MANUAL_EVENTS . ' events of your own.');
-            query($db, "INSERT INTO notely_events (owner_user_id, course_id, title, kind, event_date, event_time, location, description, repeat_rule, source)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')", [$user['id'], $course, $title, $kind, $date, $time, $location, $description, $repeat]);
+            $count = (int) query(
+                $db,
+                "SELECT COUNT(*)
+                FROM notely_events
+                WHERE owner_user_id = ?
+                AND source = 'manual'",
+                [$ownerId],
+            )->fetchColumn();
+
+            if ($count >= MAX_MANUAL_EVENTS) {
+                throw new HttpError(
+                    422,
+                    'You can add at most '
+                        . MAX_MANUAL_EVENTS
+                        . ' events of your own.',
+                );
+            }
+
+            query(
+                $db,
+                "INSERT INTO notely_events
+                (
+                    owner_user_id,
+                    created_by_user_id,
+                    course_id,
+                    title,
+                    kind,
+                    event_date,
+                    event_time,
+                    location,
+                    description,
+                    repeat_rule,
+                    source
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')",
+                [
+                    $ownerId,
+                    $sharedOwner === null ? null : $me,
+                    $course,
+                    $title,
+                    $kind,
+                    $date,
+                    $time,
+                    $location,
+                    $description,
+                    $repeat,
+                ],
+            );
+
             $id = (string) $db->lastInsertId();
+
             http_response_code(201);
-        } elseif (query($db, 'UPDATE notely_events SET course_id = ?, title = ?, kind = ?, event_date = ?, event_time = ?, location = ?, description = ?, repeat_rule = ?
-            WHERE id = ? AND owner_user_id = ?', [$course, $title, $kind, $date, $time, $location, $description, $repeat, $id, $user['id']])->rowCount() === 0
-            && !query($db, 'SELECT 1 FROM notely_events WHERE id = ? AND owner_user_id = ?', [$id, $user['id']])->fetchColumn()) {
-            // Another student's event gets the same answer as a missing one, so IDs can't be probed.
-            throw new HttpError(404, 'This event could not be found.');
+        } elseif ($sharedOwner !== null) {
+            // An editor may only update an event on the shared course
+            // that granted the edit permission.
+            $updated = query(
+                $db,
+                'UPDATE notely_events
+                SET title = ?,
+                    kind = ?,
+                    event_date = ?,
+                    event_time = ?,
+                    location = ?,
+                    description = ?,
+                    repeat_rule = ?
+                WHERE id = ?
+                AND owner_user_id = ?
+                AND course_id = ?',
+                [
+                    $title,
+                    $kind,
+                    $date,
+                    $time,
+                    $location,
+                    $description,
+                    $repeat,
+                    $id,
+                    $ownerId,
+                    $course,
+                ],
+            )->rowCount();
+
+            if (
+                $updated === 0
+                && !query(
+                    $db,
+                    'SELECT 1
+                    FROM notely_events
+                    WHERE id = ?
+                    AND owner_user_id = ?
+                    AND course_id = ?',
+                    [$id, $ownerId, $course],
+                )->fetchColumn()
+            ) {
+                throw new HttpError(
+                    404,
+                    'This event could not be found.',
+                );
+            }
+        } else {
+            // Owners keep the existing behavior, including moving an
+            // event between courses they own.
+            $updated = query(
+                $db,
+                'UPDATE notely_events
+                SET course_id = ?,
+                    title = ?,
+                    kind = ?,
+                    event_date = ?,
+                    event_time = ?,
+                    location = ?,
+                    description = ?,
+                    repeat_rule = ?
+                WHERE id = ?
+                AND owner_user_id = ?',
+                [
+                    $course,
+                    $title,
+                    $kind,
+                    $date,
+                    $time,
+                    $location,
+                    $description,
+                    $repeat,
+                    $id,
+                    $me,
+                ],
+            )->rowCount();
+
+            if (
+                $updated === 0
+                && !query(
+                    $db,
+                    'SELECT 1
+                    FROM notely_events
+                    WHERE id = ?
+                    AND owner_user_id = ?',
+                    [$id, $me],
+                )->fetchColumn()
+            ) {
+                throw new HttpError(
+                    404,
+                    'This event could not be found.',
+                );
+            }
         }
-        $row = query($db, 'SELECT ' . EVENT_COLUMNS . ' FROM notely_events WHERE id = ?', [$id])->fetch();
+
+        $row = query(
+            $db,
+            'SELECT e.' .
+                str_replace(', ', ', e.', EVENT_COLUMNS) .
+                ',
+                added.id AS added_by_id,
+                added.name AS added_by_name
+            FROM notely_events e
+            LEFT JOIN notely_users added
+            ON added.id = e.created_by_user_id
+            AND e.created_by_user_id <> e.owner_user_id
+            WHERE e.id = ?',
+            [$id],
+        )->fetch();
+
         $db->commit();
-        return ['event' => eventJson($row)];
+
+        return [
+            'event' => eventJson($row),
+        ];
     }
     if ($route === 'event-delete') {
         $id = recordId($input['id'] ?? null, 'Choose a valid event.');

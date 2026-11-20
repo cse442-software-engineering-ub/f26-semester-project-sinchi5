@@ -182,11 +182,12 @@ export const test = base.extend<{ accountApi: void }>({
     let savedEvents: Record<string, string>[] = [];
     let savedCourses: Record<string, string>[] = [];
     // Card 143 schedule shares, following the PHP rules: the course's owner shares it view only by email.
-    let scheduleShares: { owner: string; courseId: string; viewer: string }[] = [];
+    let scheduleShares: { owner: string; courseId: string; viewer: string; permission: "view" | "edit" }[] = [];
     const ownerOf = (id: string) => [...accounts.values()].find((a) => a.id === id)!;
     const sharedWithMe = (courseId: string) => scheduleShares.find((x) => x.courseId === courseId && x.viewer === user!.id);
     const withSharedBy = <T extends Record<string, string>>({ ownerId, ...row }: T) =>
-      ownerId === user!.id ? row : { ...row, sharedBy: { id: ownerId, name: ownerOf(ownerId).name } };
+      ({ ...row, ...(row.createdBy && row.createdBy !== ownerId ? { addedBy: { id: row.createdBy, name: ownerOf(row.createdBy).name } } : {}),
+        ...(ownerId === user!.id ? {} : { permission: sharedWithMe(row.courseId ?? row.id)?.permission ?? "view", sharedBy: { id: ownerId, name: ownerOf(ownerId).name } }) });
     function importRoute(action: string, query: URLSearchParams, body: Record<string, unknown>) {
       if (!user) throw new ApiError(401, "Sign in to continue.");
       if (action === "syllabus-upload") {
@@ -280,11 +281,13 @@ export const test = base.extend<{ accountApi: void }>({
       if (action === "event-save") {
         if (!/^[A-Za-z0-9_-]{1,64}$/.test(String(body.courseId ?? ""))) throw new ApiError(422, "Choose a course for this event.");
         if (body.id !== undefined && !/^\d+$/.test(String(body.id))) throw new ApiError(422, "Choose a valid event.");
-        if (sharedWithMe(String(body.courseId))) throw new ApiError(403, "You do not have permission to edit this schedule.");
-        const old = body.id === undefined ? undefined : savedEvents.find((e) => e.id === String(body.id) && e.ownerId === user!.id);
+        const share = sharedWithMe(String(body.courseId));
+        if (share && share.permission !== "edit") throw new ApiError(403, "You do not have permission to edit this schedule.");
+        const ownerId = share?.owner ?? user.id;
+        const old = body.id === undefined ? undefined : savedEvents.find((e) => e.id === String(body.id) && e.ownerId === ownerId);
         if (body.id !== undefined && !old) throw new ApiError(404, "This event could not be found.");
         const { repeat, ...fields } = body as Record<string, string>;
-        const event = { ...fields, id: old?.id ?? String(nextId++), ownerId: user.id, source: old?.source ?? "manual",
+        const event = { ...fields, id: old?.id ?? String(nextId++), ownerId, createdBy: old?.createdBy ?? user.id, source: old?.source ?? "manual",
           seriesId: old?.seriesId ?? null, ...(repeat ? { repeat } : {}) } as Record<string, string>;
         savedEvents = [...savedEvents.filter((e) => e !== old), event];
         const { ownerId: _owner, ...json } = event;
@@ -413,13 +416,21 @@ export const test = base.extend<{ accountApi: void }>({
       const me = user.id;
       const courseId = String((action === "schedule-shares" ? query.get("courseId") : body.courseId) ?? "");
       if (!savedCourses.some((c) => c.id === courseId && c.ownerId === me)) throw new ApiError(422, "Choose a valid course.");
-      const view = (a: Account) => ({ userId: a.id, name: a.name, email: a.email, permission: "view" });
+      const view = (a: Account) => ({ userId: a.id, name: a.name, email: a.email,
+        permission: scheduleShares.find((x) => x.owner === me && x.courseId === courseId && x.viewer === a.id)?.permission ?? "view" });
       const list = () => scheduleShares.filter((x) => x.owner === me && x.courseId === courseId)
         .map((x) => ownerOf(x.viewer)).sort((a, b) => a.name.localeCompare(b.name)).map(view);
       if (action === "schedule-shares") return { status: 200, json: { shares: list() } };
       if (action === "schedule-unshare") {
         scheduleShares = scheduleShares.filter((x) => !(x.owner === me && x.courseId === courseId && x.viewer === String(body.userId)));
         return { status: 200, json: { shares: list() } };
+      }
+      if (action === "schedule-permission") {
+        const share = scheduleShares.find((x) => x.owner === me && x.courseId === courseId && x.viewer === String(body.userId));
+        if (!share) throw new ApiError(404, "This schedule share could not be found.");
+        if (body.permission !== "view" && body.permission !== "edit") throw new ApiError(422, "Choose view or edit permission.");
+        share.permission = body.permission;
+        return { status: 200, json: { share: view(ownerOf(share.viewer)) } };
       }
       // The common validEmail() messages from backend/lib/security.php.
       const email = String(body.email ?? "").trim().toLowerCase();
@@ -433,14 +444,14 @@ export const test = base.extend<{ accountApi: void }>({
       if (scheduleShares.some((x) => x.owner === me && x.courseId === courseId && x.viewer === them.id)) {
         throw new ApiError(409, "This schedule is already shared with that person.");
       }
-      scheduleShares.push({ owner: me, courseId, viewer: them.id });
+      scheduleShares.push({ owner: me, courseId, viewer: them.id, permission: body.permission === "edit" ? "edit" : "view" });
       return { status: 201, json: { share: view(them) } };
     }
     await context.route("**/api/index.php?route=*", async route => {
       const query = new URL(route.request().url()).searchParams;
       const action = query.get("route")!;
       const body = route.request().postDataJSON() || {};
-      if (["schedule-share", "schedule-shares", "schedule-unshare"].includes(action)) {
+      if (["schedule-share", "schedule-shares", "schedule-unshare", "schedule-permission"].includes(action)) {
         try {
           await route.fulfill(scheduleRoute(action, query, body));
         } catch (e) {
