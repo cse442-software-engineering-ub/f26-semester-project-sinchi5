@@ -5,7 +5,6 @@ import {
   FileText,
   LockKeyhole,
   Users,
-  Pin,
   ArrowUpRight,
   BookOpen,
   CalendarDays,
@@ -157,9 +156,12 @@ export function Empty({
 export function NoteCard({
   note,
   onDelete,
+  pinSlot = false,
 }: {
   note: Note;
   onDelete?: () => void;
+  // The list puts a pin toggle beside Delete; this leaves its room in the footer.
+  pinSlot?: boolean;
 }) {
   const { state } = useApp();
   const course = state.courses.find((c) => c.id === note.courseId);
@@ -171,14 +173,12 @@ export function NoteCard({
           {course?.code || note.category}
         </span>
         {note.pinned ? (
-          <span className={s.pinnedBadge}>
-            <Pin size={14} aria-hidden="true" /> Pinned
-          </span>
+          <span className={s.pinRibbon}><span className={s.srOnly}>Pinned</span></span>
         ) : <FileText size={16} aria-hidden="true" />}
       </div>
       <h3>{note.title}</h3>
       <p className={s.excerpt}>{notePreview(note)}</p>
-      <div className={s.cardFooter}>
+      <div className={`${s.cardFooter} ${pinSlot ? s.withPin : ""}`}>
         <span>
           {note.visibility === "shared" ? (
             <Users size={13} />
@@ -187,12 +187,12 @@ export function NoteCard({
           )}{" "}
           {note.visibility === "shared" ? "Shared" : "Private"}
         </span>
-        <span>
+        <time dateTime={note.updatedAt}>
           {new Date(note.updatedAt).toLocaleDateString(undefined, {
             month: "short",
             day: "numeric",
           })}
-        </span>
+        </time>
       </div>
     </Link>
   );

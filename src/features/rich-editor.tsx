@@ -88,12 +88,11 @@ const TOOLS: (Tool | "|" | "font" | "size" | "color" | "highlight" | "link")[] =
   { label: "Italic", icon: Italic, run: (e) => chain(e).toggleItalic().run(), on: (e) => e.isActive("italic") },
   { label: "Underline", icon: Underline, run: (e) => chain(e).toggleUnderline().run(), on: (e) => e.isActive("underline") },
   { label: "Strikethrough", icon: Strikethrough, run: (e) => chain(e).toggleStrike().run(), on: (e) => e.isActive("strike") },
-  "|",
   { label: "Paragraph", icon: Pilcrow, run: (e) => chain(e).setParagraph().run(), on: (e) => e.isActive("paragraph") },
   { label: "Heading 1", icon: Heading1, run: (e) => chain(e).toggleHeading({ level: 1 }).run(), on: (e) => e.isActive("heading", { level: 1 }) },
   { label: "Heading 2", icon: Heading2, run: (e) => chain(e).toggleHeading({ level: 2 }).run(), on: (e) => e.isActive("heading", { level: 2 }) },
   { label: "Heading 3", icon: Heading3, run: (e) => chain(e).toggleHeading({ level: 3 }).run(), on: (e) => e.isActive("heading", { level: 3 }) },
-  "|", "font", "size", "color", "highlight", "|",
+  "|", "font", "size", "|", "color", "highlight", "|",
   { label: "Bulleted list", icon: List, run: (e) => chain(e).toggleBulletList().run(), on: (e) => e.isActive("bulletList") },
   { label: "Numbered list", icon: ListOrdered, run: (e) => chain(e).toggleOrderedList().run(), on: (e) => e.isActive("orderedList") },
   { label: "Checklist", icon: ListChecks, run: (e) => chain(e).toggleTaskList().run(), on: (e) => e.isActive("taskList") },
@@ -112,6 +111,8 @@ const TOOLS: (Tool | "|" | "font" | "size" | "color" | "highlight" | "link")[] =
   { label: "Redo", icon: Redo2, run: (e) => chain(e).redo().run(), off: (e) => !e.can().redo() },
   { label: "Clear formatting", icon: RemoveFormatting, run: (e) => chain(e).unsetAllMarks().clearNodes().unsetTextAlign().run() },
 ];
+// The toolbar groups, in order: text style, font and size, color and highlight, lists, align, insert, history.
+const GROUP_NAMES = ["Text style", "Font and size", "Color and highlight", "Lists", "Alignment", "Insert", "History"];
 const BUTTONS = TOOLS.filter((t): t is Tool => typeof t === "object");
 
 // The computed color of a theme variable, as #rrggbb.
@@ -183,11 +184,14 @@ function Toolbar({ editor }: { editor: Editor }) {
     </div>
   );
   let b = -1;
+  const groups: Exclude<(typeof TOOLS)[number], "|">[][] = [[]];
+  for (const t of TOOLS) { if (t === "|") groups.push([]); else groups.at(-1)!.push(t); }
   return (
     <div className={css.toolbarWrap} onMouseDown={(ev) => { if ((ev.target as HTMLElement).closest("button")) ev.preventDefault(); }}>
       <div className={css.toolbar} role="toolbar" aria-label="Formatting" ref={bar}>
-        {TOOLS.map((t, i) => {
-          if (t === "|") return <span key={i} className={css.divider} aria-hidden="true" />;
+        {groups.map((group, gi) => (
+          <div key={gi} className={css.group} role="group" aria-label={GROUP_NAMES[gi]}>
+        {group.map((t) => {
           if (t === "font") return (
             <select key={t} className={css.select} aria-label="Font family" value={FONTS.find((f) => f[1] === now.font)?.[1] ?? ""}
               onChange={(ev) => ev.target.value ? chain(editor).setFontFamily(ev.target.value).run() : chain(editor).unsetFontFamily().run()}>
@@ -213,6 +217,8 @@ function Toolbar({ editor }: { editor: Editor }) {
             </button>
           );
         })}
+          </div>
+        ))}
       </div>
       {panel === "color" && swatches("color", TEXT_SWATCHES)}
       {panel === "highlight" && swatches("highlight", MARK_SWATCHES)}

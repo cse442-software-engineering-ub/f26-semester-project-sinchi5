@@ -1,10 +1,21 @@
-/* Notes page: toolbar, filters, fluid card grid, shared section. Colors come from tokens.css only. */
+/* Notes page (card 254): one planner sheet with an aligned toolbar, a divider per course and sheet cards in an aligned grid.
+   Colors come from tokens.css only. */
+.page {
+  padding: clamp(var(--space-4), 2.4vw, var(--space-6));
+}
+.page + .page {
+  margin-top: var(--space-5);
+}
+
+/* One row: search grows, the controls share one height and baseline. Wraps cleanly on phones. */
 .libraryToolbar {
   display: flex;
-  gap: 8px;
-  align-items: center;
-  margin: 0 0 clamp(12px, 1.5vw, 20px);
   flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  margin: 0 0 var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--rule);
 }
 .search {
   flex: 1 1 18rem;
@@ -13,106 +24,136 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 0 13px;
-  background: var(--surface);
+  gap: var(--space-2);
+  border-radius: var(--radius-control);
+  padding: 0 var(--space-3);
+  background: var(--ground);
+  box-shadow: inset 0 0 0 1px var(--spine);
   color: var(--muted);
 }
 .search:focus-within {
-  border-color: var(--primary);
+  background: var(--sheet);
+  box-shadow: inset 0 0 0 2px var(--ribbon);
 }
 .search input {
   border: 0;
-  padding-left: 0;
-  font-size: 0.78rem;
-  min-width: 0;
+  box-shadow: none;
   background: transparent;
+  padding-left: 0;
+  font-size: var(--fs-body);
+  min-width: 0;
+}
+.search input:focus-visible {
+  outline: none;
 }
 .libraryToolbar > select {
   width: auto;
+  flex: 0 1 9.5rem;
   min-height: 44px;
-  font-size: 0.76rem;
+  font-size: var(--fs-body);
+}
+.libraryToolbar > button {
+  min-height: 44px;
 }
 .filters {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
-  gap: 10px 12px;
-  padding: clamp(12px, 1.4vw, 18px);
-  background: var(--surface-soft);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  margin-bottom: clamp(12px, 1.5vw, 20px);
-  animation: drop 180ms var(--ease-out);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--ground);
+  border-radius: var(--radius-card);
+  box-shadow: inset 0 0 0 1px var(--spine);
+  margin: calc(var(--space-2) * -1) 0 var(--space-5);
+  animation: drop var(--motion-base) var(--ease-out);
 }
 .filters label {
-  font-size: 0.68rem;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
   color: var(--muted);
   min-width: 0;
 }
 .filters input,
 .filters select {
-  font-size: 0.74rem;
-  min-height: 40px;
+  font-size: var(--fs-body);
+  min-height: 44px;
 }
 .libraryMeta {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 12px;
-  font-size: 0.7rem;
+  gap: var(--space-3);
+  font-size: var(--fs-small);
   color: var(--muted);
-  margin-bottom: clamp(12px, 1.5vw, 18px);
+  margin: calc(var(--space-2) * -1) 0 var(--space-4);
 }
 .chip {
   display: flex;
   align-items: center;
-  gap: 8px;
-  border-radius: 20px;
+  gap: var(--space-2);
+  border-radius: var(--radius-pill);
   background: var(--sage);
-  padding: 7px 12px;
-  font-size: 0.68rem;
+  padding: 0 var(--space-3);
+  font-size: var(--fs-small);
   min-width: 44px;
   min-height: 44px;
 }
 .loading {
   color: var(--muted);
-  font-size: 0.8rem;
-  padding: 24px 0;
+  font-size: var(--fs-body);
+  padding: var(--space-5) 0;
 }
 
-/* One section per category; the heading carries a hairline so groups read as sections. */
-.categoryGroup + .categoryGroup {
-  margin-top: clamp(24px, 3vw, 40px);
+/* A planner divider: the course's color tab, its code and name, and the count on the right, over a faint rule. */
+.courseGroup + .courseGroup {
+  margin-top: var(--space-6);
 }
-.categoryHeading {
+.courseHeading {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin: 0 0 clamp(10px, 1.2vw, 16px);
-  font-size: 0.78rem;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--rule);
+  font-size: var(--fs-lead);
+  line-height: var(--lh-lead);
+  letter-spacing: var(--ls-lead);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+}
+.courseTab {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 22px;
+  border-radius: 3px;
+  background: var(--course-color, var(--hover-line));
+}
+.courseName {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-3);
+}
+.courseName > span {
+  font-size: var(--fs-body);
+  font-weight: 400;
   color: var(--muted);
 }
-.categoryHeading::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--line);
+.count {
+  flex: 0 0 auto;
+  font-size: var(--fs-small);
+  font-weight: 500;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
-/* Fluid grid: as many columns as fit, never a narrow centered column. The two-class selector
-   beats the fixed 3 and 2 column rules in ui.module.css at every width. */
+/* Aligned auto-fill grid: equal columns, equal rows, never a narrow centered column. */
 .group .grid {
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
-  gap: clamp(12px, 1.3vw, 24px);
+  gap: var(--space-4);
 }
 .group .list {
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 36rem), 1fr));
-  gap: clamp(8px, 1vw, 16px);
+  gap: var(--space-2);
 }
 .cell {
   position: relative;
@@ -121,11 +162,6 @@
 }
 .cell > * {
   min-width: 0;
-}
-/* Room beside the card's Delete action for the pin toggle. */
-/* shortcut: matches the shared card's hashed footer class by substring, replace with a pin prop on NoteCard when src/shared/ui.tsx is next edited */
-.group .cell [class*="cardFooter"] {
-  padding-right: 128px;
 }
 .pinButton {
   position: absolute;
@@ -136,31 +172,21 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   color: var(--muted);
 }
 .pinButton[aria-pressed="true"] {
-  color: var(--primary);
+  color: var(--ribbon);
 }
 .pinButton:disabled {
   opacity: 0.5;
 }
 
-/* The shared section reads as its own area: same grid, quieter cards. */
-.sharedSection {
-  margin-top: clamp(28px, 3.5vw, 48px);
-  padding-top: clamp(16px, 2vw, 24px);
-  border-top: 1px solid var(--line);
-}
-.sharedHint {
-  margin: -6px 0 clamp(10px, 1.2vw, 16px);
-  font-size: 0.72rem;
-  color: var(--muted);
-}
+/* Shared with me is its own sheet: the same divider and cards on a quieter fill. */
 .sharedList {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
-  gap: clamp(8px, 1vw, 14px);
+  gap: var(--space-4);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -172,16 +198,27 @@
 .sharedNote {
   display: grid;
   align-content: start;
-  gap: 4px;
-  min-height: 44px;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface-soft);
+  gap: var(--space-1);
+  min-height: 88px;
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--sheet);
+  box-shadow: inset 0 0 0 1px var(--sheet-edge);
   overflow-wrap: anywhere;
+  transition: box-shadow var(--motion-base) var(--ease-out);
+}
+.sharedNote strong {
+  font-size: var(--fs-lead);
+  line-height: var(--lh-lead);
+  font-weight: 600;
 }
 .sharedNote small {
   color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+.sharedSheet {
+  background: var(--spine-shade);
 }
 
 @keyframes rise {
@@ -201,12 +238,11 @@
   .sharedList > li {
     animation: rise 220ms var(--ease-out) backwards;
     animation-delay: calc(var(--i, 0) * 25ms);
-    transition: transform 160ms var(--ease-out);
   }
 }
-@media (prefers-reduced-motion: no-preference) and (hover: hover) {
-  .cell:hover {
-    transform: translateY(-2px);
+@media (hover: hover) {
+  .sharedNote:hover {
+    box-shadow: inset 0 0 0 1px var(--hover-line), var(--sheet-shadow);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -216,22 +252,22 @@
 }
 
 @media (max-width: 767px) {
-  .libraryToolbar {
-    margin-top: 0;
-  }
   .search {
     flex-basis: 100%;
   }
-  .libraryToolbar > .secondary {
-    flex: 1;
-  }
   .libraryToolbar > select {
-    flex: 1;
+    flex: 1 1 calc(50% - var(--space-2));
     min-width: 0;
+  }
+  .libraryToolbar > select[aria-label="Sort notes"] {
+    flex-basis: 100%;
+  }
+  .libraryToolbar > button {
+    flex: 1 1 auto;
   }
   .filters {
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
-    padding: 12px;
+    padding: var(--space-3);
   }
   .search input,
   .libraryToolbar > select,
@@ -247,4 +283,22 @@
   .group .grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Names the shared classes the screen combines with its own (see both in notes-list.tsx); the segment matches the 44 px controls. */
+.segment {
+  height: 44px;
+  padding: 3px;
+}
+.libraryToolbar .segment > button {
+  min-height: 38px;
+}
+.secondary,
+.actions {
+  min-width: 0;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }

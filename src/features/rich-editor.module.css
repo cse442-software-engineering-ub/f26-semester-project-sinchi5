@@ -8,33 +8,56 @@
   display: flex;
   flex: 1;
   flex-direction: column;
+  font-size: var(--fs-lead);
+  padding-inline: var(--space-5);
 }
+/* Sticky inside the sheet, grouped with hairline separators; two neat rows on wide screens, one scrolling row on phones. */
 .toolbarWrap {
   position: sticky;
   top: 0;
   z-index: 5;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
-  margin-top: 16px;
+  background: var(--sheet);
+  border-bottom: 1px solid var(--rule);
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  padding: var(--space-1) var(--space-3);
 }
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 0;
+  gap: var(--space-1) 0;
+  padding: var(--space-1) 0;
   overflow-x: auto;
   overscroll-behavior-x: contain;
+}
+.group {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  padding: 0 var(--space-2);
+}
+.group:first-child {
+  padding-left: 0;
+}
+/* The hairline closes the group before it, so a wrapped row never starts with one. */
+.group:not(:last-child)::after {
+  content: "";
+  align-self: center;
+  width: 1px;
+  height: 20px;
+  margin-left: var(--space-2);
+  background: var(--rule);
 }
 .tool,
 .select,
 .textButton {
   flex: 0 0 auto;
   min-height: 36px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--surface);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
   color: var(--text);
-  font-size: 0.78rem;
+  font-size: var(--fs-body);
 }
 .tool {
   display: inline-flex;
@@ -47,7 +70,7 @@
 .tool[aria-pressed="true"],
 .tool[aria-expanded="true"] {
   background: var(--sage);
-  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--ribbon);
 }
 .tool:disabled {
   opacity: 0.45;
@@ -56,17 +79,19 @@
 .select {
   width: auto;
   max-width: 9.5rem;
-  padding: 0 8px;
+  padding: 0 var(--space-2);
+  background: var(--ground);
+  box-shadow: inset 0 0 0 1px var(--spine);
 }
 .textButton {
-  padding: 0 12px;
+  padding: 0 var(--space-3);
   cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--spine);
 }
-.divider {
-  flex: 0 0 1px;
-  align-self: stretch;
-  margin: 4px 4px;
-  background: var(--line);
+@media (hover: hover) {
+  .tool:not(:disabled):hover {
+    background: var(--ground);
+  }
 }
 .panel {
   display: flex;
@@ -78,7 +103,7 @@
 .swatch {
   width: 32px;
   height: 32px;
-  border: 2px solid var(--line);
+  border: 2px solid var(--spine);
   border-radius: 50%;
   cursor: pointer;
 }
@@ -102,16 +127,19 @@
 }
 .content :global(.ProseMirror) {
   flex: 1;
+  width: 100%;
+  max-width: var(--measure-read);
+  margin-inline: auto;
   min-height: 240px;
-  padding: 20px 0;
+  padding: var(--space-6) 0 var(--space-8);
   color: var(--text);
-  font-size: 0.95rem;
+  font-size: inherit;
   line-height: 1.8;
   overflow-wrap: anywhere;
   outline: none;
 }
 .content :global(.ProseMirror:focus-visible) {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--ribbon);
   outline-offset: 4px;
 }
 .content :global(.ProseMirror p.is-editor-empty:first-child::before) {
@@ -130,7 +158,7 @@
 .content :global(.ProseMirror blockquote) {
   margin: 0.8em 0;
   padding-left: 1rem;
-  border-left: 3px solid var(--line);
+  border-left: 1px solid var(--spine);
   color: var(--muted);
 }
 .content :global(.ProseMirror code) {
@@ -147,7 +175,7 @@
   overflow-x: auto;
 }
 .content :global(.ProseMirror pre code) { padding: 0; background: none; }
-.content :global(.ProseMirror hr) { border: 0; border-top: 1px solid var(--line); margin: 1.2em 0; }
+.content :global(.ProseMirror hr) { border: 0; border-top: 1px solid var(--spine); margin: 1.2em 0; }
 .content :global(.ProseMirror a) { color: var(--primary); text-decoration: underline; }
 .content :global(.ProseMirror mark) { padding: 0 2px; border-radius: 3px; color: inherit; }
 .content :global(.ProseMirror mark[data-color="yellow"]) { background: var(--highlight-yellow); color: var(--highlight-ink); }
@@ -161,7 +189,14 @@
 .content :global(.ProseMirror li[data-checked="true"] > div) { text-decoration: line-through; color: var(--muted); }
 
 @media (min-width: 768px) {
-  .toolbar { flex-wrap: wrap; overflow-x: visible; }
+  .toolbar { flex-wrap: wrap; overflow-x: visible; row-gap: var(--space-1); }
+  .content { padding-inline: var(--space-7); }
+}
+/* A faint ruled margin down the left of the measure, like a planner page. */
+@media (min-width: 1024px) {
+  .content {
+    background: linear-gradient(90deg, transparent max(var(--space-5), calc(50% - var(--measure-read) / 2 - 1.25rem)), var(--rule) 0, var(--rule) calc(max(var(--space-5), calc(50% - var(--measure-read) / 2 - 1.25rem)) + 1px), transparent 0) no-repeat;
+  }
 }
 @media (max-width: 1023px) {
   .toolbarWrap { top: calc(56px + env(safe-area-inset-top)); }
