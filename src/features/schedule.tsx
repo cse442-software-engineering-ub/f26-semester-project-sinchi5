@@ -26,6 +26,7 @@ import {
 import { dateKey } from "../services/fixtures";
 import {
   isClass,
+  isDue,
   editableCourses,
   type CourseEvent,
   type EventKind,
@@ -883,17 +884,24 @@ const minutesOf = (time: string) => {
 const hourName = (h: number) => `${h % 12 || 12} ${h < 12 ? "AM" : "PM"}`;
 const BLOCK = 60; // events carry a start time only, so a block on the rail is one hour long
 
-// shortcut: lanes are worked out per day, so one busy hour narrows that whole day's blocks; revisit if days get crowded.
+// Overlapping events sit side by side: lanes are counted per cluster of overlapping events, so a lone event keeps the full width.
 function laneOut(list: CourseEvent[]) {
   const ends: number[] = [];
-  const lane = list.map((e) => {
+  const lane: number[] = [];
+  const lanes: number[] = [];
+  let from0 = 0;
+  let clusterEnd = 0;
+  list.forEach((e, k) => {
     const from = minutesOf(e.time);
+    if (from >= clusterEnd) { ends.length = 0; from0 = k; }
     let i = ends.findIndex((end) => end <= from);
     if (i < 0) i = ends.push(0) - 1;
     ends[i] = from + BLOCK;
-    return i;
+    clusterEnd = Math.max(clusterEnd, from + BLOCK);
+    lane.push(i);
+    for (let j = from0; j <= k; j++) lanes[j] = ends.length;
   });
-  return { lane, lanes: Math.max(1, ends.length) };
+  return { lane, lanes };
 }
 
 // The current time, refreshed each minute, for the Now ribbon.
@@ -953,17 +961,21 @@ export function Schedule() {
     state.courses.find((c) => c.id === e.courseId)?.color ?? "var(--muted)";
   const codeOf = (e: CourseEvent) => state.courses.find((c) => c.id === e.courseId)?.code;
 
-  // Week: seven columns on one hour rail. Untimed items and deadlines go to the strip above the rail.
-  const week = Array.from({ length: 7 }, (_, i) => {
+  // Week: seven columns on one hour rail. Untimed items go to the strip above the rail. Due items never widen
+  // the hours (8 AM to 6 PM unless a class runs outside): inside them they are blocks, off the rail (a 23:59
+  // deadline) they become a "Due 11:59 PM" pin in the strip.
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
     const d = addDays(date, i - date.getDay());
     const key = dateKey(d);
-    const list = visibleEvents.filter((e) => e.date === key).sort(byTime);
-    const timed = list.filter((e) => e.time && e.kind !== "deadline");
-    return { d, key, strip: list.filter((e) => !timed.includes(e)), timed, ...laneOut(timed) };
+    return { d, key, list: visibleEvents.filter((e) => e.date === key).sort(byTime) };
   });
-  const starts = week.flatMap((x) => x.timed.map((e) => minutesOf(e.time)));
+  const starts = weekDays.flatMap((x) => x.list.filter((e) => e.time && !isDue(e.kind)).map((e) => minutesOf(e.time)));
   const fromHour = Math.min(8, ...starts.map((m) => Math.floor(m / 60)));
   const toHour = Math.min(24, Math.max(18, ...starts.map((m) => Math.ceil((m + BLOCK) / 60))));
+  const week = weekDays.map((x) => {
+    const timed = x.list.filter((e) => e.time && (!isDue(e.kind) || (minutesOf(e.time) >= fromHour * 60 && minutesOf(e.time) < toHour * 60)));
+    return { ...x, strip: x.list.filter((e) => !timed.includes(e)), timed, ...laneOut(timed) };
+  });
   const hours = Array.from({ length: toHour - fromHour }, (_, i) => fromHour + i);
   const nowAt = (now.getHours() * 60 + now.getMinutes()) / 60 - fromHour;
   const showNow = week.some((x) => x.key === today) && nowAt >= 0 && nowAt < toHour - fromHour;
@@ -1150,7 +1162,7 @@ export function Schedule() {
                         style={{ "--c": colorOf(e) } as CSSProperties}
                         onClick={() => openEvent(e)}
                       >
-                        {e.time && <b>{formatEventTime(e.time)}</b>} {e.title}
+                        {e.time && <b>{isDue(e.kind) ? `Due ${formatEventTime(e.time)}` : formatEventTime(e.time)}</b>} {e.title}
                       </button>
                     ))}
                   </div>
@@ -1196,7 +1208,7 @@ export function Schedule() {
                           "--c": colorOf(e),
                           "--t": minutesOf(e.time) / 60 - fromHour,
                           "--lane": x.lane[i],
-                          "--lanes": x.lanes,
+                          "--lanes": x.lanes[i],
                         } as CSSProperties
                       }
                       onClick={() => openEvent(e)}

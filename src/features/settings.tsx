@@ -11,12 +11,14 @@ import type { ColorScheme, CustomTheme, Preferences, ThemeMode } from "../domain
 
 const MODES: [ThemeMode, string][] = [["system", "System"], ["light", "Light"], ["dark", "Dark"]];
 // Preview colors: ground, sheet, ribbon of each scheme in light mode (the same values as tokens.css, card 251).
-const SCHEMES: [ColorScheme, string, string[]][] = [
-  ["sage", "Sage", ["#f2f4ee", "#ffffff", "#8b5d33"]],
-  ["fjord", "Fjord", ["#ebeef3", "#fbfcfe", "#496a92"]],
-  ["rose", "Rosé", ["#f7f0e8", "#fffaf3", "#286983"]],
-  ["mocha", "Mocha", ["#eceef3", "#ffffff", "#7a2fd6"]],
+const SCHEMES: [ColorScheme, string, string[], string[]][] = [
+  ["sage", "Sage", ["#f2f4ee", "#ffffff", "#8b5d33"], ["#151c19", "#212c27", "#a7cdbd"]],
+  ["fjord", "Fjord", ["#ebeef3", "#fbfcfe", "#496a92"], ["#292e39", "#3b4252", "#88c0d0"]],
+  ["rose", "Rosé", ["#f7f0e8", "#fffaf3", "#286983"], ["#1e1c2f", "#2a273f", "#ea9a97"]],
+  ["mocha", "Mocha", ["#eceef3", "#ffffff", "#7a2fd6"], ["#191926", "#262738", "#cba6f7"]],
 ];
+// Dark mode (chosen, or the system's) previews each scheme's dark colors.
+const wantsDark = (mode: ThemeMode) => mode === "dark" || (mode === "system" && !!window.matchMedia?.("(prefers-color-scheme: dark)").matches);
 
 // Native radios give the arrow-key and Tab behavior of a radio group.
 const SECTIONS = [
@@ -45,10 +47,10 @@ function startingColors() {
   };
   return { accent: read("--primary"), background: read("--bg"), text: read("--text") };
 }
-const swatchOf = (t: CustomTheme) => {
+const swatchOf = (t: CustomTheme, dark: boolean) => {
   const b = isHex(t.accent) && isHex(t.background) && isHex(t.text) ? buildPalette(t) : null;
   // Preview the mode the theme was made for: a dark background shows its dark set.
-  const p = b && (b.dark["--bg"] === t.background.toLowerCase() ? b.dark : b.light);
+  const p = b && (dark || b.dark["--bg"] === t.background.toLowerCase() ? b.dark : b.light);
   return p ? [p["--ground"], p["--sheet"], p["--ribbon"]] : [];
 };
 
@@ -129,6 +131,7 @@ function Appearance() {
   const current = state.preferences;
   const themes = current.customThemes ?? [];
   const full = themes.length >= MAX_THEMES;
+  const dark = wantsDark(current.mode);
   if (!current.scheme.startsWith("custom:")) lastBuiltIn.current = current.scheme as ColorScheme;
   async function choose(next: typeof current) {
     setFailed(false);
@@ -150,10 +153,10 @@ function Appearance() {
       <fieldset className={a.group}>
         <legend>Color scheme</legend>
         <div className={a.options}>
-          {SCHEMES.map(([key, label, colors]) => (
+          {SCHEMES.map(([key, label, light, night]) => (
             <label key={key} className={a.option}>
               <input type="radio" name="scheme" checked={current.scheme === key} onChange={() => choose({ ...current, scheme: key })} />
-              <Mini colors={colors} />
+              <Mini colors={dark ? night : light} />
               <span className={a.optionName}>{label}</span>
             </label>
           ))}
@@ -167,7 +170,7 @@ function Appearance() {
               <div key={t.id} className={a.themeItem}>
                 <label className={a.option}>
                   <input type="radio" name="scheme" checked={current.scheme === `custom:${t.id}`} onChange={() => choose({ ...current, scheme: `custom:${t.id}` })} />
-                  <Mini colors={swatchOf(t)} />
+                  <Mini colors={swatchOf(t, dark)} />
                   <span className={a.optionName}>{t.name}</span>
                 </label>
                 <div className={a.itemActions}>

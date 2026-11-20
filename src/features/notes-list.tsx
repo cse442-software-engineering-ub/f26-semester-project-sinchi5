@@ -221,7 +221,7 @@ export function Notes() {
             className={s.primary}
             onClick={() => openCreateNote()}
           >
-            <Plus size={18} /> Create Note
+            <Plus size={18} /> Create note
           </button>   
         }
       />

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { GraduationCap, Plus, FileText } from "lucide-react";
 import { useApp } from "../app/context";
 import { dateKey } from "../services/fixtures";
-import { PageHeading, Sheet, countOf } from "../shared/ui";
+import { PageHeading, Sheet, DateLabel, countOf } from "../shared/ui";
 import { ImportDialog } from "./imports";
 import { meetingTimes } from "./course-meetings";
 import s from "../shared/ui.module.css";
@@ -61,7 +61,7 @@ export function Courses({ onAddCourse }: { onAddCourse: () => void }) {
                   <span className={c.meta}>{course.term}</span>
                   {meets && <span className={c.meta}>{meets}</span>}
                   {course.sharedBy && <span className={c.meta}>Shared by {course.sharedBy.name}</span>}
-                  {next && <span className={c.meta}>Next: {next.title} · {next.date}</span>}
+                  {next && <span className={c.meta}>Next: {next.title} · <DateLabel date={next.date} /></span>}
                   <i className={c.spacer} aria-hidden="true" />
                   <span className={c.counts}>
                     <span>{notes === 1 ? "1 note" : `${notes} notes`}</span>

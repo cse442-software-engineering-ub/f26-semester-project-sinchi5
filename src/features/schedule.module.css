@@ -163,7 +163,8 @@
 }
 .block {
   position: absolute;
-  top: calc(var(--t) * var(--hour) + 1px);
+  /* Never lower than the last hour of the rail, so a block can't overflow the sheet. */
+  top: min(calc(var(--t) * var(--hour) + 1px), calc((var(--rows) - 1) * var(--hour) + 1px));
   height: calc(var(--hour) - 2px);
   left: calc(var(--lane) / var(--lanes) * 100% + 3px);
   width: calc(100% / var(--lanes) - 6px);

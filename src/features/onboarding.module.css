@@ -135,13 +135,6 @@
   border-radius: var(--radius-control);
   color: var(--logo-ink);
 }
-.logo i {
-  font-style: normal;
-  color: var(--logo-star);
-  font-size: 18px;
-  margin-left: -4px;
-  align-self: flex-start;
-}
 .onboardingMain footer {
   color: var(--muted);
   font-size: var(--fs-small);
@@ -190,10 +183,8 @@
   top: var(--space-3);
   left: var(--space-5);
   color: var(--muted);
-  font-size: var(--fs-label);
-  line-height: var(--lh-label);
-  letter-spacing: var(--ls-label);
-  text-transform: uppercase;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
   font-weight: 600;
 }
 .dayRail > b {
@@ -267,12 +258,10 @@
 }
 .dayLabel {
   margin-top: var(--space-2);
-  color: var(--muted);
-  font-size: var(--fs-label);
-  line-height: var(--lh-label);
-  letter-spacing: var(--ls-label);
-  text-transform: uppercase;
-  font-weight: 600;
+  color: var(--text);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  font-weight: 650;
 }
 .dayLabel:first-child {
   margin-top: 0;

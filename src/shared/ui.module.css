@@ -689,7 +689,7 @@
 
 .noteGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
   gap: var(--space-4);
 }
 .noteGrid .noteCard {
@@ -946,15 +946,16 @@
     column-gap: var(--space-3);
     margin-bottom: var(--space-5);
   }
-  .pageHeading .actions .primary {
-    font-size: 0;
-    padding: 0;
-    min-width: 44px;
-    gap: 0;
+  .pageHeading {
+    grid-template-columns: minmax(0, 1fr);
   }
-  .pageHeading .actions .primary > svg {
-    width: 20px;
-    height: 20px;
+  .pageHeading h1 {
+    overflow-wrap: break-word;
+  }
+  .pageHeading > .actions {
+    grid-column: 1;
+    grid-row: 2;
+    justify-content: flex-start;
   }
   .quickNotes {
     grid-template-columns: 1fr 1fr;

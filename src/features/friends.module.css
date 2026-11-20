@@ -194,6 +194,42 @@
   font-size: var(--fs-body);
   line-height: var(--lh-body);
 }
+/* On a phone each friend is a list row: avatar | name and email | Remove. */
+@media (max-width: 767px) {
+  .friendGrid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .friendCard {
+    grid-template-rows: none;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    padding: var(--space-2) 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    border-top: 1px solid var(--rule);
+  }
+  .friendCard:hover {
+    box-shadow: none;
+    transform: none;
+  }
+  .who {
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: stretch;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .friendCard .avatar {
+    width: 40px;
+    height: 40px;
+    font-size: var(--fs-body);
+  }
+  .remove {
+    justify-self: end;
+    margin-inline-start: 0;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .friendCard {
     transition: none;

@@ -230,7 +230,7 @@ function SamplePage() {
       </h2>
       <p className={o.sampleLead}>Your notes, your classes, your next big idea. Give them a place to come together.</p>
       <div className={o.day} aria-hidden="true">
-        <span className={o.dayTag}>Example day</span>
+        <h3 className={o.dayTag}>Example day</h3>
         <div className={o.dayRail}>
           <b>Tuesday</b>
           <small>November 17</small>
@@ -244,9 +244,9 @@ function SamplePage() {
           </div>
         </div>
         <div className={o.dayNotes}>
-          <small className={o.dayLabel}>Notes for today</small>
+          <h3 className={o.dayLabel}>Notes for today</h3>
           <div className={o.dayNote}><small>CSE 442 · Lecture 23</small><b>Scrum roles</b></div>
-          <small className={o.dayLabel}>Due</small>
+          <h3 className={o.dayLabel}>Due</h3>
           <div className={o.dayDue}><span><b>Homework 5</b><small>CSE 250</small></span><Chip tone="due">Due tonight 11:59 PM</Chip></div>
           <div className={o.dayDue}><span><b>Midterm exam</b><small>CSE 442</small></span><Chip tone="later">In 12 days</Chip></div>
         </div>
@@ -261,7 +261,6 @@ function LinkLogo() {
         <BookOpen size={23} />
       </span>
       {BRAND}
-      <i>✦</i>
     </div>
   );
 }
