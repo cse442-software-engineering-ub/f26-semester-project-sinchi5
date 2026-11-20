@@ -13,7 +13,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Note, CourseEvent, User } from "../domain";
 import { useApp } from "../app/context";
 import s from "./ui.module.css";
@@ -52,6 +52,12 @@ export function Modal({
 }) {
   const [open, setOpen] = useState(true);
   const previousFocus = useRef(document.activeElement as HTMLElement | null);
+  // Tab used to leave the dialog for the Skip link and sidebar: make the rest of the page inert while it is open.
+  // Released as soon as it starts closing, so focus can return to the button that opened it.
+  const inerted = useRef<HTMLElement[]>([]);
+  const release = () => { inerted.current.forEach((e) => { e.inert = false; }); inerted.current = []; };
+  useEffect(() => { if (!open) release(); }, [open]);
+  useEffect(() => release, []);
   return (
     <Dialog.Root
       open={open}
@@ -63,6 +69,25 @@ export function Modal({
       <Dialog.Portal>
         <Dialog.Backdrop className={s.backdrop} />
         <Dialog.Popup
+          onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
+            if (event.key !== "Tab") return;
+            // With the page inert, the next stop would be the browser's own controls: wrap inside the dialog instead.
+            const stops = [...event.currentTarget.querySelectorAll<HTMLElement>(
+              'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"]), [contenteditable="true"]',
+            )].filter((e) => !e.matches(":disabled, [inert] *") && e.tabIndex >= 0 && e.getClientRects().length > 0);
+            const edge = stops[event.shiftKey ? 0 : stops.length - 1];
+            if (stops.length && (document.activeElement === edge || document.activeElement === event.currentTarget)) {
+              event.preventDefault();
+              stops[event.shiftKey ? stops.length - 1 : 0].focus();
+            }
+          }}
+          ref={(popup: HTMLElement | null) => {
+            if (!popup || inerted.current.length) return;
+            inerted.current = [...document.body.children].filter(
+              (e): e is HTMLElement => e instanceof HTMLElement && !e.contains(popup) && !e.inert && e.tagName !== "SCRIPT",
+            );
+            inerted.current.forEach((e) => { e.inert = true; });
+          }}
           finalFocus={() =>
             previousFocus.current?.isConnected
               ? previousFocus.current
