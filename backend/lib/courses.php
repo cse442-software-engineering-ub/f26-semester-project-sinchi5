@@ -5,7 +5,8 @@ if (PHP_SAPI !== 'cli' && !defined('NOTELY_INTERNAL')) {
     exit;
 }
 
-// Card 141: a student's courses are stored on the server. Needs imports.php (courseId) for the id check.
+// Card 141: a student's courses are stored on the server. Needs imports.php (courseId) for the id check
+// and schedule-shares.php (sharedCourses).
 const COURSE_READ_ROUTES = ['courses'];
 const COURSE_ROUTES = [...COURSE_READ_ROUTES, 'course-save', 'course-delete', 'workspace-clear'];
 const MAX_COURSES = 50;
@@ -37,9 +38,10 @@ function visibleText(mixed $value, int $max, string $message): string
 function courseAction(PDO $db, array $config, array $session, string $route, array $input): array
 {
     if ($route === 'courses') {
-        $rows = query($db, 'SELECT ' . COURSE_COLUMNS . ' FROM notely_courses WHERE owner_user_id = ? ORDER BY created_at, id',
-            [requireUser($db, $session)['id']])->fetchAll();
-        return ['courses' => array_map('courseJson', $rows)];
+        $me = (string) requireUser($db, $session)['id'];
+        $rows = query($db, 'SELECT ' . COURSE_COLUMNS . ' FROM notely_courses WHERE owner_user_id = ? ORDER BY created_at, id', [$me])->fetchAll();
+        // Card 143: then the courses classmates shared with this student, each with sharedBy.
+        return ['courses' => [...array_map('courseJson', $rows), ...sharedCourses($db, $me)]];
     }
     // Bounds how fast one account can write to the shared database.
     rateLimit($db, $config, 'data-write', (string) $session['user_id'], 1000);

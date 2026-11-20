@@ -27,6 +27,7 @@
     "test:import-confirm": "php tests/backend/php/import-confirm.php",
     "test:import-confirm-http": "node tests/backend/http/import-confirm-http.mjs",
     "test:event-delete": "node tests/backend/http/event-delete-http.mjs",
+    "test:schedule-shares": "node tests/backend/http/schedule-shares-http.mjs",
     "test:syllabus-ai": "php tests/backend/php/syllabus-ai.php",
     "test:import-extract": "php tests/backend/php/import-extract.php",
     "test:import-extract-http": "node tests/backend/http/import-extract-http.mjs"
