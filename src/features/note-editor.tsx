@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { editorHtml } from "../services/noteText";
 import {
   useParams,
@@ -83,7 +83,8 @@ function NoteEditor() {
   // Phones keep the bar short: History, Reminder, Pin, Cancel and Delete go into a menu. Read the width from the window that holds the screen.
   const [phone, setPhone] = useState(false);
   const loaded = !!note;
-  useEffect(() => {
+  // Layout effect: the phone bar (with More actions) is in place before the first paint, so nothing sees the desktop bar at phone width first.
+  useLayoutEffect(() => {
     const query = screenRef.current?.ownerDocument.defaultView?.matchMedia("(max-width: 767px)");
     if (!query) return;
     const update = () => setPhone(query.matches);

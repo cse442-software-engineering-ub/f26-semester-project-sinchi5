@@ -15,16 +15,23 @@ import {
   X,
 } from "lucide-react";
 import { useApp, useHoldRefresh } from "../app/context";
-import { PageHeading, NoteCard, Empty, Modal, DeleteNoteDialog, countOf} from "../shared/ui";
-import { groupNotesByCategory, isNoteCategory, NOTE_CATEGORIES, type NoteCategory } from "../services/categories";
-import type {
-  Note,
-} from "../domain";
+import { PageHeading, NoteCard, Empty, Modal, DeleteNoteDialog, Sheet, countOf } from "../shared/ui";
+import { isNoteCategory, NOTE_CATEGORIES, type NoteCategory } from "../services/categories";
+import type { Course, Note } from "../domain";
 import s from "../shared/ui.module.css";
 import css from "./notes-list.module.css";
 import { createHttpNoteShares } from "../services/note-shares-http";
 // Shared classes this screen's own rules also name (see notes-list.module.css), applied together.
 const both = { actions: `${s.actions} ${css.actions}`, secondary: `${s.secondary} ${css.secondary}`, segment: `${s.segment} ${css.segment}` };
+
+// Notes under their course in the order of the student's courses; notes with no known course go last.
+function groupByCourse(notes: Note[], courses: Course[]) {
+  const groups: { course?: Course; notes: Note[] }[] = courses
+    .map((course) => ({ course, notes: notes.filter((n) => n.courseId === course.id) }))
+    .filter((g) => g.notes.length > 0);
+  const rest = notes.filter((n) => !courses.some((c) => c.id === n.courseId));
+  return rest.length ? [...groups, { notes: rest }] : groups;
+}
 
 export function Notes() {
   const { repo, state, refresh } = useApp();
@@ -266,9 +273,10 @@ export function Notes() {
           </div>
         </Modal>
       )}
+      <Sheet className={css.page} label="Notes">
       <div className={css.libraryToolbar}>
         <label className={css.search}>
-          <Search size={18} />
+          <Search size={18} aria-hidden="true" />
           <input
             aria-label="Search notes"
             placeholder="Find a thought, a topic, a little inspiration…"
@@ -276,14 +284,26 @@ export function Notes() {
             onChange={(e) => set("q", e.target.value)}
           />
         </label>
-        <button
-          className={`${both.secondary} ${filters ? s.activeButton : ""}`}
-          onClick={() => setFilters(!filters)}
-          aria-expanded={filters}
+        <select
+          aria-label="Course"
+          value={params.get("course") || ""}
+          onChange={(e) => set("course", e.target.value)}
         >
-          <SlidersHorizontal size={16} /> Filters{" "}
-          {active.length > 0 && `(${active.length})`}
-        </button>
+          <option value="">All courses</option>
+          {state.courses.map((c) => (
+            <option key={c.id} value={c.id}>{c.code}</option>
+          ))}
+        </select>
+        <select
+          aria-label="Category"
+          value={params.get("category") || ""}
+          onChange={(e) => set("category", e.target.value)}
+        >
+          <option value="">All categories</option>
+          {NOTE_CATEGORIES.map((c) => (
+            <option key={c}>{c}</option>
+          ))}
+        </select>
         <select
           aria-label="Sort notes"
           value={params.get("sort") || "modified"}
@@ -293,6 +313,14 @@ export function Notes() {
           <option value="created">Date created</option>
           <option value="title">Alphabetical</option>
         </select>
+        <button
+          className={`${both.secondary} ${filters ? s.activeButton : ""}`}
+          onClick={() => setFilters(!filters)}
+          aria-expanded={filters}
+        >
+          <SlidersHorizontal size={16} /> Filters{" "}
+          {active.length > 0 && `(${active.length})`}
+        </button>
         <div className={both.segment}>
           <button
             className={params.get("view") !== "list" ? s.activeButton : ""}
@@ -314,32 +342,6 @@ export function Notes() {
       </div>
       {filters && (
         <div className={css.filters} role="group" aria-label="Filter notes">
-          <label>
-            Course
-            <select
-              value={params.get("course") || ""}
-              onChange={(e) => set("course", e.target.value)}
-            >
-              <option value="">All courses</option>
-              {state.courses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.code}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Category
-            <select
-              value={params.get("category") || ""}
-              onChange={(e) => set("category", e.target.value)}
-            >
-              <option value="">All categories</option>
-              {NOTE_CATEGORIES.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-          </label>
           <label>
             Tags
             <select
@@ -419,16 +421,19 @@ export function Notes() {
       ) : loading ? (
         <p role="status" className={css.loading}>Gathering your notes…</p>
       ) : notes.length ? (
-        // Card 42: notes sit under their category heading (with a count); a selected
-        // category filter leaves just that one group.
-        groupNotesByCategory(notes).map(({ category, notes: group }) => (
-          <section
-            key={category}
-            className={`${css.categoryGroup} ${css.group}`}
-            aria-labelledby={`category-heading-${category}`}
-          >
-            <h2 id={`category-heading-${category}`} className={css.categoryHeading}>
-              {category} ({group.length})
+        // Notes sit under their course, each course a planner divider with its color tab and count.
+        groupByCourse(notes, state.courses).map(({ course, notes: group }) => {
+          const id = `course-heading-${course?.id ?? "none"}`;
+          return (
+          <section key={course?.id ?? "none"} className={`${css.courseGroup} ${css.group}`} aria-labelledby={id}
+            style={{ "--course-color": course?.color || "var(--hover-line)" } as CSSProperties}>
+            <h2 id={id} className={css.courseHeading}>
+              <i className={css.courseTab} aria-hidden="true" />
+              <span className={css.courseName}>
+                <strong>{course?.code || "No course"}</strong>
+                {course?.name && <span>{course.name}</span>}
+              </span>
+              <span className={css.count}>{countOf(group.length, "note")}</span>
             </h2>
             <div
               className={`${s.noteGrid} ${params.get("view") === "list" ? `${s.noteList} ${css.list}` : css.grid}`}
@@ -437,6 +442,7 @@ export function Notes() {
                 <div key={n.id} className={css.cell} style={{ "--i": Math.min(i, 8) } as CSSProperties}>
                   <NoteCard
                     note={n}
+                    pinSlot={n.ownerId === state.user?.id}
                     onDelete={
                       n.ownerId === state.user?.id
                         ? () => {
@@ -462,10 +468,11 @@ export function Notes() {
               ))}
             </div>
           </section>
-        ))
+          );
+        })
       ) : emptyCategory ? (
         <Empty title={`No ${emptyCategory} notes yet`}>
-          Notes you put in {emptyCategory} will show up here.{" "}
+          Nothing is filed under {emptyCategory} yet. Start one and it will wait for you here.{" "}
           <button className={s.primary} onClick={() => openCreateNote(emptyCategory)}>
             <Plus size={18} /> New note
           </button>
@@ -479,7 +486,7 @@ export function Notes() {
             </>
           ) : (
             <>
-              Your space is empty. Write your first note and it will show up here.{" "}
+              A blank page is a good place to begin. Write your first note and it will be kept with its course.{" "}
               <button className={s.primary} onClick={() => openCreateNote()}>
                 <Plus size={18} /> New note
               </button>
@@ -487,10 +494,18 @@ export function Notes() {
           )}
         </Empty>
       )}
+      </Sheet>
       {!!shared.length && (
-        <section className={`${css.categoryGroup} ${css.group} ${css.sharedSection}`} aria-labelledby="shared-with-me-heading">
-          <h2 id="shared-with-me-heading" className={css.categoryHeading}>Shared with me</h2>
-          <p className={css.sharedHint}>{countOf(shared.length, "note")} friends shared through your courses. You can read them but not change them.</p>
+        <Sheet className={`${css.page} ${css.sharedSheet}`} label="Shared with me">
+        <section className={css.group} aria-labelledby="shared-with-me-heading">
+          <h2 id="shared-with-me-heading" className={css.courseHeading}>
+            <i className={css.courseTab} aria-hidden="true" />
+            <span className={css.courseName}>
+              <strong>Shared with me</strong>
+              <span>Friends shared these through your courses. You can read them but not change them.</span>
+            </span>
+            <span className={css.count}>{countOf(shared.length, "note")}</span>
+          </h2>
           <ul className={css.sharedList}>
             {shared.map((n) => (
               <li key={n.id}>
@@ -502,6 +517,7 @@ export function Notes() {
             ))}
           </ul>
         </section>
+        </Sheet>
       )}
       {noteToDelete && (
         <DeleteNoteDialog

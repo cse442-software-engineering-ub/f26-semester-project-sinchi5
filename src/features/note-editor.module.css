@@ -4,27 +4,34 @@
   flex-direction: column;
   min-height: calc(100dvh - 2 * clamp(20px, 3vw, 48px));
 }
+/* The bar above the sheet: every control is 44 px tall and centered on one line. */
 .editorTop {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 10px;
+  gap: var(--space-2) var(--space-3);
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: var(--space-4);
 }
 .editorTop .muted {
-  font-size: 0.68rem;
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
 }
 .editorTop .noteTitle {
   flex: 1 1 12rem;
   min-width: 0;
   width: auto;
-  font-size: 1.2rem;
-  font-weight: 550;
-  letter-spacing: -0.03em;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+  font-size: var(--fs-title);
+  line-height: var(--lh-title);
+  font-weight: 600;
+  letter-spacing: var(--ls-title);
 }
 .toggle[aria-expanded="true"] {
   background: var(--sage);
-  border-color: var(--primary);
+  border-color: var(--ribbon);
 }
 .sheetHead,
 .scrim {
@@ -42,10 +49,9 @@
 .menu {
   min-width: 200px;
   padding: 6px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  box-shadow: var(--shadow);
+  background: var(--sheet);
+  border-radius: var(--radius-card);
+  box-shadow: inset 0 0 0 1px var(--sheet-edge), var(--shadow);
   z-index: 30;
 }
 .menuItem {
@@ -60,7 +66,7 @@
   user-select: none;
 }
 .menuItem[data-highlighted] {
-  background: var(--nav);
+  background: var(--ground);
   outline: none;
 }
 .menuItem[data-disabled] {
@@ -68,7 +74,7 @@
   cursor: default;
 }
 .menuItem:focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--ribbon);
   outline-offset: -2px;
 }
 .menuDanger {
@@ -89,23 +95,34 @@
   min-height: 0;
   overflow: hidden;
 }
+/* Details: one calm sunken row of fields under the bar. */
 .detailsPad {
-  padding: 0 0 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-4);
+  align-items: flex-end;
+  margin-bottom: var(--space-4);
+  padding: var(--space-4);
+  background: var(--ground);
+  border-radius: var(--radius-card);
+  box-shadow: inset 0 0 0 1px var(--spine);
 }
 .reminderSummary {
-  margin: 0 0 18px;
+  margin: calc(var(--space-2) * -1) 0 var(--space-4);
   color: var(--text);
-  font-size: 0.78rem;
+  font-size: var(--fs-body);
+  font-variant-numeric: tabular-nums;
 }
 .editorLayout {
-  --people-w: 300px;
+  --people-w: 340px;
+  --people-gap: var(--space-3);
   display: grid;
   flex: 1;
   grid-template-columns: minmax(0, 1fr) 0;
   transition: grid-template-columns var(--motion-base) var(--ease-out);
 }
 .editorLayout[data-people="true"] {
-  grid-template-columns: minmax(0, 1fr) calc(var(--people-w) + 24px);
+  grid-template-columns: minmax(0, 1fr) calc(var(--people-w) + var(--people-gap));
 }
 /* contain: size keeps the side panel from making the row taller than the writing area; it scrolls instead. */
 .people {
@@ -119,14 +136,14 @@
   visibility: visible;
   transition: none;
 }
+/* The writing SHEET: one large planner page. The formatting toolbar and the writing area live inside it. */
 .editor {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 24px 35px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  background: var(--sheet);
+  border-radius: var(--radius-sheet);
+  box-shadow: inset 0 0 0 1px var(--sheet-edge), var(--sheet-shadow);
 }
 .noteTitle {
   border: 0;
@@ -136,46 +153,52 @@
 }
 .noteMetadata {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  flex: 4 1 30rem;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: var(--space-3) var(--space-4);
 }
-.noteMetadata label {
-  font-size: 0.65rem;
+.noteMetadata label,
+.tagsLabel {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
   color: var(--muted);
-}
-.noteMetadata input,
-.noteMetadata select {
-  font-size: 0.73rem;
 }
 .tagsLabel {
-  margin-top: 20px;
-  font-size: 0.65rem;
-  color: var(--muted);
+  flex: 1 1 14rem;
+  min-width: 0;
 }
+.noteMetadata input,
+.noteMetadata select,
+.tagsLabel input {
+  font-size: var(--fs-body);
+  min-height: 44px;
+}
+/* People: the facing page. Same sheet material as the writing sheet, shaded toward the spine on its inner edge. */
 .inspector {
   width: var(--people-w);
-  margin-left: 24px;
-  padding: 20px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  margin-left: var(--people-gap);
+  padding: var(--space-5) var(--space-5) var(--space-5) calc(var(--space-5) + 6px);
+  background: linear-gradient(90deg, var(--spine-shade), transparent 18px) no-repeat var(--sheet);
+  border-radius: var(--radius-sheet);
+  box-shadow: inset 0 0 0 1px var(--sheet-edge), var(--sheet-shadow);
   align-self: start;
 }
+
 .inspector > .segment {
   margin-bottom: 26px;
 }
 .inspector h3 {
-  margin-bottom: 15px;
-  font-size: 0.95rem;
+  margin-bottom: var(--space-3);
+  font-size: var(--fs-lead);
 }
 .inspector .muted {
-  font-size: 0.72rem;
-  margin-bottom: 16px;
+  font-size: var(--fs-small);
+  margin-bottom: var(--space-4);
 }
 .collaborators {
-  padding-bottom: 24px;
-  margin-bottom: 24px;
-  border-bottom: 1px solid var(--line);
+  padding-bottom: var(--space-5);
+  margin-bottom: var(--space-5);
+  border-bottom: 1px solid var(--rule);
 }
 .collaboratorList {
   list-style: none;
@@ -188,7 +211,7 @@
   overflow-wrap: anywhere;
 }
 .comment {
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--rule);
   padding: 0 0 18px;
   margin-bottom: 18px;
 }
@@ -212,7 +235,7 @@
   text-align: left;
   width: 100%;
   padding: 14px 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--rule);
 }
 .version strong {
   font-size: 0.7rem;
@@ -232,18 +255,12 @@
 }
 @media (max-width: 1250px) {
   .editorLayout {
-      --people-w: 265px;
-    }
-  .editor {
-      padding: 20px 25px;
+      --people-w: 300px;
     }
 }
 @media (max-width: 767px) {
-  .editor {
-      padding: 22px 18px;
-    }
   .editorTop .noteTitle {
-      font-size: 1.1rem;
+      font-size: var(--fs-lead);
     }
   /* Phones: People is a bottom sheet over the page, not a column. */
   .editorLayout,
@@ -262,8 +279,9 @@
       margin: 0;
       max-height: 75dvh;
       overflow-y: auto;
-      border-radius: 14px 14px 0 0;
-      padding-bottom: calc(20px + env(safe-area-inset-bottom));
+      border-radius: 18px 18px 0 0;
+      padding: var(--space-5);
+      padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom));
       transform: translateY(100%);
       visibility: hidden;
       transition: transform var(--motion-base) var(--ease-drawer), visibility 0s linear var(--motion-base);
@@ -293,17 +311,19 @@
   .noteMetadata {
       grid-template-columns: minmax(0, 1fr);
     }
-  .noteMetadata label {
-      font-size: 0.875rem;
+  .noteMetadata label,
+  .tagsLabel {
+      font-size: var(--fs-body);
     }
   /* Card 164: 16px fields,
 so iPhone Safari doesn't zoom in when one is tapped. */
 .noteMetadata input,
-  .noteMetadata select {
+  .noteMetadata select,
+  .tagsLabel input {
       font-size: 1rem;
     }
   .editorTop {
-      gap: 5px;
+      gap: var(--space-1);
     }
   .editorTop .textLink {
       font-size: 0.66rem;
@@ -325,9 +345,6 @@ so iPhone Safari doesn't zoom in when one is tapped. */
     }
   .editorTop .iconButton {
       min-width: 35px;
-    }
-  .inspector {
-      padding: 20px;
     }
 }
 .editorTop .iconButton {
@@ -353,5 +370,30 @@ so iPhone Safari doesn't zoom in when one is tapped. */
   .people[data-open="true"] .inspector {
     transition-duration: 0s;
     transition-delay: 0s;
+  }
+}
+
+.inspector > .segment {
+  margin-bottom: var(--space-5);
+}
+@media (max-width: 767px) {
+  .inspector {
+    background: linear-gradient(180deg, var(--spine-shade), transparent 18px) no-repeat var(--sheet);
+  }
+}
+
+/* Tablet and laptop widths: the bar is two tidy lines, who and where on the first, the actions on the second with Details and People at the far end. */
+@media (min-width: 768px) and (max-width: 1799px) {
+  .editorTop::before {
+    content: "";
+    order: 3;
+    flex: 0 0 100%;
+    height: 0;
+  }
+  .editorTop > :nth-child(n + 4) {
+    order: 4;
+  }
+  .editorTop > .toggle:nth-last-child(2) {
+    margin-left: auto;
   }
 }

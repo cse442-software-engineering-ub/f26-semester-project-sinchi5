@@ -362,12 +362,15 @@
   margin-bottom: var(--space-3);
   color: var(--muted);
 }
-.pinnedBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--fs-small);
-  font-weight: 600;
+/* Pinned: a small ribbon hanging from the card's top edge, with a notched tail. */
+.pinRibbon {
+  position: absolute;
+  top: 0;
+  right: var(--space-4);
+  width: 16px;
+  height: 26px;
+  background: var(--ribbon);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
 }
 .courseBadge {
   display: inline-flex;
@@ -702,8 +705,13 @@
   padding-right: 84px;
   flex-wrap: wrap;
 }
-.noteItem .cardFooter > span {
+.noteItem .cardFooter > span,
+.noteItem .cardFooter > time {
   white-space: nowrap;
+}
+/* Room for the pin toggle beside Delete. */
+.noteItem .noteCard .cardFooter.withPin {
+  padding-right: 128px;
 }
 .cardAction {
   position: absolute;

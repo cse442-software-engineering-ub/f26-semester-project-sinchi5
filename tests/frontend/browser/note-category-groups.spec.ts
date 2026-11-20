@@ -1,7 +1,7 @@
 import { type Page } from "@playwright/test";
 import { test, expect } from "./support/account-fixture";
 
-// Card 42: notes grouped under category headings, and finding notes by category.
+// Card 42, regrouped by card 254: notes sit under one divider per course (these notes have no course, so one "No course" section), and category stays a filter.
 // Each test starts from a new account (mocked account API) so the counts are exact.
 const password = "Sample meadow password 42!";
 
@@ -32,15 +32,15 @@ async function createNote(page: Page, title: string, category = "School") {
   }
 }
 
-const group = (page: Page, name: string) => page.getByRole("region", { name });
+const group = (page: Page, name: string | RegExp) => page.getByRole("region", { name });
+const noCourse = /^No course/;
 const noteTitles = (page: Page) => page.getByRole("heading", { level: 3 }).allInnerTexts();
 
 async function chooseCategory(page: Page, category: string) {
-  await page.getByRole("button", { name: /^Filters/ }).click();
   await page.getByLabel("Category").selectOption(category);
 }
 
-test("Test 1 - group notes under category headings with counts", async ({ page }) => {
+test("Test 1 - group notes under a course divider with a count", async ({ page }) => {
   await register(page);
   await createNote(page, "Algebra review");
   await createNote(page, "Physics lab");
@@ -48,17 +48,9 @@ test("Test 1 - group notes under category headings with counts", async ({ page }
   await createNote(page, "Project minutes", "Meetings");
   await page.goto("/notes");
 
-  await expect(page.getByRole("heading", { name: "School (2)" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Work (1)" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Meetings (1)" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /^Personal \(/ })).toHaveCount(0);
-
   const headings = await page.getByRole("heading", { level: 2 }).allInnerTexts();
-  expect(headings).toEqual(["School (2)", "Work (1)", "Meetings (1)"]);
-  expect((await group(page, "School (2)").getByRole("heading", { level: 3 }).allInnerTexts()).sort()).toEqual(["Algebra review", "Physics lab"]);
-  expect(await group(page, "Work (1)").getByRole("heading", { level: 3 }).allInnerTexts()).toEqual(["Sprint plan"]);
-  expect(await group(page, "Meetings (1)").getByRole("heading", { level: 3 }).allInnerTexts()).toEqual(["Project minutes"]);
-  expect((await noteTitles(page)).sort()).toEqual(["Algebra review", "Physics lab", "Project minutes", "Sprint plan"]);
+  expect(headings.map((h) => h.replace(/\s+/g, " "))).toEqual(["No course 4 notes"]);
+  expect((await group(page, noCourse).getByRole("heading", { level: 3 }).allInnerTexts()).sort()).toEqual(["Algebra review", "Physics lab", "Project minutes", "Sprint plan"]);
 });
 
 test("Test 2 - find notes with the category filter and search, and keep the filter on reload", async ({ page }) => {
@@ -69,24 +61,18 @@ test("Test 2 - find notes with the category filter and search, and keep the filt
   await page.goto("/notes");
 
   await chooseCategory(page, "Meetings");
-  await expect(page.getByRole("heading", { name: "Meetings (2)" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /^School \(/ })).toHaveCount(0);
   expect((await noteTitles(page)).sort()).toEqual(["Project minutes", "Weekly agenda"]);
 
   await page.getByLabel("Search notes").fill("Project");
-  await expect(page.getByRole("heading", { name: "Meetings (1)" })).toBeVisible();
   expect(await noteTitles(page)).toEqual(["Project minutes"]);
 
   await page.getByLabel("Search notes").fill("");
-  await expect(page.getByRole("heading", { name: "Meetings (2)" })).toBeVisible();
-  expect((await noteTitles(page)).sort()).toEqual(["Project minutes", "Weekly agenda"]);
+  await expect.poll(async () => (await noteTitles(page)).sort()).toEqual(["Project minutes", "Weekly agenda"]);
   await expect(page.getByLabel("Category")).toHaveValue("Meetings");
   expect(new URL(page.url()).searchParams.get("category")).toBe("Meetings");
 
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Meetings (2)" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /^School \(/ })).toHaveCount(0);
-  await page.getByRole("button", { name: /^Filters/ }).click();
+  await expect.poll(async () => (await noteTitles(page)).sort()).toEqual(["Project minutes", "Weekly agenda"]);
   await expect(page.getByLabel("Category")).toHaveValue("Meetings");
 });
 
@@ -106,8 +92,7 @@ test("Test 3 - an empty category names the category and offers New note", async 
   await expect(dialog).toContainText("This note will be saved in Personal.");
   await dialog.getByLabel("Note title").fill("Diary entry");
   await dialog.getByRole("button", { name: "Close" }).click();
-  await expect(page.getByRole("heading", { name: "Personal (1)" })).toBeVisible();
-  expect(await group(page, "Personal (1)").getByRole("heading", { level: 3 }).allInnerTexts()).toEqual(["Diary entry"]);
+  await expect(group(page, noCourse).getByRole("heading", { level: 3 })).toHaveText(["Diary entry"]);
 });
 
 test("a search with no matches inside a category keeps the general message", async ({ page }) => {
@@ -126,15 +111,17 @@ test("a note moved between categories appears exactly once, under its latest cat
   await page.getByLabel("Category").selectOption("Personal");
   await expect(page.getByText("All changes saved", { exact: true })).toBeVisible();
   await page.goto("/notes");
-  await expect(page.getByRole("heading", { name: "Personal (1)" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /^(Meetings|Work) \(/ })).toHaveCount(0);
-  expect(await noteTitles(page)).toEqual(["Moving note"]);
+  await expect.poll(() => noteTitles(page)).toEqual(["Moving note"]);
+  await page.getByLabel("Category").selectOption("Personal");
+  await expect.poll(() => noteTitles(page)).toEqual(["Moving note"]);
+  await page.getByLabel("Category").selectOption("Work");
+  await expect(page.getByRole("heading", { name: "No Work notes yet" })).toBeVisible();
 });
 
 test("a note created normally lands in School", async ({ page }) => {
   await register(page);
   await createNote(page, "Plain note");
   await page.goto("/notes");
-  await expect(page.getByRole("heading", { name: "School (1)" })).toBeVisible();
-  expect(await group(page, "School (1)").getByRole("heading", { level: 3 }).allInnerTexts()).toEqual(["Plain note"]);
+  await page.getByLabel("Category").selectOption("School");
+  await expect.poll(() => noteTitles(page)).toEqual(["Plain note"]);
 });
