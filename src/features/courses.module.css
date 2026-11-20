@@ -1,59 +1,134 @@
-.header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: clamp(20px, 2.5vw, 32px);
-}
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.card strong,
-.card span {
-  overflow-wrap: anywhere;
-}
+/* Courses: each course is a planner divider card (its color as the tab) in a grid that adds columns as the page widens. */
 .grid {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
-  gap: clamp(12px, 1.5vw, 20px);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  gap: var(--space-gutter);
+}
+.grid > li {
+  display: flex;
+  min-width: 0;
 }
 .card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  min-height: 112px;
-  padding: 20px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+  min-height: 11rem;
+  padding: var(--space-6) var(--space-5) var(--space-4);
+  border-radius: var(--radius-sheet);
+  background: var(--sheet);
+  box-shadow: inset 0 0 0 1px var(--sheet-edge), var(--sheet-shadow);
+  transition: transform var(--motion-base) var(--ease-out);
 }
+/* The divider tab in the course's color, sitting on the card's top edge. */
+.tab {
+  position: absolute;
+  top: 0;
+  inset-inline-start: var(--space-5);
+  width: 3.5rem;
+  height: 8px;
+  border-radius: 0 0 6px 6px;
+  background: var(--tab);
+}
+.card strong,
 .card span {
-  color: var(--muted);
-  font-size: 0.85rem;
+  overflow-wrap: anywhere;
 }
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  margin-bottom: 8px;
+.code {
+  font-size: var(--fs-title);
+  line-height: var(--lh-title);
+  letter-spacing: var(--ls-title);
+  font-weight: 650;
+}
+.name {
+  font-size: var(--fs-lead);
+  line-height: var(--lh-lead);
+}
+.meta {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.name + .meta {
+  margin-top: var(--space-2);
+}
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin-top: auto;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--rule);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.spacer {
+  flex: 1;
+  min-height: var(--space-4);
+}
+.card:focus-visible {
+  outline: 2px solid var(--ribbon);
+  outline-offset: 3px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .card:hover {
+    transform: translateY(-2px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+  .card:hover {
+    transform: none;
+  }
 }
 .empty {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 56px 20px;
+  gap: var(--space-3);
+  max-width: 40rem;
+  margin-inline: auto;
   text-align: center;
   color: var(--muted);
-  border: 1px dashed var(--line);
-  border-radius: 12px;
+}
+.empty > svg {
+  color: var(--ribbon);
 }
 .empty h2 {
   color: var(--text);
+}
+.empty p {
+  max-width: var(--measure-read);
+}
+.emptyActions {
+  justify-content: center;
+  margin-top: var(--space-2);
+}
+
+/* On a phone the shared heading shrinks its primary button to an icon and squeezes the title, so both actions
+   drop to their own row under the title with their words. */
+.bar {
+  display: contents;
+}
+@media (max-width: 767px) {
+  div:has(> .bar):has(> .bar) {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-content: flex-start;
+  }
+  .bar > .act.act.act {
+    font-size: var(--fs-body);
+    padding: 0 var(--space-4);
+    gap: var(--space-2);
+  }
 }

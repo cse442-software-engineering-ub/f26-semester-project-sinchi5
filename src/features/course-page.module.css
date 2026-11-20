@@ -1,28 +1,140 @@
-.eventLink {
+/* The course page is a Spread: lectures and notes on the left page, what is coming up and the share actions on the right. */
+.spread {
+  position: relative;
+}
+.spread [data-page]:first-child {
+  position: relative;
   display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 20px 0;
-  border-bottom: 1px solid var(--line);
+  flex-direction: column;
+  gap: var(--space-5);
 }
-.eventLink span,
-.eventLink small {
-  font-size: 0.7rem;
+/* The divider tab in the course's color, on the left page's top edge. */
+.tab {
+  position: absolute;
+  top: 0;
+  inset-inline-start: clamp(var(--space-5), 2.6vw, var(--space-7));
+  width: 4rem;
+  height: 10px;
+  border-radius: 0 0 8px 8px;
+}
+.header {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+}
+.header h1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
   color: var(--muted);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-variant-numeric: tabular-nums;
 }
-.eventLink strong {
-  font-size: 0.8rem;
-  flex: 1;
-}
-@media (max-width: 767px) {
-  .eventLink {
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-  .eventLink > span {
-      width: 100%;
-    }
+.meta strong {
+  color: var(--text);
 }
 .shareStatus {
-  margin: -6px 0 22px;
+  margin: 0;
+}
+.shareStatus:empty {
+  display: none;
+}
+.startRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.lecture {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--rule);
+}
+.lectureHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.lectureHead h2 {
+  font-size: var(--fs-lead);
+  line-height: var(--lh-lead);
+  font-weight: 600;
+}
+.notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+  gap: var(--space-3);
+}
+.coming h2,
+.manage h2 {
+  font-size: var(--fs-lead);
+  line-height: var(--lh-lead);
+  font-weight: 600;
+}
+.coming {
+  display: flex;
+  flex-direction: column;
+}
+.coming h2 {
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--rule);
+}
+.none {
+  padding: var(--space-4) 0;
+}
+.eventLink {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: 2px;
+  min-height: 56px;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--rule);
+  border-radius: var(--radius-control);
+}
+.eventLink strong {
+  grid-column: 1;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  overflow-wrap: anywhere;
+}
+.when,
+.eventLink small {
+  grid-column: 1;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-transform: capitalize;
+}
+.eventLink > [data-tone] {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+}
+.eventLink[data-past] {
+  opacity: 0.7;
+}
+.eventLink:focus-visible {
+  outline: 2px solid var(--ribbon);
+  outline-offset: 2px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .eventLink:hover strong {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+.manage {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
 }

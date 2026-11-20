@@ -4,11 +4,12 @@
   gap: var(--space-3);
   margin-top: var(--space-5);
   padding-top: var(--space-4);
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--rule);
 }
 .sharedWith h3 {
   margin: 0;
-  font-size: var(--fs-body);
+  font-size: var(--fs-lead);
+  line-height: var(--lh-lead);
   font-weight: 600;
 }
 .person {
@@ -16,4 +17,24 @@
   min-width: 0;
 }
 
-.permission { min-height: 44px; max-width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 8px; color: inherit; background: var(--surface); font: inherit; }
+/* A sunken field like the rest of the form: ground fill, spine edge. */
+.permission {
+  min-height: 44px;
+  max-width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--spine);
+  border-radius: var(--radius-control);
+  color: inherit;
+  background: var(--ground);
+  font: inherit;
+}
+.permission:focus-visible {
+  outline: 2px solid var(--ribbon);
+  outline-offset: 2px;
+}
+
+/* Each row: avatar, name and email, then the permission; Stop sharing sits on its own line below. */
+.rows.rows > li {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  border-top-color: var(--rule);
+}

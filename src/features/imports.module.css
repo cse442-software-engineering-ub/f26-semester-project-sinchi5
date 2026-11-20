@@ -1,32 +1,42 @@
 .completionActions {
   justify-content: center;
 }
+/* A calm sunken sheet with a dashed rule edge: drop a file here or click to browse. */
 .dropzone {
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
-  border: 1px dashed var(--dropzone-line);
-  border-radius: 12px;
-  background: var(--surface-soft);
-  padding: 35px 20px;
-  gap: 14px;
+  border: 1.5px dashed var(--dropzone-line);
+  border-radius: var(--radius-sheet);
+  background: var(--ground);
+  padding: var(--space-7) var(--space-5);
+  gap: var(--space-3);
   width: 100%;
   cursor: pointer;
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
   position: relative;
   flex-direction: column;
+  transition: border-color var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .dropzone:hover {
+    border-color: var(--ribbon);
+    background: var(--surface-soft);
+  }
 }
 .dropzone > svg {
   color: var(--glyph-3);
 }
 .dropzone > strong {
-  font-size: 0.85rem;
-  font-weight: 500;
+  font-size: var(--fs-lead);
+  line-height: var(--lh-lead);
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 .dropzone > span {
-  font-size: 0.65rem;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
   color: var(--muted);
 }
 .dropzone input {
@@ -36,7 +46,7 @@
   cursor: pointer;
 }
 .dropzone:focus-within {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--ribbon);
   outline-offset: 3px;
 }
 .spinner {
@@ -51,8 +61,8 @@ and a highlighter swipes across
   gap: 7px;
   width: 52px;
   padding: 12px 10px;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--sheet);
+  border: 1px solid var(--spine);
   border-radius: 6px;
   animation: readingTilt 2.4s cubic-bezier(0.77, 0, 0.175, 1) infinite alternate;
 }
@@ -61,7 +71,7 @@ and a highlighter swipes across
   display: block;
   height: 5px;
   overflow: hidden;
-  background: var(--line);
+  background: var(--rule);
   border-radius: 3px;
 }
 .readingPage i:last-child {
@@ -141,26 +151,27 @@ helper text,
 and tips. */
 .steps {
   display: flex;
-  gap: 6px;
-  margin: 0 0 18px;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-5);
   padding: 0;
   list-style: none;
-  font-size: 0.7rem;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
   color: var(--muted);
 }
 .steps li {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding-top: 8px;
-  border-top: 3px solid var(--line);
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 3px solid var(--rule);
 }
 .steps li[data-done] {
   border-top-color: var(--mint);
 }
 .steps li[aria-current="step"] {
-  border-top-color: var(--primary);
+  border-top-color: var(--ribbon);
   color: var(--text);
   font-weight: 600;
 }
@@ -179,28 +190,57 @@ and tips. */
 .reviewHeading {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  margin: 8px 0 0;
-  font-size: 0.95rem;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--rule);
+  font-size: var(--fs-lead);
+  line-height: var(--lh-lead);
 }
 .reviewSubheading {
-  margin: 4px 0 0;
-  font-size: 0.8rem;
+  margin: var(--space-1) 0 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   font-weight: 600;
 }
+/* One detected class or due date: a row on the ruled list, not a box inside a box. */
+.item {
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  padding: 0 0 var(--space-4);
+}
+.item legend {
+  padding: 0 0 var(--space-2);
+  color: var(--muted);
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+}
+/* The section question (card 235): its own grouped panel, apart from the list above it. */
 .sectionQuestions {
   display: grid;
-  gap: 8px;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--spine);
+  border-radius: var(--radius-card);
+  background: var(--ground);
+}
+.sectionQuestions legend {
+  padding: 0 var(--space-2);
+  font-size: var(--fs-body);
+  font-weight: 650;
 }
 .placedHint {
   margin: 0;
   width: fit-content;
   max-width: 100%;
-  padding: 2px 10px;
-  border-radius: 999px;
-  background: var(--sage);
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--surface-soft);
   color: var(--text);
-  font-size: 0.75rem;
+  font-size: var(--fs-small);
   overflow-wrap: anywhere;
 }
 @keyframes spin {
