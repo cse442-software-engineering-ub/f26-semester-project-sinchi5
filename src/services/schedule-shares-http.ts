@@ -1,4 +1,4 @@
-import type { ScheduleShare } from "../domain";
+import type { ScheduleShare, CollaboratorPermission } from "../domain";
 import { createApiClient } from "./notes-http";
 
 // Card 144: the schedule-sharing routes from card 143. Only the course's owner can list, share, or stop sharing.
@@ -9,8 +9,10 @@ export function createHttpScheduleShares(endpoint = `${import.meta.env.BASE_URL}
   return {
     list: async (courseId: string) =>
       (await send<{ shares?: ScheduleShare[] }>(`schedule-shares&courseId=${encodeURIComponent(courseId)}`)).shares ?? [],
-    share: async (courseId: string, email: string) =>
-      (await send<{ share: ScheduleShare }>("schedule-share", { courseId, email })).share,
+    share: async (courseId: string, email: string, permission: CollaboratorPermission = "view") =>
+      (await send<{ share: ScheduleShare }>("schedule-share", { courseId, email, permission })).share,
+    setPermission: async (courseId: string, userId: string, permission: CollaboratorPermission) =>
+      (await send<{ share: ScheduleShare }>("schedule-permission", { courseId, userId, permission })).share,
     // Resolves to who still has the schedule.
     unshare: async (courseId: string, userId: string) =>
       (await send<{ shares?: ScheduleShare[] }>("schedule-unshare", { courseId, userId })).shares ?? [],

@@ -23,7 +23,7 @@ import {
 import { dateKey } from "../services/fixtures";
 import {
   isClass,
-  ownCourses,
+  editableCourses,
   type CourseEvent,
   type EventKind,
 } from "../domain";
@@ -99,7 +99,7 @@ export function EventDialog({
     event || {
       id: "",
       title: "",
-      courseId: ownCourses(state.courses)[0]?.id || "",
+      courseId: editableCourses(state.courses)[0]?.id || "",
       kind: "lecture",
       date: date || dateKey(),
       time: "10:00",
@@ -166,8 +166,8 @@ export function EventDialog({
     });
   }
 
-  // Card 144: an event in a classmate's shared course is shown, never edited or deleted.
-  if (event?.sharedBy) return <SharedEventDetails event={event} onClose={onClose} />;
+  // Shared schedules require explicit edit access; deletion always stays with the owner.
+  if (event?.sharedBy && event.permission !== "edit") return <SharedEventDetails event={event} onClose={onClose} />;
 
   return (
     <Modal
@@ -246,6 +246,7 @@ export function EventDialog({
           <label>
             Course
             <select
+              disabled={Boolean(event?.sharedBy)}
               value={value.courseId}
               onChange={(e) =>
                 update(
@@ -258,14 +259,14 @@ export function EventDialog({
                 Personal
               </option>
 
-              {/* Card 144: a classmate's shared course is view only, so it isn't a choice. */}
-              {ownCourses(state.courses).map(
+              {/* Include shared courses only when this student has edit access. */}
+              {editableCourses(state.courses).map(
                 (c) => (
                   <option
                     key={c.id}
                     value={c.id}
                   >
-                    {c.code}
+                    {c.code}{c.sharedBy ? ` (${c.sharedBy.name})` : ""}
                   </option>
                 ),
               )}
@@ -480,7 +481,7 @@ export function EventDialog({
           )}
 
         <div className={`${both.actions} ${event ? css.splitActions : ""}`}>
-          {event && (
+          {event && !event.sharedBy && (
             <button
               type="button"
               className={
@@ -508,7 +509,7 @@ export function EventDialog({
         </div>
       </form>
 
-      {event && confirming && (
+      {event && !event.sharedBy && confirming && (
         <DeleteEventDialog
           title={event.title}
           repeats={Boolean(

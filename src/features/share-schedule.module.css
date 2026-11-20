@@ -15,3 +15,5 @@
   display: grid;
   min-width: 0;
 }
+
+.permission { min-height: 44px; max-width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 8px; color: inherit; background: var(--surface); font: inherit; }
