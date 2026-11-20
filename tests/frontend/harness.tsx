@@ -57,12 +57,18 @@ export function unmount() {
 export function mount(ui: ReactElement, { width }: { width?: number } = {}) {
   unmount();
   let el: HTMLElement;
+  const loading: Promise<void>[] = [];
   if (width) {
     const frame = document.createElement("iframe");
     frame.style.cssText = `width:${width}px;height:700px;border:1px solid gray;display:block`;
     document.body.append(frame);
     const doc = frame.contentDocument!;
-    for (const n of document.head.querySelectorAll("link[rel=stylesheet], style")) doc.head.append(n.cloneNode(true));
+    // The screen renders only after the copied stylesheets have loaded, so a layout read never sees an unstyled frame.
+    for (const n of document.head.querySelectorAll("link[rel=stylesheet], style")) {
+      const copy = n.cloneNode(true) as HTMLElement;
+      if (copy instanceof HTMLLinkElement) loading.push(new Promise((r) => { copy.onload = copy.onerror = () => r(); }));
+      doc.head.append(copy);
+    }
     doc.body.style.margin = "0";
     el = doc.createElement("div");
     doc.body.append(el);
@@ -72,8 +78,9 @@ export function mount(ui: ReactElement, { width }: { width?: number } = {}) {
     document.body.append(el);
   }
   const root = createRoot(el);
-  root.render(ui);
   mounted = { root, el };
+  if (loading.length) void Promise.all(loading).then(() => { if (mounted?.root === root) root.render(ui); });
+  else root.render(ui);
   return el;
 }
 
