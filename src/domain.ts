@@ -193,6 +193,7 @@ export interface AuthRepository {
 }
 export interface CourseRepository {
   list(): Promise<Course[]>;
+  remove(id: string): Promise<void>;
   create(course: Omit<Course, "id">): Promise<Course>;
   folders(id: string): Promise<Record<string, Note[]>>;
 }
