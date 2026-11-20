@@ -620,6 +620,7 @@
   margin: 0 0 var(--space-2);
 }
 .modalHeading p {
+  overflow-wrap: anywhere;
   font-size: var(--fs-body);
   line-height: var(--lh-body);
   color: var(--muted);

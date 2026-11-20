@@ -87,16 +87,22 @@ export function Modal({
     </Dialog.Root>
   );
 }
-export function DeleteNoteDialog({
+type DeleteDialogProps = {
+  title: string;
+  onDelete: () => Promise<void>;
+  onClose: () => void;
+};
+
+export function DeleteNoteDialog(props: DeleteDialogProps) {
+  return <DeleteDialog {...props} item="note" />;
+}
+
+export function DeleteDialog({
+  item,
   title,
   onDelete,
   onClose,
-}: {
-  title: string;
-  // Resolves once the note is gone; the caller then unmounts the dialog.
-  onDelete: () => Promise<void>;
-  onClose: () => void;
-}) {
+}: DeleteDialogProps & { item: "course" | "note" }) {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
   const pending = useRef(false);
@@ -111,13 +117,15 @@ export function DeleteNoteDialog({
       // Stay disabled after success until the caller removes the dialog.
       pending.current = false;
       setDeleting(false);
-      setError(`This note could not be deleted. ${(e as Error).message}`);
+      setError(`This ${item} could not be deleted. ${(e as Error).message}`);
     }
   }
   return (
     <Modal
-      title="Delete this note?"
-      description={`“${title}” and its comments and history will be permanently removed. This can’t be undone.`}
+      title={item === "course" ? "Delete course?" : "Delete this note?"}
+      description={item === "course"
+        ? `Delete ${title}? Its events will be deleted, but its notes will be kept.`
+        : `“${title}” and its comments and history will be permanently removed. This can’t be undone.`}
       dismissible={!deleting}
       onClose={onClose}
     >
@@ -126,13 +134,13 @@ export function DeleteNoteDialog({
           {error}
         </p>
       )}
-      {deleting && <p role="status">Deleting note…</p>}
+      {deleting && <p role="status">Deleting {item}…</p>}
       <div className={s.actions}>
         <Dialog.Close className={s.secondary} disabled={deleting}>
           Cancel
         </Dialog.Close>
         <button className={s.danger} disabled={deleting} onClick={confirm}>
-          Delete note
+          Delete {item}
         </button>
       </div>
     </Modal>
