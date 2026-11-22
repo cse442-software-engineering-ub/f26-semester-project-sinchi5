@@ -88,7 +88,9 @@ await test("5. At 375 the People toggle does not open a bottom sheet, Escape doe
   await wait(400);
   const panel = root.querySelector("#note-people")!;
   const rect = panel.getBoundingClientRect();
-  expect([style(root, panel).position, Math.round(rect.bottom) >= win(root).innerHeight - 1, rect.width >= 370, visible(root, panel)]).toEqual(["fixed", true, true, true]);
+  const viewportWidth = root.ownerDocument.documentElement.clientWidth;
+  const spansViewport = Math.abs(rect.left) <= 1 && Math.abs(rect.right - viewportWidth) <= 1;
+  expect([style(root, panel).position, Math.round(rect.bottom) >= win(root).innerHeight - 1, spansViewport, visible(root, panel)]).toEqual(["fixed", true, true, true]);
   (field("Add a comment") as HTMLElement).focus();
   root.ownerDocument.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   await wait(400);
