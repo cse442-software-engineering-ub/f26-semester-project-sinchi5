@@ -133,6 +133,9 @@ await test("10. A week is not a sheet with a ruled list, or its text is unreadab
     const [hi, lo] = [lum(bg), lum(fg)].sort((a, b) => b - a);
     expect((hi + 0.05) / (lo + 0.05) >= 4.5).toBe(true);
     expect(getComputedStyle(sheet).boxShadow !== "none").toBe(true);
-    expect(getComputedStyle(row("Event e2")).borderBottomWidth).toBe("1px");
+    const divider = getComputedStyle(row("Event e2"));
+    // Browsers can snap a 1px CSS border to a fractional width at different display scales.
+    expect(divider.borderBottomStyle).toBe("solid");
+    expect(Number.parseFloat(divider.borderBottomWidth) > 0).toBe(true);
   } finally { delete root.dataset.scheme; delete root.dataset.theme; }
 });
