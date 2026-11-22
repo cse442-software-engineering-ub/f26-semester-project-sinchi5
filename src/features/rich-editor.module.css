@@ -194,7 +194,7 @@
   .toolbarWrap { top: calc(56px + env(safe-area-inset-top)); }
 }
 @media (max-width: 767px) {
-  .tool, .select, .textButton, .swatch { min-height: 44px; }
+  .tool, .select, .textButton { min-height: 48px; }
   .tool { min-width: 44px; }
   .swatch { width: 44px; height: 44px; }
   .select { font-size: 1rem; }
