@@ -1,114 +1,226 @@
-// Card 164: on phones every field uses 16px text, so iPhone Safari doesn't zoom in when one is
-// tapped (it zooms on anything smaller), and the note's Course / Lecture date / Category boxes stay
-// inside the screen. Desktop sizes don't change.
+import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "./support/account-fixture";
-import type { Page } from "@playwright/test";
+import { logOut, openSettings } from "./support/shell";
 
-const NOTE = "Agile development & the Scrum framework";
+const noteTitle = "QA Field Fit";
+const phoneSizes = [{ width: 320, height: 640 }, { width: 390, height: 664 }];
+const fieldNames = ["Course", "Lecture date", "Category"];
+const textFields = 'input:not([type]), input:is([type="text"], [type="email"], [type="password"], [type="search"], [type="tel"], [type="url"], [type="number"], [type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"]), select, textarea';
 
-// Visible text fields whose text is under 16px, as "label: size".
-function smallFields(page: Page) {
-  return page.evaluate(() => [...document.querySelectorAll("input, select, textarea")]
-    .filter((field) => {
-      const type = field.getAttribute("type");
-      const box = field.getBoundingClientRect();
-      return !["checkbox", "radio", "file", "color", "range", "hidden"].includes(type ?? "") &&
-        box.width > 0 && box.height > 0 && getComputedStyle(field).visibility !== "hidden";
-    })
-    .filter((field) => parseFloat(getComputedStyle(field).fontSize) < 16)
-    .map((field) => {
-      const name = field.getAttribute("aria-label") ||
-        (field as HTMLInputElement).labels?.[0]?.firstChild?.textContent?.trim() ||
-        field.getAttribute("placeholder") || field.tagName;
-      return `${name}: ${getComputedStyle(field).fontSize}`;
-    }));
-}
-async function lookAround(page: Page) {
+async function openRegistration(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Take a look around first" }).click();
-  await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening)/ })).toBeVisible();
+  await page.getByRole("button", { name: "Create account", exact: true }).click();
+  await expect(page.getByLabel("Your name")).toBeVisible();
 }
-async function openNote(page: Page) {
+
+async function register(page: Page, email = "field-fit@example.edu") {
+  await page.getByLabel("Your name").fill("Field Fit Tester");
+  await page.getByLabel("Email address").fill(email);
+  await page.getByLabel("Password", { exact: true }).fill("Mock field fit password 42!");
+  await page.getByLabel("Confirm password").fill("Mock field fit password 42!");
+  await page.getByRole("button", { name: "Create account", exact: true }).click();
+  await page.getByLabel("I saved my recovery code").check();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(page.getByRole("heading", { name: /Good .*Field/ })).toBeVisible();
+}
+
+async function openCourseForm(page: Page) {
+  await page.goto("/courses");
+  await page.getByRole("button", { name: "Add course", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Add course" });
+  await expect(dialog.getByLabel("Course code")).toBeVisible();
+  return dialog;
+}
+
+async function saveCourse(dialog: Locator) {
+  await dialog.getByLabel("Course code").fill("CSE 442");
+  await dialog.getByLabel("Term").fill("Fall 2026");
+  await dialog.getByLabel("Course name").fill("Software Engineering");
+  await dialog.getByRole("button", { name: "Add course", exact: true }).click();
+  await expect(dialog).toBeHidden();
+}
+
+async function createNote(page: Page) {
   await page.goto("/notes");
-  await page.getByText(NOTE).first().click();
-  await expect(page.getByLabel("Lecture date", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Create note", exact: true }).click();
+  const title = page.getByLabel("Note title", { exact: true });
+  await expect(title).toBeEditable();
+  await title.fill(noteTitle);
+  await expect(page.getByRole("status").filter({ hasText: /^All changes saved$/ })).toBeVisible();
+  await page.getByRole("link", { name: "All notes" }).click();
+  // Reopen through the list to prove the fixture was saved, without relying on a generated ID.
+  await page.getByRole("link", { name: new RegExp(noteTitle) }).click();
+  await expect(title).toHaveValue(noteTitle);
 }
-// Right edge of the input or drop-down inside each metadata label.
-function metadataBoxes(page: Page) {
-  return page.evaluate(() => ["Course", "Lecture date", "Category"].map((name) => {
-    const label = [...document.querySelectorAll("label")].find((l) => l.firstChild?.textContent?.trim() === name);
-    const box = label!.querySelector("input, select")!.getBoundingClientRect();
-    return { name, left: box.left, right: box.right, top: box.top, size: getComputedStyle(label!.querySelector("input, select")!).fontSize };
-  }));
+
+async function openDetails(page: Page) {
+  const toggle = page.getByRole("button", { name: "Details", exact: true });
+  if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  const panel = page.locator("#note-details");
+  await expect(panel.getByLabel("Lecture date", { exact: true })).toBeVisible();
+  return panel;
+}
+
+async function fieldLayout(field: Locator) {
+  return field.evaluate(element => {
+    const box = element.getBoundingClientRect();
+    const label = (element as HTMLInputElement).labels?.[0]?.textContent?.trim();
+    const name = element.getAttribute("aria-label") || label || element.getAttribute("name") || element.tagName;
+    const viewportWidth = document.documentElement.clientWidth;
+    const clippingAncestors: string[] = [];
+    for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+      if (!["hidden", "clip", "auto", "scroll"].includes(getComputedStyle(parent).overflowX)) continue;
+      const left = parent.getBoundingClientRect().left + parent.clientLeft;
+      if (box.left < left - 1 || box.right > left + parent.clientWidth + 1) {
+        clippingAncestors.push(parent.tagName);
+      }
+    }
+    const form = element.closest("form");
+    return {
+      name, fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
+      left: box.left, right: box.right, top: box.top, bottom: box.bottom,
+      viewportWidth, clippingAncestors,
+      formOverflow: form ? form.scrollWidth - form.clientWidth : 0,
+    };
+  });
+}
+
+async function checkField(field: Locator, minFontSize: number) {
+  await expect(field).toBeVisible();
+  await expect(field).toBeEnabled();
+  // The editor toolbar scrolls independently. Measure each control after revealing it.
+  await field.scrollIntoViewIfNeeded();
+  await field.focus();
+  await expect(field).toBeFocused();
+  const layout = await fieldLayout(field);
+  expect(layout.fontSize, layout.name).toBeGreaterThanOrEqual(minFontSize);
+  expect(layout.left, layout.name).toBeGreaterThanOrEqual(-1);
+  expect(layout.right, layout.name).toBeLessThanOrEqual(layout.viewportWidth + 1);
+  expect(layout.clippingAncestors, layout.name).toEqual([]);
+  expect(layout.formOverflow, layout.name).toBeLessThanOrEqual(0);
+  return layout;
+}
+
+async function checkDocumentWidth(page: Page) {
+  expect(await page.evaluate(() => {
+    const root = document.documentElement;
+    return root.scrollWidth - root.clientWidth;
+  })).toBeLessThanOrEqual(0);
+}
+
+async function checkPhoneFields(page: Page, surface: string, scope: Page | Locator = page) {
+  await test.step(surface, async () => {
+    const fields = await scope.locator(textFields).filter({ visible: true }).all();
+    expect(fields.length, surface).toBeGreaterThan(0);
+    for (const field of fields) await checkField(field, 16);
+    await checkDocumentWidth(page);
+  });
+}
+
+async function checkMetadata(page: Page, minFontSize: number) {
+  const panel = await openDetails(page);
+  const layouts = [];
+  for (const name of fieldNames) {
+    layouts.push(await checkField(panel.getByLabel(name, { exact: true }), minFontSize));
+  }
+  await checkDocumentWidth(page);
+  return { panel, layouts };
 }
 
 test("fields are at least 16px on a phone", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "Phone-only check");
-  await page.goto("/");
-  await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page.getByLabel("Your name")).toBeVisible();
-  expect(await smallFields(page), "Create account").toEqual([]);
+  for (const size of phoneSizes) {
+    await page.setViewportSize(size);
+    await test.step(`${size.width} CSS px`, async () => {
+      await page.goto("/welcome?mode=signin");
+      await expect(page.getByRole("heading", { name: "Good to see you again." })).toBeVisible();
+      await checkPhoneFields(page, "Sign-in");
 
-  await page.goto("/");
-  await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page.getByLabel("Email address")).toBeVisible();
-  expect(await smallFields(page), "sign-in").toEqual([]);
+      await openRegistration(page);
+      await checkPhoneFields(page, "Create account");
+      await register(page, `field-fit-${size.width}@example.edu`);
+      const course = await openCourseForm(page);
+      await checkPhoneFields(page, "Add course", course);
+      expect(await course.evaluate(dialog => dialog.scrollWidth - dialog.clientWidth)).toBeLessThanOrEqual(0);
+      await saveCourse(course);
 
-  await lookAround(page);
-  await page.getByRole("button", { name: "Add course", exact: true }).first().click();
-  const addCourse = page.getByRole("dialog", { name: "Add course" });
-  await expect(addCourse).toBeVisible();
-  expect(await smallFields(page), "Add course").toEqual([]);
-  expect(await addCourse.evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth), "Add course fits").toBe(true);
-  await page.keyboard.press("Escape");
+      await page.goto("/notes");
+      await expect(page.getByLabel("Search notes", { exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "Filters", exact: true }).click();
+      await expect(page.getByRole("group", { name: "Filter notes" })).toBeVisible();
+      await checkPhoneFields(page, "Notes search and filters");
 
-  await page.goto("/notes");
-  await expect(page.getByLabel("Search notes")).toBeVisible();
-  expect(await smallFields(page), "Notes list").toEqual([]);
+      await createNote(page);
+      await expect(page.getByRole("toolbar", { name: "Formatting" })).toBeVisible();
+      await checkPhoneFields(page, "Full note editor");
+      await checkPhoneFields(page, "Note Details", await openDetails(page));
 
-  await page.getByRole("button", { name: "Create Note" }).first().click();
-  await expect(page.getByRole("dialog").getByLabel("Note title")).toBeVisible();
-  expect(await smallFields(page), "Create Note").toEqual([]);
-  await page.keyboard.press("Escape");
+      await page.goto("/schedule?view=month");
+      await page.getByRole("button", { name: "Add event", exact: true }).click();
+      const event = page.getByRole("dialog", { name: "Add event" });
+      // Use the short fixture here. The #245 long-title picker is a separate regression.
+      await expect(event.getByRole("button", { name: new RegExp(noteTitle) })).toBeVisible();
+      await checkPhoneFields(page, "Add event", event);
+      await page.keyboard.press("Escape");
+      await expect(event).toBeHidden();
 
-  await openNote(page);
-  expect(await smallFields(page), "note editor").toEqual([]);
+      await openSettings(page);
+      await page.getByRole("button", { name: "Edit account", exact: true }).click();
+      const account = page.getByRole("dialog", { name: "Edit account" });
+      await expect(account.getByLabel("Current password")).toBeVisible();
+      await checkPhoneFields(page, "Edit account", account);
+      await page.keyboard.press("Escape");
+      await expect(account).toBeHidden();
 
-  await page.goto("/schedule?view=month");
-  await page.getByRole("button", { name: "Add event" }).click();
-  await expect(page.getByRole("dialog").getByLabel("Title")).toBeVisible();
-  expect(await smallFields(page), "Add event").toEqual([]);
-  await page.keyboard.press("Escape");
-
-  await page.goto("/settings");
-  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
-  expect(await smallFields(page), "Settings").toEqual([]);
+      // Each width exercises registration with a fresh mock account.
+      await logOut(page);
+    });
+  }
 });
 
 test("note fields stay on screen on a phone", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "Phone-only check");
-  await lookAround(page);
-  await openNote(page);
-  for (const size of [{ width: 390, height: 664 }, { width: 320, height: 640 }]) {
+  await page.setViewportSize(phoneSizes[0]);
+  await openRegistration(page);
+  await register(page);
+  await saveCourse(await openCourseForm(page));
+  await createNote(page);
+  for (const size of phoneSizes) {
     await page.setViewportSize(size);
-    for (const box of await metadataBoxes(page)) {
-      expect(box.left, `${box.name} at ${size.width}px`).toBeGreaterThanOrEqual(0);
-      expect(box.right, `${box.name} at ${size.width}px`).toBeLessThanOrEqual(size.width);
-    }
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(size.width);
+    await checkMetadata(page, 16);
+    await page.reload();
+    await expect(page.getByLabel("Note title", { exact: true })).toHaveValue(noteTitle);
+    await checkMetadata(page, 16);
   }
 });
 
-test("desktop fields unchanged", async ({ page }, testInfo) => {
+test("desktop Details fields fit on one row", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "Desktop-only check");
   await page.setViewportSize({ width: 1440, height: 900 });
-  await lookAround(page);
-  await openNote(page);
-  const [course, date, category] = await metadataBoxes(page);
-  for (const box of [course, date, category]) expect(box.size, box.name).toBe("11.68px");
-  // Two columns: Course and Lecture date side by side, Category below Course.
-  expect(date.top).toBe(course.top);
-  expect(date.left).toBeGreaterThan(course.right);
-  expect(category.top).toBeGreaterThan(course.top);
-  expect(category.left).toBe(course.left);
+  await openRegistration(page);
+  await register(page);
+  await saveCourse(await openCourseForm(page));
+  await createNote(page);
+  // Proposed #254 baseline, pending confirmation on Scrumboard #164.
+  for (const width of [1440, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    const { panel, layouts } = await checkMetadata(page, 14);
+    const bounds = (await panel.boundingBox())!;
+    const [course, date, category] = layouts;
+    for (const field of layouts) {
+      expect(field.left, field.name).toBeGreaterThanOrEqual(bounds.x - 1);
+      expect(field.right, field.name).toBeLessThanOrEqual(bounds.x + bounds.width + 1);
+      expect(field.top, field.name).toBeGreaterThanOrEqual(bounds.y - 1);
+      expect(field.bottom, field.name).toBeLessThanOrEqual(bounds.y + bounds.height + 1);
+      if (width === 1440) {
+        expect(Math.abs(field.top - course.top), field.name).toBeLessThanOrEqual(1);
+      }
+    }
+    for (const [first, second] of [[course, date], [course, category], [date, category]]) {
+      // The tablet may wrap, but the desktop row must stay in reading order.
+      if (width === 768 && first.bottom <= second.top) continue;
+      expect(first.right, `${first.name} before ${second.name}`).toBeLessThanOrEqual(second.left);
+    }
+  }
 });
