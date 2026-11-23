@@ -282,7 +282,8 @@ export const test = base.extend<{ accountApi: void }>({
         return { deleted: true };
       }
       if (action === "event-save") {
-        if (!/^[A-Za-z0-9_-]{1,64}$/.test(String(body.courseId ?? ""))) throw new ApiError(422, "Choose a course for this event.");
+        // "" is a Personal event, as in the PHP route since PR #201.
+        if (body.courseId !== "" && !/^[A-Za-z0-9_-]{1,64}$/.test(String(body.courseId ?? ""))) throw new ApiError(422, "Choose a course for this event.");
         if (body.id !== undefined && !/^\d+$/.test(String(body.id))) throw new ApiError(422, "Choose a valid event.");
         const share = sharedWithMe(String(body.courseId));
         if (share && share.permission !== "edit") throw new ApiError(403, "You do not have permission to edit this schedule.");

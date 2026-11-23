@@ -3,6 +3,7 @@ import type { CourseEvent } from "../domain";
 import { useApp } from "../app/context";
 import { dateKey } from "../services/fixtures";
 import { semesterList } from "../services/semester";
+import { expandRepeats } from "../services/recurrence";
 import { Chip, PageHeading, Sheet } from "../shared/ui";
 import { EventDialog } from "./schedule";
 import css from "./assignments.module.css";
@@ -45,8 +46,10 @@ export function Assignments() {
   const selectedCourseId =
     courseFilter === "__all__" ? undefined : courseFilter;
 
+  // A repeating event is one record; list each of its dates, as Schedule and Today do (card 149).
+  const occurrences = state.events.flatMap((e) => expandRepeats(e, e.date, e.repeat?.until ?? e.date));
   const { upcoming, past } = semesterList(
-    state.events,
+    occurrences,
     today,
     selectedCourseId,
   );
@@ -65,7 +68,7 @@ export function Assignments() {
 
     return (
       <button
-        key={event.id}
+        key={`${event.id}-${event.date}`}
         type="button"
         className={css.row}
         data-past={isPast || undefined}
@@ -163,7 +166,8 @@ export function Assignments() {
 
       {selectedEvent && (
         <EventDialog
-          event={selectedEvent}
+          event={state.events.find((e) => e.id === (selectedEvent.repeatOf ?? selectedEvent.id)) ?? selectedEvent}
+          occurrence={selectedEvent.date}
           onClose={() => setSelectedEvent(undefined)}
         />
       )}
