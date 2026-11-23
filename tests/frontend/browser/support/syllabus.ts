@@ -44,6 +44,8 @@ export async function signUpWithCourse(page: Page, email = "notely-syllabus-442@
     await page.getByRole("dialog").getByLabel("Classes end").fill(classes.end);
   }
   await page.getByRole("dialog").getByRole("button", { name: "Add course", exact: true }).click();
+  // Wait for the save: navigating away while the window is open drops the course.
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 }
 
 export async function openUpload(page: Page) {

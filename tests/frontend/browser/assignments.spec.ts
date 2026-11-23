@@ -469,12 +469,9 @@ test(
       })
       .click();
 
-    await page
-      .getByRole("link", {
-        name: "Assignments",
-        exact: true,
-      })
-      .click();
+    // On a phone, Assignments sits under "More" in the bottom menu (card 256).
+    await page.getByRole("button", { name: "More" }).click();
+    await page.getByRole("menuitem", { name: "Assignments" }).click();
 
     await expect(
       assignmentRow(page, "Review quiz"),
@@ -493,5 +490,46 @@ test(
     );
 
     expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+  },
+);
+test(
+  "Task test 8 - a weekly repeating assignment is listed on each of its dates",
+  async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "chromium",
+      "Desktop task test",
+    );
+
+    await signUpWithCourse(
+      page,
+      "notely-assignments-repeat-442@example.edu",
+    );
+
+    const start = offsetDate(1);
+    await page.goto(`/schedule?date=${start}&view=month`);
+    await page.getByRole("button", { name: "Add event" }).click();
+    const dialog = page.getByRole("dialog", { name: "Make room for what’s next" });
+    await dialog.getByLabel("Title").fill("Weekly reading");
+    await dialog.getByLabel("Course").selectOption({ label: "CSE 442" });
+    await dialog.getByLabel("Event type").selectOption("assignment");
+    await dialog.getByLabel("Date").fill(start);
+    await dialog.getByLabel("Time").fill("");
+    await dialog.getByLabel("Repeats").selectOption({ label: "Every week" });
+    await dialog.getByLabel("Ends on").fill(offsetDate(15));
+    await dialog.getByRole("button", { name: "Create event" }).click();
+    await expect(dialog).toHaveCount(0);
+
+    await page.getByRole("link", { name: "Assignments", exact: true }).click();
+
+    // Days 1, 8 and 15: one row per date, each in its own week.
+    await expect(assignmentRow(page, "Weekly reading")).toHaveCount(3);
+    for (const days of [1, 8, 15]) {
+      await expect(page.getByRole("heading", { name: weekLabel(offsetDate(days)), exact: true })).toBeVisible();
+    }
+
+    await assignmentRow(page, "Weekly reading").nth(1).click();
+    const details = page.getByRole("dialog", { name: "Event details" });
+    await expect(details.getByText(/^Repeats every week on /)).toBeVisible();
+    await expect(details.getByLabel("Title")).toHaveValue("Weekly reading");
   },
 );
