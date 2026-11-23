@@ -108,6 +108,14 @@ await test("10. Events: the list is wrong when empty, with 1, or with 2", `${EVE
   expect(list.map((e) => e.title)).toEqual(["Study group", "Office hours"]);
   expect(list[1].repeat).toEqual(repeat);
 });
+await test("10b. A Personal event (no course) is refused, or a missing course is accepted", EVENTS + " (the courseId check)", async () => {
+  const r = await api("event-save", { ...event, courseId: "", title: "Work shift", repeat });
+  expect([r.status, r.body.event?.courseId, r.body.event?.title, r.body.event?.repeat]).toEqual([201, "", "Work shift", repeat]);
+  expect((await api("events")).body.events.find((e) => e.id === r.body.event.id)?.courseId).toBe("");
+  const { courseId, ...noCourse } = event;
+  expect(await api("event-save", noCourse)).toEqual(422, { error: "Choose a course for this event." });
+  expect((await api("event-delete", { id: r.body.event.id })).status).toBe(200);
+});
 await test("11. Editing an event adds a copy, or loses the change, or keeps a removed repeat", EVENTS, async () => {
   const id = (await api("events")).body.events[0].id;
   const r = await api("event-save", { ...event, id, title: "Renamed", time: "", repeat });
