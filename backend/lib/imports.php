@@ -387,10 +387,13 @@ function importAction(PDO $db, array $config, array $session, string $route, arr
         ];
     }
     if ($route === 'event-save') {
-        $course = courseId(
-            $input['courseId'] ?? null,
-            'Choose a course for this event.',
-        );
+        // An empty courseId is a Personal event (the event window's "Personal" choice).
+        $course = ($input['courseId'] ?? null) === ''
+            ? ''
+            : courseId(
+                $input['courseId'] ?? null,
+                'Choose a course for this event.',
+            );
 
         [$title, $kind, $date, $time, $location] =
             reviewedEvents([$input])[0];
