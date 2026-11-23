@@ -4,7 +4,6 @@ import { logOut, openSettings } from "./support/shell";
 
 const noteTitle = "QA Field Fit";
 const phoneSizes = [{ width: 320, height: 640 }, { width: 390, height: 664 }];
-const fieldNames = ["Course", "Lecture date", "Category"];
 const textFields = 'input:not([type]), input:is([type="text"], [type="email"], [type="password"], [type="search"], [type="tel"], [type="url"], [type="number"], [type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"]), select, textarea';
 
 async function openRegistration(page: Page) {
@@ -45,8 +44,13 @@ async function createNote(page: Page) {
   await page.getByRole("button", { name: "Create note", exact: true }).click();
   const title = page.getByLabel("Note title", { exact: true });
   await expect(title).toBeEditable();
-  await title.fill(noteTitle);
-  await expect(page.getByRole("status").filter({ hasText: /^All changes saved$/ })).toBeVisible();
+  const [saved] = await Promise.all([
+    page.waitForResponse(response => new URL(response.url()).searchParams.get("route") === "note-save"),
+    title.fill(noteTitle),
+  ]);
+  expect(saved.ok()).toBe(true);
+  expect(await saved.json()).toMatchObject({ note: { title: noteTitle } });
+  await expect(page.getByRole("status").filter({ hasText: "All changes saved" })).toBeVisible();
   await page.getByRole("link", { name: "All notes" }).click();
   // Reopen through the list to prove the fixture was saved, without relying on a generated ID.
   await page.getByRole("link", { name: new RegExp(noteTitle) }).click();
@@ -121,8 +125,12 @@ async function checkPhoneFields(page: Page, surface: string, scope: Page | Locat
 async function checkMetadata(page: Page, minFontSize: number) {
   const panel = await openDetails(page);
   const layouts = [];
-  for (const name of fieldNames) {
-    layouts.push(await checkField(panel.getByLabel(name, { exact: true }), minFontSize));
+  for (const field of [
+    panel.getByRole("combobox", { name: "Course", exact: true }),
+    panel.getByLabel("Lecture date", { exact: true }),
+    panel.getByRole("combobox", { name: "Category", exact: true }),
+  ]) {
+    layouts.push(await checkField(field, minFontSize));
   }
   await checkDocumentWidth(page);
   return { panel, layouts };
@@ -158,7 +166,7 @@ test("fields are at least 16px on a phone", async ({ page }, testInfo) => {
 
       await page.goto("/schedule?view=month");
       await page.getByRole("button", { name: "Add event", exact: true }).click();
-      const event = page.getByRole("dialog", { name: "Add event" });
+      const event = page.getByRole("dialog").filter({ has: page.getByRole("button", { name: "Create event", exact: true }) });
       // Use the short fixture here. The #245 long-title picker is a separate regression.
       await expect(event.getByRole("button", { name: new RegExp(noteTitle) })).toBeVisible();
       await checkPhoneFields(page, "Add event", event);
